@@ -29,6 +29,7 @@ import {
   Link2,
   LoaderCircle,
   MapPin,
+  Navigation,
   Plus,
   Radio,
   RotateCcw,
@@ -40,12 +41,33 @@ import {
   Thermometer,
   Trash2,
   TrendingUp,
+  TriangleAlert,
   Upload,
+  Volume2,
   Wifi,
   WifiOff,
   X,
   Zap,
 } from 'lucide-react'
+
+import AlarmCenterView from './AlarmCenterView.jsx'
+import AlarmOverlay from './AlarmOverlay.jsx'
+import EvacuationView from './EvacuationView.jsx'
+import { positionNodeId } from './building.js'
+import { planRoute } from './evacuation.js'
+import { DEFAULT_THRESHOLDS, createFrame, normalizePacket, riskFromMaxTemp } from './thermal.js'
+import {
+  ALARM_VIBRATION_INTERVAL,
+  isAudioUnlocked,
+  speak,
+  startSiren,
+  stopSpeak,
+  stopSiren,
+  stopVibrate,
+  supportsVibration,
+  unlockAudio,
+  vibrateAlarm,
+} from './alarm.js'
 
 const DEMO_THERMAL = `${import.meta.env.BASE_URL}demo-thermal.jpg`
 const DEMO_LIVE = `${import.meta.env.BASE_URL}demo-live.gif`
@@ -54,9 +76,36 @@ const tabs = [
   { id: 'home', label: '首页检测', icon: ScanLine },
   { id: 'camera', label: '现场监控', icon: Video },
   { id: 'alerts', label: '预警记录', icon: BellRing },
+  { id: 'alarm', label: '报警中心', icon: ShieldAlert },
+  { id: 'evacuation', label: '逃生指引', icon: Navigation },
   { id: 'dashboard', label: '数据看板', icon: BarChart3 },
   { id: 'about', label: '关于项目', icon: Layers3 },
 ]
+
+const DEFAULT_ALARM_SETTINGS = {
+  sound: true,
+  voice: true,
+  vibrate: true,
+  autoTrigger: true,
+  escalateSec: 30,
+  highThreshold: DEFAULT_THRESHOLDS.high,
+  mediumThreshold: DEFAULT_THRESHOLDS.medium,
+}
+
+const SPOT_LABELS = { A: 'A 楼梯口', C: '走廊中段', B: 'B 楼梯口' }
+
+function loadStored(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function nowText() {
+  return new Date().toLocaleString('zh-CN', { hour12: false })
+}
 
 const defaultCameras = [
   { id: 'demo-live', name: '热感监控演示', location: '三楼东侧走廊', type: 'demo', url: DEMO_LIVE, public: true },
@@ -124,69 +173,6 @@ function riskColor(risk) {
   return risk === 'high' ? '#ef4444' : risk === 'medium' ? '#f59e0b' : '#22c55e'
 }
 
-function createFrame(phase = 0) {
-  const width = 32
-  const height = 24
-  const temperatures = []
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const nx = x / (width - 1)
-      const ny = y / (height - 1)
-      const drift = Math.sin(phase * 0.055) * 4
-      const second = Math.cos(phase * 0.031) * 3
-      const base = 27.5 + 3.5 * (1 - ny) + 0.9 * Math.sin(nx * 8)
-      const hotA = (60 + drift) * Math.exp(-((nx - 0.35) ** 2 + (ny - 0.34) ** 2) / 0.019)
-      const hotB = (39 + second) * Math.exp(-((nx - 0.72) ** 2 + (ny - 0.28) ** 2) / 0.027)
-      const hotC = (21 + drift * 0.4) * Math.exp(-((nx - 0.79) ** 2 + (ny - 0.70) ** 2) / 0.031)
-      temperatures.push(base + hotA + hotB + hotC)
-    }
-  }
-  const maxTemp = Math.max(...temperatures)
-  const minTemp = Math.min(...temperatures)
-  const averageTemp = temperatures.reduce((sum, value) => sum + value, 0) / temperatures.length
-  return {
-    width,
-    height,
-    temperatures,
-    minTemp,
-    maxTemp,
-    averageTemp,
-    risk: maxTemp >= 65 ? 'high' : maxTemp >= 45 ? 'medium' : 'low',
-    hotspots: [
-      { x: 28, y: 24, w: 18, h: 22, temp: maxTemp },
-      { x: 64, y: 18, w: 15, h: 20, temp: maxTemp - 12.4 },
-      { x: 73, y: 60, w: 14, h: 19, temp: maxTemp - 21.2 },
-    ],
-    source: '内置模拟热像仪',
-  }
-}
-
-function normalizePacket(packet) {
-  const width = Number(packet.width || 32)
-  const height = Number(packet.height || 24)
-  let temperatures = Array.isArray(packet.temperatures) ? packet.temperatures.map(Number) : []
-  if (temperatures.length !== width * height) temperatures = createFrame().temperatures
-  const maxTemp = Number(packet.max_temp ?? packet.maxTemp ?? Math.max(...temperatures))
-  const minTemp = Number(packet.min_temp ?? packet.minTemp ?? Math.min(...temperatures))
-  return {
-    width,
-    height,
-    temperatures,
-    maxTemp,
-    minTemp,
-    averageTemp: temperatures.reduce((sum, value) => sum + value, 0) / temperatures.length,
-    hotspots: (packet.hotspots || []).map((spot) => ({
-      x: Number(spot.x || 0) * 100,
-      y: Number(spot.y || 0) * 100,
-      w: Number(spot.width || 0.15) * 100,
-      h: Number(spot.height || 0.18) * 100,
-      temp: Number(spot.temp ?? maxTemp),
-    })),
-    risk: maxTemp >= 65 ? 'high' : maxTemp >= 45 ? 'medium' : 'low',
-    source: packet.source || 'ESP32 设备',
-  }
-}
-
 function ConnectionBadge({ state }) {
   const text = state === 'connected' ? '设备在线' : state === 'connecting' ? '连接中' : state === 'failed' ? '连接失败' : '模拟运行'
   return <span className={`connection-badge state-${state}`}><i />{text}</span>
@@ -198,13 +184,13 @@ function RiskBadge({ risk, compact = false }) {
 
 function DeviceSheet({ devices, activeDevice, connection, error, onClose, onConnect, onDisconnect, onSave, onDelete }) {
   const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState({ name: '', location: '', url: '' })
+  const [form, setForm] = useState({ name: '', location: '', url: '', floor: 4 })
   const editingDevice = editing && typeof editing === 'object' ? editing : null
   const valid = form.name.trim() && /^wss?:\/\//i.test(form.url.trim())
 
   const openForm = (device) => {
     setEditing(device || 'new')
-    setForm(device ? { name: device.name, location: device.location, url: device.url } : { name: '', location: '', url: '' })
+    setForm(device ? { name: device.name, location: device.location, url: device.url, floor: device.floor || 4 } : { name: '', location: '', url: '', floor: 4 })
   }
 
   if (editing) {
@@ -218,9 +204,15 @@ function DeviceSheet({ devices, activeDevice, connection, error, onClose, onConn
           </div>
           <label>设备名称<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="例如：实验楼 ESP32" /></label>
           <label>设备位置<input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="例如：三楼东侧走廊" /></label>
+          <label>
+            安装楼层
+            <select value={form.floor} onChange={(e) => setForm({ ...form, floor: Number(e.target.value) })}>
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((value) => <option key={value} value={value}>{value} 楼</option>)}
+            </select>
+          </label>
           <label>WebSocket 地址<input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="wss://设备地址:81/" inputMode="url" autoCapitalize="none" /></label>
           <div className="sheet-tip"><Info size={14} />手机网页使用 HTTPS 时通常只能连接 wss:// 地址；普通 ws:// 可在 Mac App 中使用。</div>
-          <button className="sheet-save" type="button" disabled={!valid} onClick={() => { onSave(editingDevice?.id, { name: form.name.trim(), location: form.location.trim(), url: form.url.trim() }); setEditing(null) }}><Save size={16} />保存设备</button>
+          <button className="sheet-save" type="button" disabled={!valid} onClick={() => { onSave(editingDevice?.id, { name: form.name.trim(), location: form.location.trim(), url: form.url.trim(), floor: form.floor }); setEditing(null) }}><Save size={16} />保存设备</button>
         </section>
       </div>
     )
@@ -543,7 +535,7 @@ export default function MobileApp() {
   const [progress, setProgress] = useState(0)
   const [detected, setDetected] = useState(false)
   const [result, setResult] = useState(createFrame())
-  const [alerts, setAlerts] = useState(sampleAlerts)
+  const [alerts, setAlerts] = useState(() => loadStored('thermalGuardAlerts', sampleAlerts))
   const [devices, setDevices] = useState(() => {
     try { const saved = JSON.parse(localStorage.getItem('thermalGuardDevices') || 'null'); return Array.isArray(saved) && saved.length ? saved : initialDevices } catch { return initialDevices }
   })
@@ -554,14 +546,54 @@ export default function MobileApp() {
   const [selectedCameraId, setSelectedCameraId] = useState(() => initialCameraState()[0].id)
   const [cameraSheet, setCameraSheet] = useState(null)
   const [toast, setToast] = useState('')
+  const [settings, setSettings] = useState(() => ({ ...DEFAULT_ALARM_SETTINGS, ...loadStored('thermalGuardAlarmSettings', {}) }))
+  const [alarm, setAlarm] = useState(null)
+  const [overlayOpen, setOverlayOpen] = useState(false)
+  const [fire, setFire] = useState(null)
+  const [position, setPosition] = useState({ floor: 4, spot: 'C' })
+  const [blockedNodes, setBlockedNodes] = useState([])
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  const [audioReady, setAudioReady] = useState(() => isAudioUnlocked())
+  const [notice, setNotice] = useState(null)
   const timerRef = useRef(null)
   const socketRef = useRef(null)
   const inputCameraRef = useRef(null)
   const inputGalleryRef = useRef(null)
+  const armedRef = useRef(true)
 
   useEffect(() => {
     localStorage.setItem('thermalGuardDevices', JSON.stringify(devices))
   }, [devices])
+
+  useEffect(() => {
+    localStorage.setItem('thermalGuardAlerts', JSON.stringify(alerts.slice(0, 60)))
+  }, [alerts])
+
+  useEffect(() => {
+    localStorage.setItem('thermalGuardAlarmSettings', JSON.stringify(settings))
+  }, [settings])
+
+  // 报警或火情进行时开启 1 秒心跳，用于计时与路线重算
+  useEffect(() => {
+    if (!alarm && !fire) return undefined
+    setNowMs(Date.now())
+    const timer = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [alarm, fire])
+
+  // 首次用户交互时解锁音频（浏览器自动播放策略）
+  useEffect(() => {
+    const unlock = async () => {
+      const ok = await unlockAudio()
+      if (ok) setAudioReady(true)
+    }
+    window.addEventListener('pointerdown', unlock)
+    window.addEventListener('keydown', unlock)
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
 
   useEffect(() => {
     localStorage.setItem('thermalGuardCameras', JSON.stringify(cameras))
@@ -590,6 +622,7 @@ export default function MobileApp() {
 
   const handleImage = (file) => {
     if (!file) return
+    armedRef.current = true
     const reader = new FileReader()
     reader.onload = (event) => {
       setImage(event.target.result)
@@ -602,6 +635,7 @@ export default function MobileApp() {
 
   const resetDetection = () => {
     clearInterval(timerRef.current)
+    armedRef.current = true
     setImage('')
     setFileName('')
     setDetected(false)
@@ -612,6 +646,7 @@ export default function MobileApp() {
   const runDetection = () => {
     if (!image || detecting) return
     clearInterval(timerRef.current)
+    armedRef.current = true
     setDetected(false)
     setDetecting(true)
     setProgress(3)
@@ -622,12 +657,14 @@ export default function MobileApp() {
         value = 100
         clearInterval(timerRef.current)
         window.setTimeout(() => {
-          const nextResult = createFrame(phase)
+          // 检测场景按火情工况生成，保证演示结果与后续报警、逃生长流程一致
+          const nextResult = createFrame(phase, 'fire')
           setResult(nextResult)
           setFrame(nextResult)
           setDetected(true)
           setDetecting(false)
-          setAlerts((current) => [{ id: `local-${Date.now()}`, time: new Date().toLocaleString('zh-CN', { hour12: false }), risk: nextResult.risk, zone: '手机端实时检测', temp: nextResult.maxTemp, hotspots: nextResult.hotspots.length }, ...current].slice(0, 30))
+          const effectiveRisk = riskFromMaxTemp(nextResult.maxTemp, { high: settings.highThreshold, medium: settings.mediumThreshold })
+          setAlerts((current) => [{ id: `local-${Date.now()}`, time: nowText(), risk: effectiveRisk, zone: activeDevice?.location || '手机端实时检测', temp: nextResult.maxTemp, hotspots: nextResult.hotspots.length, kind: 'detection', handled: false }, ...current].slice(0, 60))
         }, 260)
       }
       setProgress(Math.min(value, 99))
@@ -669,6 +706,212 @@ export default function MobileApp() {
     else setDevices((current) => [...current, { id: globalThis.crypto?.randomUUID?.() || `${Date.now()}`, ...values }])
   }
 
+  /* ---------------- 报警系统 ---------------- */
+
+  // 检测结果的最终风险等级按用户配置的阈值换算，保证设置真正生效
+  const resultRisk = useMemo(
+    () => riskFromMaxTemp(result.maxTemp, { high: settings.highThreshold, medium: settings.mediumThreshold }),
+    [result.maxTemp, settings.highThreshold, settings.mediumThreshold],
+  )
+  const riskAdjustedResult = useMemo(() => ({ ...result, risk: resultRisk }), [result, resultRisk])
+
+  const elapsedSec = fire ? Math.max(0, (nowMs - fire.startedAt) / 1000) : 0
+  const route = useMemo(
+    () => planRoute({ startId: positionNodeId(position.floor, position.spot), fire, elapsedSec, blocked: blockedNodes }),
+    [position.floor, position.spot, fire, elapsedSec, blockedNodes],
+  )
+
+  const alarmActive = Boolean(alarm && !alarm.acknowledged)
+  const alarmId = alarm?.id
+  const alarmEscalated = Boolean(alarm?.escalated)
+  const alarmMode = fire?.mode || alarm?.mode || 'live'
+
+  const pushAlarm = (payload) => {
+    const id = `alarm-${payload.startedAt}-${Math.random().toString(36).slice(2, 6)}`
+    setAlarm({ id, acknowledged: false, escalated: false, risk: 'high', sourceLabel: '热成像 AI 检测', mode: 'live', ...payload })
+    setOverlayOpen(true)
+    setNowMs(Date.now())
+    setActiveTab('evacuation')
+    setAlerts((current) => [{
+      id,
+      kind: 'alarm',
+      mode: payload.mode || 'live',
+      risk: 'high',
+      temp: payload.temp,
+      time: nowText(),
+      zone: payload.location || '手机端实时检测',
+      hotspots: payload.hotspots ?? 0,
+      handled: false,
+      acknowledged: false,
+    }, ...current].slice(0, 60))
+  }
+
+  // 检测判定为高风险时自动触发报警；中风险只出提示，不打断现场
+  useEffect(() => {
+    if (!settings.autoTrigger || !detected) return
+    if (resultRisk === 'low') {
+      armedRef.current = true
+      return
+    }
+    if (resultRisk === 'medium') {
+      if (armedRef.current) setNotice({ id: Date.now(), text: `检测到中风险温升 ${result.maxTemp.toFixed(1)}°C，建议现场核查`, tone: 'warn' })
+      return
+    }
+    if (resultRisk === 'high' && armedRef.current) {
+      armedRef.current = false
+      const floor = activeDevice?.floor || position.floor
+      const startedAt = Date.now()
+      setFire({ nodeId: `C${floor}`, floor, startedAt, mode: 'live' })
+      pushAlarm({
+        mode: 'live',
+        startedAt,
+        temp: result.maxTemp,
+        hotspots: result.hotspots.length,
+        location: `${activeDevice?.location || '手机端实时检测'} · ${floor} 楼`,
+      })
+    }
+  }, [detected, resultRisk, result.maxTemp])
+
+  // 警笛
+  useEffect(() => {
+    if (!alarmActive || !settings.sound || !audioReady) {
+      stopSiren()
+      return undefined
+    }
+    startSiren(alarmEscalated ? 'escalated' : alarmMode === 'drill' ? 'drill' : 'normal')
+    return () => stopSiren()
+  }, [alarmId, alarmActive, alarmEscalated, alarmMode, settings.sound, audioReady])
+
+  // 震动（iOS Safari 不支持）
+  useEffect(() => {
+    if (!alarmActive || !settings.vibrate || !supportsVibration()) return undefined
+    vibrateAlarm()
+    const timer = setInterval(vibrateAlarm, ALARM_VIBRATION_INTERVAL)
+    return () => {
+      clearInterval(timer)
+      stopVibrate()
+    }
+  }, [alarmId, alarmActive, settings.vibrate])
+
+  // 语音播报
+  useEffect(() => {
+    if (!alarmActive || !settings.voice) {
+      stopSpeak()
+      return undefined
+    }
+    const text = alarmMode === 'drill' ? '这是一次火警演练，请沿逃生路线离开' : '检测到火警，请立即沿逃生路线撤离，不要搭乘电梯'
+    speak(text)
+    const timer = setInterval(() => speak(text), alarmEscalated ? 5000 : 9000)
+    return () => {
+      clearInterval(timer)
+      stopSpeak()
+    }
+  }, [alarmId, alarmActive, alarmEscalated, alarmMode, settings.voice])
+
+  // 未确认升级
+  useEffect(() => {
+    if (!alarm || alarm.acknowledged || !settings.escalateSec) return undefined
+    const delay = Math.max(0, alarm.startedAt + settings.escalateSec * 1000 - Date.now())
+    const timer = setTimeout(() => {
+      setAlarm((current) => (current && !current.acknowledged ? { ...current, escalated: true } : current))
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [alarmId, alarm?.acknowledged, alarm?.startedAt, settings.escalateSec])
+
+  // 标签页闪烁提醒
+  useEffect(() => {
+    if (!alarmActive) return undefined
+    const original = document.title
+    let flip = false
+    const timer = setInterval(() => {
+      flip = !flip
+      document.title = flip ? '🚨 火警警报' : '请立即撤离'
+    }, 900)
+    return () => {
+      clearInterval(timer)
+      document.title = original
+    }
+  }, [alarmId, alarmActive])
+
+  useEffect(() => {
+    if (!notice || notice.tone !== 'warn') return undefined
+    const timer = setTimeout(() => setNotice(null), 9000)
+    return () => clearTimeout(timer)
+  }, [notice])
+
+  const enableSound = async () => {
+    const ok = await unlockAudio()
+    setAudioReady(ok)
+  }
+
+  const acknowledgeAlarm = () => {
+    if (!alarm) return
+    stopSiren()
+    stopSpeak()
+    stopVibrate()
+    setAlarm({ ...alarm, acknowledged: true, acknowledgedAt: Date.now() })
+    setAlerts((current) => current.map((item) => (item.id === alarm.id ? { ...item, acknowledged: true } : item)))
+  }
+
+  const reenforceAlarm = () => {
+    stopSiren()
+    stopSpeak()
+    setAlarm((current) => (current ? { ...current, acknowledged: false, escalated: false, startedAt: Date.now() } : current))
+    setNowMs(Date.now())
+  }
+
+  const resolveAlarm = () => {
+    stopSiren()
+    stopSpeak()
+    stopVibrate()
+    setAlarm(null)
+    setOverlayOpen(false)
+    setFire(null)
+    if (resultRisk === 'low') {
+      armedRef.current = true
+    } else {
+      setNotice({ id: Date.now(), text: `已解除警报，但检测结果仍为${riskTitle(resultRisk)}，请确认现场安全后再重新布防`, tone: 'info' })
+    }
+  }
+
+  const startDrill = (floor, spot) => {
+    const startedAt = Date.now()
+    armedRef.current = false
+    setPosition((current) => (current.floor === floor ? current : { ...current, floor }))
+    setFire({ nodeId: `${spot}${floor}`, floor, startedAt, mode: 'drill' })
+    pushAlarm({
+      mode: 'drill',
+      startedAt,
+      temp: result.maxTemp,
+      hotspots: result.hotspots.length,
+      location: `演练：${floor} 楼${SPOT_LABELS[spot] || '走廊中段'}`,
+      sourceLabel: '火警演练',
+    })
+  }
+
+  const stopDrill = () => {
+    stopSiren()
+    stopSpeak()
+    stopVibrate()
+    setAlarm(null)
+    setOverlayOpen(false)
+    setFire(null)
+  }
+
+  // 保证中风险阈值始终低于高温报警阈值
+  const updateSettings = (patch) => setSettings((current) => {
+    const next = { ...current, ...patch }
+    if (next.mediumThreshold >= next.highThreshold) {
+      if ('highThreshold' in patch) next.mediumThreshold = Math.max(35, next.highThreshold - 5)
+      else next.highThreshold = Math.min(90, next.mediumThreshold + 5)
+    }
+    return next
+  })
+
+  const toggleBlockedNode = (id) => {
+    setBlockedNodes((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+  }
+
   const selectedCamera = cameras.find((camera) => camera.id === selectedCameraId) || cameras[0]
 
   const saveCamera = (values) => {
@@ -703,17 +946,75 @@ export default function MobileApp() {
   const page = useMemo(() => {
     if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
     if (activeTab === 'alerts') return <AlertsPage alerts={alerts} />
+    if (activeTab === 'alarm') {
+      return (
+        <AlarmCenterView
+          alarm={alarm}
+          fire={fire}
+          alerts={alerts}
+          settings={settings}
+          audioReady={audioReady}
+          onSettingsChange={updateSettings}
+          onManualAlarm={() => pushAlarm({ mode: 'manual', startedAt: Date.now(), temp: result.maxTemp, hotspots: result.hotspots.length, location: '手动触发（自检）', sourceLabel: '手动报警' })}
+          onStartDrill={startDrill}
+          onStopDrill={stopDrill}
+          onClearFire={() => setFire(null)}
+          onEnableSound={enableSound}
+          onMarkHandled={(id) => setAlerts((current) => current.map((item) => (item.id === id ? { ...item, handled: true } : item)))}
+          onClearAlerts={() => setAlerts([])}
+        />
+      )
+    }
+    if (activeTab === 'evacuation') {
+      return (
+        <EvacuationView
+          route={route}
+          fire={fire}
+          position={position}
+          blocked={blockedNodes}
+          nowMs={nowMs}
+          onPositionChange={setPosition}
+          onToggleBlock={toggleBlockedNode}
+          onStartDrillAt={(nodeId, floor) => startDrill(floor, nodeId[0])}
+          onClearFire={() => setFire(null)}
+        />
+      )
+    }
     if (activeTab === 'dashboard') return <DashboardPage />
     if (activeTab === 'about') return <AboutPage />
-    return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
-  }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, result, phase])
+    return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={riskAdjustedResult} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
+  }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, riskAdjustedResult, phase, alarm, fire, settings, audioReady, route, position, blockedNodes, nowMs])
 
   return (
-    <div className="mobile-app-shell">
+    <div className={`mobile-app-shell ${alarm ? 'has-alarm' : ''}`}>
       <header className="mobile-topbar">
         <div className="mobile-brand"><span><Flame size={19} /></span><div><strong>热感哨兵</strong><small>AI火警网警</small></div></div>
         <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
       </header>
+
+      {alarm && !overlayOpen && (
+        <button className={`alarm-banner ${alarm.acknowledged ? 'is-muted' : ''}`} type="button" onClick={() => setOverlayOpen(true)}>
+          <ShieldAlert size={16} />
+          <span>{alarm.acknowledged ? '报警已静音，危险未解除' : '火警报警进行中'}</span>
+          <strong>返回警报</strong>
+        </button>
+      )}
+
+      {notice && !alarm && (
+        <div className={`warn-banner tone-${notice.tone || 'warn'}`}>
+          <TriangleAlert size={15} />
+          <span>{notice.text}</span>
+          <button type="button" aria-label="关闭提示" onClick={() => setNotice(null)}><X size={14} /></button>
+        </div>
+      )}
+
+      {settings.sound && !audioReady && !alarm && (
+        <button className="warn-banner is-action" type="button" onClick={enableSound}>
+          <Volume2 size={15} />
+          <span>点击启用报警声音，否则火警时只有画面提示</span>
+        </button>
+      )}
+
       <main className="mobile-main">{page}</main>
       <nav className="mobile-tabs">
         {tabs.map(({ id, label, icon: Icon }) => <button type="button" className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}><Icon size={20} /><span>{label}</span></button>)}
@@ -721,6 +1022,23 @@ export default function MobileApp() {
       {showDevices && <DeviceSheet devices={devices} activeDevice={activeDevice} connection={connection} error={error} onClose={() => setShowDevices(false)} onConnect={connectDevice} onDisconnect={disconnect} onSave={saveDevice} onDelete={(id) => setDevices((current) => current.filter((device) => device.id !== id))} />}
       {cameraSheet && <CameraSheet editing={cameraSheet.camera} onClose={() => setCameraSheet(null)} onSave={saveCamera} />}
       {toast && <div className="toast-message">{toast}</div>}
+      {alarm && overlayOpen && (
+        <AlarmOverlay
+          alarm={alarm}
+          nowMs={nowMs}
+          soundOn={settings.sound}
+          audioReady={audioReady}
+          onEvacuate={() => {
+            setOverlayOpen(false)
+            setActiveTab('evacuation')
+          }}
+          onAcknowledge={acknowledgeAlarm}
+          onReenforce={reenforceAlarm}
+          onResolve={resolveAlarm}
+          onStopDrill={stopDrill}
+          onEnableSound={enableSound}
+        />
+      )}
     </div>
   )
 }
