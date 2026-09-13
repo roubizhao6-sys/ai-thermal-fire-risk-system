@@ -3,7 +3,7 @@
   "short_name": "热感哨兵",
   "description": "基于热成像与计算机视觉的早期火灾预警科研演示原型",
   "lang": "zh-CN",
-  "start_url": "./",
+  "start_url": "./mobile-app.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
