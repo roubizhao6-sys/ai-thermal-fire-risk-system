@@ -18,6 +18,8 @@ targets:
     sources:
       - path: Sources/Core
       - path: Sources/User
+    resources:
+      - path: Resources
     info:
       path: Info/User.plist
       properties:
@@ -37,12 +39,15 @@ targets:
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   ThermalGuardSystem:
     type: application
     platform: iOS
     sources:
       - path: Sources/Core
       - path: Sources/System
+    resources:
+      - path: Resources
     info:
       path: Info/System.plist
       properties:
@@ -62,3 +67,14 @@ targets:
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  ThermalGuardCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Sources/Core
+      - path: Tests/CoreTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thermalguard.coretests
+        GENERATE_INFOPLIST_FILE: YES

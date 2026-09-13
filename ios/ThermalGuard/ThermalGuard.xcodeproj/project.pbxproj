@@ -14,21 +14,27 @@
 		3877D48278D00EEEE477CD43 /* DetectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55E75D4F1746C64C00C6E3C4 /* DetectView.swift */; };
 		427C3FF7E61FFAF3EA67A5A7 /* ThermalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C66F7B38E8A139DC3C7409 /* ThermalFrame.swift */; };
 		492F7979246020317DED2566 /* CityHeatMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 743B34A89BF4C73F1267773F /* CityHeatMapView.swift */; };
+		5143840153DE854626C06A82 /* EvacuationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AA78A284C9DC414120B3D80 /* EvacuationTests.swift */; };
 		522A34DFDF39266B666E06D5 /* ThermalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C66F7B38E8A139DC3C7409 /* ThermalFrame.swift */; };
 		57D19993B788635B1D9B057F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2D45681E5B91BBBFA8D2874 /* Theme.swift */; };
 		60B59CB7191B936F7C281B82 /* SystemStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2AA0B3FF7DDD6C5C6F48343 /* SystemStore.swift */; };
 		67556A5CB4178CAF5F459988 /* ThermalGuardSystemApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 353081AC799CCC105741D19F /* ThermalGuardSystemApp.swift */; };
+		7CDA95CFD78ABD0EAAD85CFE /* ThermalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C66F7B38E8A139DC3C7409 /* ThermalFrame.swift */; };
 		7FD4A9A59D548121486A9867 /* Evacuation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C8804B7FFA92E47F4A1BBB /* Evacuation.swift */; };
 		900F7C69EE4DC25179831B11 /* HeadingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C54606B939E404C89020F3B /* HeadingProvider.swift */; };
+		9D40973362D2CE8766122406 /* Building.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B86C6349765605ABA34BF0 /* Building.swift */; };
 		A5B376BF422368D1CBA4E609 /* UserHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3506C7587B7C342C61370F1F /* UserHomeView.swift */; };
+		AB423E06325A3E059ED7D775 /* Evacuation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C8804B7FFA92E47F4A1BBB /* Evacuation.swift */; };
 		D4B13C4009AB4B10337DD10A /* Building.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B86C6349765605ABA34BF0 /* Building.swift */; };
 		D81249BD5BAB70E2FABD2A3A /* ThermalGuardUserApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33FF9E989DCBACBBE2BFAF99 /* ThermalGuardUserApp.swift */; };
+		E3F1097FF2D784DA8A3589CA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2D45681E5B91BBBFA8D2874 /* Theme.swift */; };
 		F5467D2FB047299046F10D0A /* Evacuation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C8804B7FFA92E47F4A1BBB /* Evacuation.swift */; };
 		FCF14EDCA55CC3DD3BCE2568 /* CompassDialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64D60C24BFAAC118A124B8EB /* CompassDialView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0C54606B939E404C89020F3B /* HeadingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadingProvider.swift; sourceTree = "<group>"; };
+		0EF2269B07A76D6D75563A82 /* ThermalGuardCoreTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ThermalGuardCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		17379FB7997C3C42CC3CD2FF /* ThermalGuardUser.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ThermalGuardUser.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		28B86C6349765605ABA34BF0 /* Building.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Building.swift; sourceTree = "<group>"; };
 		31C66F7B38E8A139DC3C7409 /* ThermalFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalFrame.swift; sourceTree = "<group>"; };
@@ -41,6 +47,7 @@
 		708EAA998414ED763ADF1ABC /* SystemRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemRootView.swift; sourceTree = "<group>"; };
 		743B34A89BF4C73F1267773F /* CityHeatMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityHeatMapView.swift; sourceTree = "<group>"; };
 		88C8804B7FFA92E47F4A1BBB /* Evacuation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Evacuation.swift; sourceTree = "<group>"; };
+		8AA78A284C9DC414120B3D80 /* EvacuationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvacuationTests.swift; sourceTree = "<group>"; };
 		A41E5ED4105733516D1DD3D2 /* UserStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserStore.swift; sourceTree = "<group>"; };
 		C2AA0B3FF7DDD6C5C6F48343 /* SystemStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStore.swift; sourceTree = "<group>"; };
 		F2D45681E5B91BBBFA8D2874 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -84,6 +91,7 @@
 			isa = PBXGroup;
 			children = (
 				256CCE4D775C3680841A1FF6 /* Sources */,
+				FF72F37E11F2D102B4B78CF1 /* Tests */,
 				DCB8AB657E843F512CCBC93C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,15 +111,49 @@
 		DCB8AB657E843F512CCBC93C /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				0EF2269B07A76D6D75563A82 /* ThermalGuardCoreTests.xctest */,
 				31EBEFFF1B11815A20F96BFF /* ThermalGuardSystem.app */,
 				17379FB7997C3C42CC3CD2FF /* ThermalGuardUser.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
+		FDD89977AA26CE3C75009155 /* CoreTests */ = {
+			isa = PBXGroup;
+			children = (
+				8AA78A284C9DC414120B3D80 /* EvacuationTests.swift */,
+			);
+			path = CoreTests;
+			sourceTree = "<group>";
+		};
+		FF72F37E11F2D102B4B78CF1 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				FDD89977AA26CE3C75009155 /* CoreTests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		16181185FAA971251B984561 /* ThermalGuardCoreTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C095BA5B08B22591331EE824 /* Build configuration list for PBXNativeTarget "ThermalGuardCoreTests" */;
+			buildPhases = (
+				45968CA2226A7037083D1258 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ThermalGuardCoreTests;
+			packageProductDependencies = (
+			);
+			productName = ThermalGuardCoreTests;
+			productReference = 0EF2269B07A76D6D75563A82 /* ThermalGuardCoreTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		646A14DE34623C64E7CB9F49 /* ThermalGuardUser */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 0949B9646AD6E2D37D0785AF /* Build configuration list for PBXNativeTarget "ThermalGuardUser" */;
@@ -173,11 +215,24 @@
 			targets = (
 				646A14DE34623C64E7CB9F49 /* ThermalGuardUser */,
 				E6E931EF0E26F0B1808C3A1A /* ThermalGuardSystem */,
+				16181185FAA971251B984561 /* ThermalGuardCoreTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
+		45968CA2226A7037083D1258 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9D40973362D2CE8766122406 /* Building.swift in Sources */,
+				AB423E06325A3E059ED7D775 /* Evacuation.swift in Sources */,
+				5143840153DE854626C06A82 /* EvacuationTests.swift in Sources */,
+				E3F1097FF2D784DA8A3589CA /* Theme.swift in Sources */,
+				7CDA95CFD78ABD0EAAD85CFE /* ThermalFrame.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6AF9E14AA6D9E2C938B4F7FD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -213,6 +268,22 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		15ED76095A443ACBB4794B08 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.thermalguard.coretests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		3AA4B198C364714A5A3702A7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -396,6 +467,22 @@
 			};
 			name = Release;
 		};
+		D9A892D04C5A58676E6195ED /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.thermalguard.coretests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		F40EA0D2500005E40503B475 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -442,6 +529,15 @@
 			buildConfigurations = (
 				87C5D40CEEADE607D7AA5437 /* Debug */,
 				C412CF3F1D52F48A022B4BF4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C095BA5B08B22591331EE824 /* Build configuration list for PBXNativeTarget "ThermalGuardCoreTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				15ED76095A443ACBB4794B08 /* Debug */,
+				D9A892D04C5A58676E6195ED /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

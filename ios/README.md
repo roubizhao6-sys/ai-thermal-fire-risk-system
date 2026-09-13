@@ -44,6 +44,19 @@ xcrun simctl install booted <DerivedData>/Build/Products/Debug-iphonesimulator/T
 xcrun simctl launch booted com.thermalguard.user
 ```
 
+## 测试
+
+核心逻辑的单元测试（11 项），断言与 Web 端 `tests/*.test.mjs` 同一组不变量：
+
+```bash
+xcodebuild -project ThermalGuard.xcodeproj -scheme ThermalGuardCoreTests \
+  -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
+```
+
+覆盖：无火情路线距离 76 米、避开起火楼梯、站在火源点仍能撤离、
+出口全封时给出避险提示、向下通道中断改走天台、危险半径随时间增长、
+方位角与方位词映射、三种工况的风险分级与阈值可配置。
+
 ## 演示与截图用启动参数
 
 | 参数 | 作用 |
