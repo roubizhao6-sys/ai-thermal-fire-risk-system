@@ -31,6 +31,11 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSLocationWhenInUseUsageDescription: 用于读取手机朝向，把撤离方向对准真实世界。
+        # 系统端可以用 thermalguarduser://fire?floor=6 直接把警情推到这个 App
+        CFBundleURLTypes:
+          - CFBundleURLName: com.thermalguard.user.fire
+            CFBundleURLSchemes:
+              - thermalguarduser
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.thermalguard.user

@@ -51,6 +51,7 @@ struct SystemRootView: View {
 // 报警中心：全屏高对比报警，和 Web 端同一套交互
 private struct AlarmOverlayView: View {
     @Bindable var store: SystemStore
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         ZStack {
@@ -85,6 +86,19 @@ private struct AlarmOverlayView: View {
                     .padding(.horizontal, 24)
 
                 Spacer()
+
+                // 把警情推给用户端 App：真实产品走 APNs，演示用 URL scheme
+                Button {
+                    let floor = store.fire?.floor ?? 4
+                    if let url = FireLink.makeFireURL(floor: floor) { openURL(url) }
+                } label: {
+                    Label("推送警情到用户端", systemImage: "arrow.up.forward.app")
+                        .font(.system(size: 15, weight: .medium))
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
 
                 Button {
                     store.resolveAlarm()

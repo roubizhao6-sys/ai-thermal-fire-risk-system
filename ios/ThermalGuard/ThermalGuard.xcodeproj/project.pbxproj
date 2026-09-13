@@ -7,8 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		014DFEC8C009A62DEE528DB8 /* FireLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591015D9F644E59FA54F1F17 /* FireLink.swift */; };
+		155AF2A80212860CB27AF8E9 /* FireLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591015D9F644E59FA54F1F17 /* FireLink.swift */; };
 		1C4641E8B135FADDBDCD113D /* SystemRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 708EAA998414ED763ADF1ABC /* SystemRootView.swift */; };
 		1D9E65BE93E758309C6F6860 /* Building.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B86C6349765605ABA34BF0 /* Building.swift */; };
+		24951FF027954A9E32AD3C8E /* FireLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591015D9F644E59FA54F1F17 /* FireLink.swift */; };
 		24EBBF9EB4ECBDBA1E4D5986 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2D45681E5B91BBBFA8D2874 /* Theme.swift */; };
 		352FBE13F402B8A995A4ED1E /* UserStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A41E5ED4105733516D1DD3D2 /* UserStore.swift */; };
 		3877D48278D00EEEE477CD43 /* DetectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55E75D4F1746C64C00C6E3C4 /* DetectView.swift */; };
@@ -43,6 +46,7 @@
 		3506C7587B7C342C61370F1F /* UserHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserHomeView.swift; sourceTree = "<group>"; };
 		353081AC799CCC105741D19F /* ThermalGuardSystemApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalGuardSystemApp.swift; sourceTree = "<group>"; };
 		55E75D4F1746C64C00C6E3C4 /* DetectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectView.swift; sourceTree = "<group>"; };
+		591015D9F644E59FA54F1F17 /* FireLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireLink.swift; sourceTree = "<group>"; };
 		64D60C24BFAAC118A124B8EB /* CompassDialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompassDialView.swift; sourceTree = "<group>"; };
 		708EAA998414ED763ADF1ABC /* SystemRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemRootView.swift; sourceTree = "<group>"; };
 		743B34A89BF4C73F1267773F /* CityHeatMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityHeatMapView.swift; sourceTree = "<group>"; };
@@ -81,6 +85,7 @@
 			children = (
 				28B86C6349765605ABA34BF0 /* Building.swift */,
 				88C8804B7FFA92E47F4A1BBB /* Evacuation.swift */,
+				591015D9F644E59FA54F1F17 /* FireLink.swift */,
 				F2D45681E5B91BBBFA8D2874 /* Theme.swift */,
 				31C66F7B38E8A139DC3C7409 /* ThermalFrame.swift */,
 			);
@@ -228,6 +233,7 @@
 				9D40973362D2CE8766122406 /* Building.swift in Sources */,
 				AB423E06325A3E059ED7D775 /* Evacuation.swift in Sources */,
 				5143840153DE854626C06A82 /* EvacuationTests.swift in Sources */,
+				014DFEC8C009A62DEE528DB8 /* FireLink.swift in Sources */,
 				E3F1097FF2D784DA8A3589CA /* Theme.swift in Sources */,
 				7CDA95CFD78ABD0EAAD85CFE /* ThermalFrame.swift in Sources */,
 			);
@@ -240,6 +246,7 @@
 				1D9E65BE93E758309C6F6860 /* Building.swift in Sources */,
 				FCF14EDCA55CC3DD3BCE2568 /* CompassDialView.swift in Sources */,
 				F5467D2FB047299046F10D0A /* Evacuation.swift in Sources */,
+				155AF2A80212860CB27AF8E9 /* FireLink.swift in Sources */,
 				900F7C69EE4DC25179831B11 /* HeadingProvider.swift in Sources */,
 				57D19993B788635B1D9B057F /* Theme.swift in Sources */,
 				522A34DFDF39266B666E06D5 /* ThermalFrame.swift in Sources */,
@@ -257,6 +264,7 @@
 				492F7979246020317DED2566 /* CityHeatMapView.swift in Sources */,
 				3877D48278D00EEEE477CD43 /* DetectView.swift in Sources */,
 				7FD4A9A59D548121486A9867 /* Evacuation.swift in Sources */,
+				24951FF027954A9E32AD3C8E /* FireLink.swift in Sources */,
 				1C4641E8B135FADDBDCD113D /* SystemRootView.swift in Sources */,
 				60B59CB7191B936F7C281B82 /* SystemStore.swift in Sources */,
 				24EBBF9EB4ECBDBA1E4D5986 /* Theme.swift in Sources */,

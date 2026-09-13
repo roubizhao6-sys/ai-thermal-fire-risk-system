@@ -72,6 +72,23 @@ xcrun simctl launch booted com.thermalguard.user -demoFire -demoFloor 6
 xcrun simctl launch booted com.thermalguard.system -startTab map -demoFire
 ```
 
+## 两个 App 之间的警情联动
+
+系统端的全屏报警里有一个「推送警情到用户端」按钮，会打开：
+
+```
+thermalguarduser://fire?floor=6
+```
+
+用户端注册了 `thermalguarduser` scheme，收到后直接进入对应楼层的撤离状态
+（`thermalguarduser://clear` 则回到常态）。解析逻辑在 `Core/FireLink.swift`，有单元测试覆盖。
+
+注意：这是**演示手段**。真实产品应当由后端经 APNs 下发报警，
+这样用户端在锁屏、静音下也能被叫醒；URL scheme 只在用户端处于可被唤起的状态时才有效。
+
+另外在模拟器上用 `xcrun simctl openurl` 测试时，iOS 会先弹一个系统确认框
+（因为请求来自 App 之外），点掉才会进 App；真机上从系统端 App 内点击按钮则直接打开。
+
 ## 已知前置条件
 
 - 部署目标 iOS 17.0，Swift 5 语言模式

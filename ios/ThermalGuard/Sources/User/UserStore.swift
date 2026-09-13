@@ -82,4 +82,21 @@ final class UserStore {
             if self?.hint == text { self?.hint = nil }
         }
     }
+
+    /// 系统端通过 thermalguarduser://fire?floor=6 把警情推进来。
+    /// 真实产品应该走 APNs，这里用 URL scheme 让两个 App 在一台设备上就能演示联动。
+    func handle(url: URL) {
+        switch FireLink.parse(url) {
+        case .fire(let floor):
+            position.floor = floor
+            fire = FireSource(nodeId: "C\(floor)", floor: floor, startedAt: Date(), isDrill: true)
+            startTicking()
+            show(hint: "已接收系统端推送的火警：\(floor) 楼")
+        case .clear:
+            stopDrill()
+            show(hint: "系统端已解除警情")
+        case nil:
+            break
+        }
+    }
 }

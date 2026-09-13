@@ -46,6 +46,7 @@ struct UserHomeView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showsPositionSheet) { PositionSheet(store: store) }
         .sheet(isPresented: $showsSteps) { StepsSheet(route: store.route) }
+        .onOpenURL { store.handle(url: $0) }
         // 演示与截图用：-demoFire 直接进入火警态，-demoFloor 8 指定楼层
         .task {
             let arguments = ProcessInfo.processInfo.arguments

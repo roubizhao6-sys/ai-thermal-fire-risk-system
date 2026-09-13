@@ -95,3 +95,34 @@ final class ThermalFrameTests: XCTestCase {
         XCTAssertEqual(frame.risk(high: 40, medium: 30), .high)
     }
 }
+
+// 系统端 → 用户端的警情链接解析
+final class FireLinkTests: XCTestCase {
+    func testParsesFireWithFloor() {
+        let url = URL(string: "thermalguarduser://fire?floor=6")!
+        XCTAssertEqual(FireLink.parse(url), .fire(floor: 6))
+    }
+
+    func testClampsOutOfRangeFloor() {
+        XCTAssertEqual(FireLink.parse(URL(string: "thermalguarduser://fire?floor=99")!), .fire(floor: Building.floorCount))
+        XCTAssertEqual(FireLink.parse(URL(string: "thermalguarduser://fire?floor=0")!), .fire(floor: 1))
+    }
+
+    func testDefaultsToFourthFloorWhenMissing() {
+        XCTAssertEqual(FireLink.parse(URL(string: "thermalguarduser://fire")!), .fire(floor: 4))
+    }
+
+    func testParsesClear() {
+        XCTAssertEqual(FireLink.parse(URL(string: "thermalguarduser://clear")!), .clear)
+    }
+
+    func testRejectsOtherSchemesAndHosts() {
+        XCTAssertNil(FireLink.parse(URL(string: "https://example.com/fire?floor=6")!))
+        XCTAssertNil(FireLink.parse(URL(string: "thermalguarduser://unknown")!))
+    }
+
+    func testRoundTrip() {
+        let url = FireLink.makeFireURL(floor: 7)!
+        XCTAssertEqual(FireLink.parse(url), .fire(floor: 7))
+    }
+}
