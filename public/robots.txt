@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/sitemap.xml
