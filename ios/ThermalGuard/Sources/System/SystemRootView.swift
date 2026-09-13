@@ -6,13 +6,17 @@ struct SystemRootView: View {
     @State private var store = SystemStore()
     @State private var tab: Tab = .map
 
-    enum Tab: Hashable { case map, detect, alerts, escape }
+    enum Tab: Hashable { case map, monitor, detect, alerts, escape }
 
     var body: some View {
         TabView(selection: $tab) {
             CityHeatMapView(store: store)
                 .tabItem { Label("地图", systemImage: "map") }
                 .tag(Tab.map)
+
+            LiveMonitorView(store: store)
+                .tabItem { Label("监控", systemImage: "video") }
+                .tag(Tab.monitor)
 
             DetectView(store: store)
                 .tabItem { Label("检测", systemImage: "thermometer.medium") }
@@ -35,6 +39,7 @@ struct SystemRootView: View {
             if let index = arguments.firstIndex(of: "-startTab"), index + 1 < arguments.count {
                 switch arguments[index + 1] {
                 case "detect": tab = .detect
+                case "monitor": tab = .monitor
                 case "alerts": tab = .alerts
                 case "escape": tab = .escape
                 default: tab = .map

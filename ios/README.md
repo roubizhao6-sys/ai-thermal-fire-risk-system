@@ -5,7 +5,7 @@
 | Target | 定位 | 主界面 |
 | --- | --- | --- |
 | `ThermalGuardUser` | **用户端**：火灾逃生路线指引 | 指南针式单屏表盘 |
-| `ThermalGuardSystem` | **系统检测端**：消防监控 | 城市热力地图 / 检测 / 预警 / 逃生 |
+| `ThermalGuardSystem` | **系统检测端**：消防监控 | 城市热力地图 / 现场监控 / 检测 / 预警 / 逃生 |
 
 ## 结构
 
@@ -20,6 +20,7 @@ ios/ThermalGuard/
     Theme.swift               主题色（与网页端同一套 token）
   Sources/User/               用户端：表盘、朝向、位置、状态
   Sources/System/             系统端：地图、检测、预警、报警
+    LiveMonitorView.swift     现场监控：HLS 用 AVPlayer、MJPEG 用 WebView、内置演示流
   Info/                       生成的两份 Info.plist
 ```
 
@@ -65,11 +66,25 @@ xcodebuild -project ThermalGuard.xcodeproj -scheme ThermalGuardCoreTests \
 | `-demoFloor 6` | 用户端指定所在楼层 |
 | `-startTab map\|detect\|alerts\|escape` | 系统端指定初始标签 |
 
+> `-startTab` 还支持 `monitor`（现场监控）。
+
 例如：
 
 ```bash
 xcrun simctl launch booted com.thermalguard.user -demoFire -demoFloor 6
 xcrun simctl launch booted com.thermalguard.system -startTab map -demoFire
+```
+
+## 资源打包的注意点
+
+`project.yml` 里资源目录要写在 target 的 **`sources`** 下（XcodeGen 会按文件类型自动归类到
+Copy Bundle Resources）。XcodeGen **没有** `resources:` 这个键，写了会被静默忽略——
+表现为 AppIcon 不生效、内置演示流 `demo-live.gif` 找不到。改完可用下面的方式确认：
+
+```bash
+grep -c demo-live.gif ThermalGuard.xcodeproj/project.pbxproj   # 应大于 0
+ls <DerivedData>/Build/Products/Debug-iphonesimulator/ThermalGuardSystem.app/
+# 应当能看到 demo-live.gif 与 Assets.car
 ```
 
 ## 两个 App 之间的警情联动

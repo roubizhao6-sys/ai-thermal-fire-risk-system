@@ -13,14 +13,19 @@
 		1D9E65BE93E758309C6F6860 /* Building.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B86C6349765605ABA34BF0 /* Building.swift */; };
 		24951FF027954A9E32AD3C8E /* FireLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591015D9F644E59FA54F1F17 /* FireLink.swift */; };
 		24EBBF9EB4ECBDBA1E4D5986 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2D45681E5B91BBBFA8D2874 /* Theme.swift */; };
+		2E6E44D3A220E1826A09A846 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2A5A3AFE5096B5745DD5AEFC /* Assets.xcassets */; };
+		303AC3B45FF4D65923AF093B /* CameraSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7706BCB7B57BD9E4D3618170 /* CameraSource.swift */; };
 		352FBE13F402B8A995A4ED1E /* UserStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A41E5ED4105733516D1DD3D2 /* UserStore.swift */; };
 		3877D48278D00EEEE477CD43 /* DetectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55E75D4F1746C64C00C6E3C4 /* DetectView.swift */; };
+		3D059F145F5C61D1055E6390 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2A5A3AFE5096B5745DD5AEFC /* Assets.xcassets */; };
 		427C3FF7E61FFAF3EA67A5A7 /* ThermalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C66F7B38E8A139DC3C7409 /* ThermalFrame.swift */; };
+		436B1A4FED58086F8F69D843 /* LiveMonitorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48F0BA81FF3C3FAC208DDB71 /* LiveMonitorView.swift */; };
 		492F7979246020317DED2566 /* CityHeatMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 743B34A89BF4C73F1267773F /* CityHeatMapView.swift */; };
 		5143840153DE854626C06A82 /* EvacuationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AA78A284C9DC414120B3D80 /* EvacuationTests.swift */; };
 		522A34DFDF39266B666E06D5 /* ThermalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C66F7B38E8A139DC3C7409 /* ThermalFrame.swift */; };
 		57D19993B788635B1D9B057F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2D45681E5B91BBBFA8D2874 /* Theme.swift */; };
 		60B59CB7191B936F7C281B82 /* SystemStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2AA0B3FF7DDD6C5C6F48343 /* SystemStore.swift */; };
+		6755342201772C8E89CFBBE5 /* demo-live.gif in Resources */ = {isa = PBXBuildFile; fileRef = AC2FA5F5F1444D1C8CC51CEA /* demo-live.gif */; };
 		67556A5CB4178CAF5F459988 /* ThermalGuardSystemApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 353081AC799CCC105741D19F /* ThermalGuardSystemApp.swift */; };
 		7CDA95CFD78ABD0EAAD85CFE /* ThermalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C66F7B38E8A139DC3C7409 /* ThermalFrame.swift */; };
 		7FD4A9A59D548121486A9867 /* Evacuation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C8804B7FFA92E47F4A1BBB /* Evacuation.swift */; };
@@ -28,11 +33,14 @@
 		9D40973362D2CE8766122406 /* Building.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B86C6349765605ABA34BF0 /* Building.swift */; };
 		A5B376BF422368D1CBA4E609 /* UserHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3506C7587B7C342C61370F1F /* UserHomeView.swift */; };
 		AB423E06325A3E059ED7D775 /* Evacuation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C8804B7FFA92E47F4A1BBB /* Evacuation.swift */; };
+		B2B1F4F3209D4EB38A47A63F /* demo-live.gif in Resources */ = {isa = PBXBuildFile; fileRef = AC2FA5F5F1444D1C8CC51CEA /* demo-live.gif */; };
 		D4B13C4009AB4B10337DD10A /* Building.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B86C6349765605ABA34BF0 /* Building.swift */; };
+		D4BA61B00C5005AD9731FFAA /* CameraSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7706BCB7B57BD9E4D3618170 /* CameraSource.swift */; };
 		D81249BD5BAB70E2FABD2A3A /* ThermalGuardUserApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33FF9E989DCBACBBE2BFAF99 /* ThermalGuardUserApp.swift */; };
 		E3F1097FF2D784DA8A3589CA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2D45681E5B91BBBFA8D2874 /* Theme.swift */; };
 		F5467D2FB047299046F10D0A /* Evacuation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C8804B7FFA92E47F4A1BBB /* Evacuation.swift */; };
 		FCF14EDCA55CC3DD3BCE2568 /* CompassDialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64D60C24BFAAC118A124B8EB /* CompassDialView.swift */; };
+		FF9D69C826718C8FBB23521A /* CameraSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7706BCB7B57BD9E4D3618170 /* CameraSource.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,19 +48,23 @@
 		0EF2269B07A76D6D75563A82 /* ThermalGuardCoreTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ThermalGuardCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		17379FB7997C3C42CC3CD2FF /* ThermalGuardUser.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ThermalGuardUser.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		28B86C6349765605ABA34BF0 /* Building.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Building.swift; sourceTree = "<group>"; };
+		2A5A3AFE5096B5745DD5AEFC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		31C66F7B38E8A139DC3C7409 /* ThermalFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalFrame.swift; sourceTree = "<group>"; };
 		31EBEFFF1B11815A20F96BFF /* ThermalGuardSystem.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ThermalGuardSystem.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		33FF9E989DCBACBBE2BFAF99 /* ThermalGuardUserApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalGuardUserApp.swift; sourceTree = "<group>"; };
 		3506C7587B7C342C61370F1F /* UserHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserHomeView.swift; sourceTree = "<group>"; };
 		353081AC799CCC105741D19F /* ThermalGuardSystemApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalGuardSystemApp.swift; sourceTree = "<group>"; };
+		48F0BA81FF3C3FAC208DDB71 /* LiveMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMonitorView.swift; sourceTree = "<group>"; };
 		55E75D4F1746C64C00C6E3C4 /* DetectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectView.swift; sourceTree = "<group>"; };
 		591015D9F644E59FA54F1F17 /* FireLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireLink.swift; sourceTree = "<group>"; };
 		64D60C24BFAAC118A124B8EB /* CompassDialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompassDialView.swift; sourceTree = "<group>"; };
 		708EAA998414ED763ADF1ABC /* SystemRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemRootView.swift; sourceTree = "<group>"; };
 		743B34A89BF4C73F1267773F /* CityHeatMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityHeatMapView.swift; sourceTree = "<group>"; };
+		7706BCB7B57BD9E4D3618170 /* CameraSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraSource.swift; sourceTree = "<group>"; };
 		88C8804B7FFA92E47F4A1BBB /* Evacuation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Evacuation.swift; sourceTree = "<group>"; };
 		8AA78A284C9DC414120B3D80 /* EvacuationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvacuationTests.swift; sourceTree = "<group>"; };
 		A41E5ED4105733516D1DD3D2 /* UserStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserStore.swift; sourceTree = "<group>"; };
+		AC2FA5F5F1444D1C8CC51CEA /* demo-live.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = "demo-live.gif"; sourceTree = "<group>"; };
 		C2AA0B3FF7DDD6C5C6F48343 /* SystemStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStore.swift; sourceTree = "<group>"; };
 		F2D45681E5B91BBBFA8D2874 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -63,6 +75,7 @@
 			children = (
 				743B34A89BF4C73F1267773F /* CityHeatMapView.swift */,
 				55E75D4F1746C64C00C6E3C4 /* DetectView.swift */,
+				48F0BA81FF3C3FAC208DDB71 /* LiveMonitorView.swift */,
 				708EAA998414ED763ADF1ABC /* SystemRootView.swift */,
 				C2AA0B3FF7DDD6C5C6F48343 /* SystemStore.swift */,
 				353081AC799CCC105741D19F /* ThermalGuardSystemApp.swift */,
@@ -84,6 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				28B86C6349765605ABA34BF0 /* Building.swift */,
+				7706BCB7B57BD9E4D3618170 /* CameraSource.swift */,
 				88C8804B7FFA92E47F4A1BBB /* Evacuation.swift */,
 				591015D9F644E59FA54F1F17 /* FireLink.swift */,
 				F2D45681E5B91BBBFA8D2874 /* Theme.swift */,
@@ -95,10 +109,20 @@
 		926FA26682261CF5444CC12A = {
 			isa = PBXGroup;
 			children = (
+				A2AD0D1599A27A807C77C93D /* Resources */,
 				256CCE4D775C3680841A1FF6 /* Sources */,
 				FF72F37E11F2D102B4B78CF1 /* Tests */,
 				DCB8AB657E843F512CCBC93C /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		A2AD0D1599A27A807C77C93D /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				2A5A3AFE5096B5745DD5AEFC /* Assets.xcassets */,
+				AC2FA5F5F1444D1C8CC51CEA /* demo-live.gif */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		A470DE1AAE96DE341994C26B /* User */ = {
@@ -164,6 +188,7 @@
 			buildConfigurationList = 0949B9646AD6E2D37D0785AF /* Build configuration list for PBXNativeTarget "ThermalGuardUser" */;
 			buildPhases = (
 				6AF9E14AA6D9E2C938B4F7FD /* Sources */,
+				664F39A1D3A22460DCCC2294 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -181,6 +206,7 @@
 			buildConfigurationList = 4F2A05BA88AB33EC07864366 /* Build configuration list for PBXNativeTarget "ThermalGuardSystem" */;
 			buildPhases = (
 				76610416D174C5268DA02D14 /* Sources */,
+				15EE2AE43F961C838372ED7E /* Resources */,
 			);
 			buildRules = (
 			);
@@ -225,12 +251,34 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		15EE2AE43F961C838372ED7E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2E6E44D3A220E1826A09A846 /* Assets.xcassets in Resources */,
+				6755342201772C8E89CFBBE5 /* demo-live.gif in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		664F39A1D3A22460DCCC2294 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3D059F145F5C61D1055E6390 /* Assets.xcassets in Resources */,
+				B2B1F4F3209D4EB38A47A63F /* demo-live.gif in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		45968CA2226A7037083D1258 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				9D40973362D2CE8766122406 /* Building.swift in Sources */,
+				D4BA61B00C5005AD9731FFAA /* CameraSource.swift in Sources */,
 				AB423E06325A3E059ED7D775 /* Evacuation.swift in Sources */,
 				5143840153DE854626C06A82 /* EvacuationTests.swift in Sources */,
 				014DFEC8C009A62DEE528DB8 /* FireLink.swift in Sources */,
@@ -244,6 +292,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1D9E65BE93E758309C6F6860 /* Building.swift in Sources */,
+				FF9D69C826718C8FBB23521A /* CameraSource.swift in Sources */,
 				FCF14EDCA55CC3DD3BCE2568 /* CompassDialView.swift in Sources */,
 				F5467D2FB047299046F10D0A /* Evacuation.swift in Sources */,
 				155AF2A80212860CB27AF8E9 /* FireLink.swift in Sources */,
@@ -261,10 +310,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				D4B13C4009AB4B10337DD10A /* Building.swift in Sources */,
+				303AC3B45FF4D65923AF093B /* CameraSource.swift in Sources */,
 				492F7979246020317DED2566 /* CityHeatMapView.swift in Sources */,
 				3877D48278D00EEEE477CD43 /* DetectView.swift in Sources */,
 				7FD4A9A59D548121486A9867 /* Evacuation.swift in Sources */,
 				24951FF027954A9E32AD3C8E /* FireLink.swift in Sources */,
+				436B1A4FED58086F8F69D843 /* LiveMonitorView.swift in Sources */,
 				1C4641E8B135FADDBDCD113D /* SystemRootView.swift in Sources */,
 				60B59CB7191B936F7C281B82 /* SystemStore.swift in Sources */,
 				24EBBF9EB4ECBDBA1E4D5986 /* Theme.swift in Sources */,

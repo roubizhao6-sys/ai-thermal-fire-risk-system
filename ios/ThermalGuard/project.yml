@@ -18,7 +18,7 @@ targets:
     sources:
       - path: Sources/Core
       - path: Sources/User
-    resources:
+      # XcodeGen 按文件类型自动归类：.xcassets / .gif 会进 Copy Bundle Resources
       - path: Resources
     info:
       path: Info/User.plist
@@ -51,7 +51,6 @@ targets:
     sources:
       - path: Sources/Core
       - path: Sources/System
-    resources:
       - path: Resources
     info:
       path: Info/System.plist

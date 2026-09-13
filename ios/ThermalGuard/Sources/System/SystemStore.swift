@@ -8,6 +8,8 @@ final class SystemStore {
     var frame: ThermalFrame = .simulated(phase: 0)
     var alerts: [AlarmPoint] = AlarmPoint.demo
     var selectedPointId: String?
+    var cameras: [CameraSource] = CameraSource.demo
+    var selectedCameraId: String = CameraSource.demo[0].id
     var fire: FireSource?
     var phase: Double = 0
     var isDetecting = false
