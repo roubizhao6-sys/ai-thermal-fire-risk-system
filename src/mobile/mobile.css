@@ -150,6 +150,61 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .mobile-main { width: 100%; max-width: 720px; margin: 0 auto; }
 .mobile-page { padding: 20px 16px 32px; animation: pageIn .3s var(--ease) both; }
 
+/* iOS 分段控件：贴在顶栏下方，用于「预警」标签内部切换 */
+.segmented-wrap {
+  position: sticky;
+  top: 54px;
+  z-index: 30;
+  padding: 10px 16px 8px;
+  background: rgba(0, 0, 0, .72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--fill-quiet);
+}
+.segmented button {
+  min-height: 32px;
+  color: var(--text-2);
+  border-radius: 7px;
+  background: transparent;
+  font-size: var(--t-footnote);
+  font-weight: 500;
+  transition: color .2s var(--ease), background .2s var(--ease);
+}
+.segmented button.active {
+  color: var(--text);
+  background: var(--surface-3);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
+}
+
+/* iOS 披露行：用于从数据看板进入关于项目 */
+.disclosure-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  text-align: left;
+}
+.disclosure-row:active { background: var(--surface-2); }
+.disclosure-row > span { width: 30px; height: 30px; display: grid; place-items: center; color: var(--text-2); border-radius: 8px; background: var(--fill-quiet); }
+.disclosure-row > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.disclosure-row strong { font-size: var(--t-subhead); font-weight: 500; }
+.disclosure-row small { color: var(--text-3); font-size: var(--t-caption); }
+.disclosure-row > svg { color: var(--text-3); }
+
 /* 报警中心 / 逃生指引页的页头（与 page-heading 同一套字阶） */
 .page-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .page-intro > div { min-width: 0; }
@@ -164,7 +219,7 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
   right: 0;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   padding: 6px 4px var(--m-safe-bottom);
   border-top: 1px solid var(--separator-soft);
   background: var(--surface-translucent);
@@ -913,6 +968,8 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .alarm-banner span { flex: 1; text-align: left; font-weight: 500; }
 .alarm-banner strong { padding: 4px 10px; border-radius: var(--r-pill); background: rgba(255, 255, 255, .22); font-size: var(--t-caption); font-weight: 600; white-space: nowrap; }
 .alarm-banner.is-muted { background: var(--surface-3); }
+/* 报警横幅出现时，把分段控件下移避免重叠 */
+.mobile-app-shell.has-alarm .segmented-wrap { top: 98px; }
 .warn-banner {
   display: flex;
   align-items: center;
@@ -1362,8 +1419,7 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
   .mobile-tabs { left: 50%; right: auto; width: 720px; transform: translateX(-50%); }
 }
 
-/* 窄屏下 7 个标签收紧字号 */
+/* 窄屏下标签字号微调 */
 @media (max-width: 400px) {
-  .mobile-tabs button { font-size: 10px; }
-  .mobile-tabs button svg { width: 18px; height: 18px; }
+  .mobile-tabs button { font-size: 11px; }
 }

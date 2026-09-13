@@ -73,13 +73,17 @@ const DEMO_THERMAL = `${import.meta.env.BASE_URL}demo-thermal.jpg`
 const DEMO_LIVE = `${import.meta.env.BASE_URL}demo-live.gif`
 
 const tabs = [
-  { id: 'home', label: '首页检测', icon: ScanLine },
-  { id: 'camera', label: '现场监控', icon: Video },
-  { id: 'alerts', label: '预警记录', icon: BellRing },
-  { id: 'alarm', label: '报警中心', icon: ShieldAlert },
-  { id: 'evacuation', label: '逃生指引', icon: Navigation },
-  { id: 'dashboard', label: '数据看板', icon: BarChart3 },
-  { id: 'about', label: '关于项目', icon: Layers3 },
+  { id: 'home', label: '检测', icon: ScanLine },
+  { id: 'camera', label: '监控', icon: Video },
+  { id: 'alerts', label: '预警', icon: BellRing },
+  { id: 'evacuation', label: '逃生', icon: Navigation },
+  { id: 'dashboard', label: '看板', icon: BarChart3 },
+]
+
+// 「预警」标签内部用分段控件切换：事件记录 / 报警设置
+const alertSections = [
+  { id: 'records', label: '事件记录' },
+  { id: 'settings', label: '报警设置' },
 ]
 
 const DEFAULT_ALARM_SETTINGS = {
@@ -494,7 +498,7 @@ function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete
   )
 }
 
-function DashboardPage() {
+function DashboardPage({ onOpenAbout }) {
   const stats = [
     ['累计检测图像', '12,846', '张', '+18.6%', ImageIcon, 'blue'],
     ['预警总次数', '1,329', '次', '+12.4%', BellRing, 'orange'],
@@ -508,13 +512,21 @@ function DashboardPage() {
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>风险趋势</strong><small>近30日最高温度预警指数</small></div><TrendingUp size={18} /></div><LineChart /></section>
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>隐患类型分布</strong><small>高频隐患分类统计</small></div><BarChart3 size={18} /></div><div className="bar-chart">{[['电气过热', 72], ['设备异常', 58], ['环境温升', 44], ['线路老化', 31], ['其他', 26]].map(([label, value], index) => <div className="bar-row" key={label}><span>{label}</span><div><i style={{ width: `${value}%`, '--bar-delay': `${index * 90}ms` }} /></div><b>{value}</b></div>)}</div></section>
       <div className="dashboard-note"><Activity size={16} />数据用于隐患识别、巡检优先级排序和风险治理优化。</div>
+      {onOpenAbout && (
+        <button className="disclosure-row" type="button" onClick={onOpenAbout}>
+          <span><Layers3 size={18} /></span>
+          <div><strong>关于项目</strong><small>技术原理、五大核心创新与适用场景</small></div>
+          <ChevronRight size={17} />
+        </button>
+      )}
     </div>
   )
 }
 
-function AboutPage() {
+function AboutPage({ onBack }) {
   return (
     <div className="mobile-page">
+      {onBack && <button className="back-button" type="button" onClick={onBack}><ArrowLeft size={16} />返回看板</button>}
       <header className="page-heading"><span>关于项目</span><h1>让AI成为火警监测网警</h1><p>热成像 + 计算机视觉，让隐患在灾害发生前被看见</p></header>
       <section className="mobile-card principle-card"><div className="card-head"><div><strong>技术原理</strong><small>多模态融合识别</small></div><Cpu size={19} /></div><div className="principle-flow"><div><ScanLine size={20} /><strong>YOLO检测</strong><span>火焰与烟雾目标</span></div><ArrowRight size={16} /><div><Thermometer size={20} /><strong>温度融合</strong><span>热区轮廓与梯度</span></div><ArrowRight size={16} /><div><ShieldAlert size={20} /><strong>风险判断</strong><span>灾前分级预警</span></div></div></section>
       <section className="mobile-card innovation-card"><div className="card-head"><div><strong>五大核心创新</strong><small>AI火警网警的优势</small></div><Sparkles size={18} /></div>{[['灾前预警', '在明火和烟雾出现前识别温度异常'], ['精准定位', '红橙热区标注高温隐患位置'], ['多级研判', '温度轮廓、扩散梯度、持续特征综合分析'], ['低误报率', '区分人员、设备和正常热源'], ['轻量部署', '边缘设备可运行，老旧楼宇改造成本低']].map(([title, text], index) => <div className="innovation-row" key={title}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{title}</strong><p>{text}</p></div></div>)}</section>
@@ -547,6 +559,8 @@ export default function MobileApp() {
   const [cameraSheet, setCameraSheet] = useState(null)
   const [toast, setToast] = useState('')
   const [settings, setSettings] = useState(() => ({ ...DEFAULT_ALARM_SETTINGS, ...loadStored('thermalGuardAlarmSettings', {}) }))
+  const [alertSection, setAlertSection] = useState('records')
+  const [dashView, setDashView] = useState('dashboard')
   const [alarm, setAlarm] = useState(null)
   const [overlayOpen, setOverlayOpen] = useState(false)
   const [fire, setFire] = useState(null)
@@ -945,8 +959,8 @@ export default function MobileApp() {
 
   const page = useMemo(() => {
     if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
-    if (activeTab === 'alerts') return <AlertsPage alerts={alerts} />
-    if (activeTab === 'alarm') {
+    // 「预警」标签：分段控件在事件记录与报警设置之间切换
+    if (activeTab === 'alerts' && alertSection === 'settings') {
       return (
         <AlarmCenterView
           alarm={alarm}
@@ -965,6 +979,7 @@ export default function MobileApp() {
         />
       )
     }
+    if (activeTab === 'alerts') return <AlertsPage alerts={alerts} />
     if (activeTab === 'evacuation') {
       return (
         <EvacuationView
@@ -980,10 +995,9 @@ export default function MobileApp() {
         />
       )
     }
-    if (activeTab === 'dashboard') return <DashboardPage />
-    if (activeTab === 'about') return <AboutPage />
+    if (activeTab === 'dashboard') return dashView === 'about' ? <AboutPage onBack={() => setDashView('dashboard')} /> : <DashboardPage onOpenAbout={() => setDashView('about')} />
     return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={riskAdjustedResult} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
-  }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, riskAdjustedResult, phase, alarm, fire, settings, audioReady, route, position, blockedNodes, nowMs])
+  }, [activeTab, alertSection, dashView, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, riskAdjustedResult, phase, alarm, fire, settings, audioReady, route, position, blockedNodes, nowMs])
 
   return (
     <div className={`mobile-app-shell ${alarm ? 'has-alarm' : ''}`}>
@@ -1013,6 +1027,25 @@ export default function MobileApp() {
           <Volume2 size={15} />
           <span>点击启用报警声音，否则火警时只有画面提示</span>
         </button>
+      )}
+
+      {activeTab === 'alerts' && (
+        <div className="segmented-wrap">
+          <div className="segmented" role="tablist" aria-label="预警内容切换">
+            {alertSections.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={alertSection === id}
+                className={alertSection === id ? 'active' : ''}
+                onClick={() => setAlertSection(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       <main className="mobile-main">{page}</main>
