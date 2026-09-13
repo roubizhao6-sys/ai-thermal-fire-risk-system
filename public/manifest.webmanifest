@@ -1,0 +1,16 @@
+{
+  "name": "AI热感火警风险检测系统",
+  "short_name": "热感哨兵",
+  "description": "基于热成像与计算机视觉的早期火灾预警科研演示原型",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070d18",
+  "theme_color": "#0f172a",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
