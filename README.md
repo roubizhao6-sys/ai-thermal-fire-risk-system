@@ -17,6 +17,23 @@ https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/
 - 检测数据统计、趋势图与风险分布
 - 桌面端与移动端响应式适配
 
+## macOS 原生 App
+
+原生 SwiftUI 应用位于 `macos/AIThermalFireGuard`，支持：
+
+- 内置模拟热像仪
+- ESP32 USB 串口接入
+- Wi-Fi WebSocket 接入
+- 32×24 热成像矩阵与风险分级
+- 实验设备采购、接线与固件示例
+
+运行：
+
+```bash
+cd macos/AIThermalFireGuard
+./script/build_and_run.sh
+```
+
 ## 本地运行
 
 ```bash
