@@ -182,6 +182,14 @@ enum HardwareSource: String, CaseIterable, Identifiable {
         case .webSocket: "wifi"
         }
     }
+
+    static var availableCases: [HardwareSource] {
+#if APP_STORE
+        [.simulator, .webSocket]
+#else
+        allCases
+#endif
+    }
 }
 
 enum ConnectionState: Equatable {

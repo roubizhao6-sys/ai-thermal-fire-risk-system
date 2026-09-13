@@ -22,7 +22,7 @@ struct SettingsView: View {
 
             Form {
                 Picker("默认数据源", selection: $store.source) {
-                    ForEach(HardwareSource.allCases) { source in
+                    ForEach(HardwareSource.availableCases) { source in
                         Text(source.title).tag(source)
                     }
                 }

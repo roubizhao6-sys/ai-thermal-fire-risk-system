@@ -47,7 +47,7 @@ struct HardwareView: View {
 
     private var sourcePicker: some View {
         HStack(spacing: 12) {
-            ForEach(HardwareSource.allCases) { source in
+            ForEach(HardwareSource.availableCases) { source in
                 Button {
                     store.source = source
                     if source == .simulator {

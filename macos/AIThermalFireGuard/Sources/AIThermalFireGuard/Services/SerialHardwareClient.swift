@@ -1,3 +1,4 @@
+#if !APP_STORE
 import Foundation
 
 final class SerialHardwareClient: HardwareClient {
@@ -113,3 +114,5 @@ final class SerialHardwareClient: HardwareClient {
         try? fileHandle?.close()
     }
 }
+
+#endif

@@ -32,10 +32,14 @@ final class ThermalMonitorStore: ObservableObject {
     }
 
     func refreshSerialPorts() {
+#if APP_STORE
+        serialPorts = []
+#else
         serialPorts = SerialHardwareClient.availablePorts()
         if let first = serialPorts.first, !serialPorts.contains(serialPath) {
             serialPath = first
         }
+#endif
     }
 
     func connectSimulator() {
@@ -51,10 +55,15 @@ final class ThermalMonitorStore: ObservableObject {
         case .simulator:
             connectSimulator()
         case .serial:
+#if APP_STORE
+            connectionState = .failed("App Store 版本不提供直接串口访问，请使用 Wi-Fi WebSocket")
+            statusMessage = "App Store 版本使用 Wi-Fi WebSocket 接入 ESP32"
+#else
             install(
                 SerialHardwareClient(portPath: serialPath),
                 successMessage: "已连接 ESP32 串口 \(serialPath)"
             )
+#endif
         case .webSocket:
             install(
                 WebSocketHardwareClient(endpoint: webSocketURL),
