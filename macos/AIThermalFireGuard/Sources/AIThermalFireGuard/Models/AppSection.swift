@@ -11,7 +11,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .dashboard: "运行总览"
+        case .dashboard: "首页检测"
         case .monitor: "实时热成像"
         case .hardware: "硬件连接"
         case .equipment: "实验设备"
@@ -21,7 +21,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .dashboard: "检测状态与风险概览"
+        case .dashboard: "超早期温度预警与智能判断"
         case .monitor: "32×24 热成像矩阵"
         case .hardware: "串口与 Wi-Fi 数据接入"
         case .equipment: "采购清单与接线方案"

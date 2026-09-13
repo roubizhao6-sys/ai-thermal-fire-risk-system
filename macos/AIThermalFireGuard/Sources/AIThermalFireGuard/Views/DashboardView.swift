@@ -11,8 +11,8 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 18) {
                 PageHeader(
                     eyebrow: "运行总览",
-                    title: "AI 热感火警风险检测系统",
-                    subtitle: "热成像矩阵、温度估算与风险分级实时联动",
+                    title: "AI热感火警风险检测",
+                    subtitle: "超早期温度预警 · 多维度智能判断",
                     trailing: {
                         HStack(spacing: 10) {
                             RiskBadge(risk: store.frame.risk)
@@ -81,7 +81,7 @@ struct DashboardView: View {
     }
 
     private var riskSummary: some View {
-        PanelCard(title: "风险研判", subtitle: "多级预警模型", icon: "shield.lefthalf.filled") {
+        PanelCard(title: "风险研判", subtitle: "AI火警网警多级预警", icon: "shield.lefthalf.filled") {
             VStack(alignment: .leading, spacing: 15) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {

@@ -47,8 +47,8 @@ const features = [
   {
     icon: ScanSearch,
     index: '01',
-    title: '热成像图像智能识别',
-    text: '融合 YOLO 目标检测与热成像特征提取，自动识别火焰、烟雾及异常高温目标。',
+    title: 'AI火警网警智能识别',
+    text: '融合 YOLO 目标检测与热成像温度轮廓，在明火与烟雾出现前发现异常热源。',
     tag: '视觉智能',
   },
   {
@@ -208,9 +208,9 @@ function Hero() {
       <div className="hero-orb hero-orb-two" />
       <div className="section-shell hero-layout">
         <div className="hero-copy">
-          <div className="hero-status"><span /><b>AI 火警风险智能识别</b><i>版本 2.6</i></div>
+          <div className="hero-status"><span /><b>AI 火警网警 · 超早期预警</b><i>版本 2.6</i></div>
           <h1>AI热感火警<br /><em>风险检测系统</em></h1>
-          <p>基于热成像与计算机视觉的早期火灾预警原型</p>
+          <p>超早期温度预警 · 多维度智能判断</p>
           <div className="hero-actions">
             <a className="primary-btn" href="#detection"><Play size={17} fill="currentColor" />开始检测<ArrowRight size={16} /></a>
             <a className="ghost-btn" href="#about"><Eye size={17} />了解技术原理</a>
@@ -640,9 +640,9 @@ function About() {
         <div className="about-layout">
           <div className="about-copy" data-reveal>
             <span className="eyebrow"><Layers3 size={14} />项目技术说明</span>
-            <h2>计算机视觉与热成像，<br />让早期火情无处遁形</h2>
-            <p>系统以热成像画面为基础，通过 YOLO 目标检测模型识别火焰、烟雾与异常热源，并结合温度矩阵分析完成热区定位与风险分级。</p>
-            <div className="tech-tags"><span>YOLO 目标检测</span><span>热成像温度分析</span><span>OpenCV 图像处理</span><span>多级风险模型</span></div>
+            <h2>让AI成为火警监测网警，<br />让隐患在灾害发生前被看见</h2>
+            <p>系统以热成像画面为基础，通过 YOLO 目标检测和温度轮廓、扩散梯度、持续特征融合分析，区分正常热源与火灾隐患，并在明火、烟雾出现前完成灾前分级预警。</p>
+            <div className="tech-tags"><span>YOLO 目标检测</span><span>热成像温度分析</span><span>OpenCV 图像处理</span><span>多级风险模型</span><span>灾前预警</span><span>低误报率</span><span>轻量部署</span></div>
             <div className="tech-highlight">
               <div className="highlight-icon"><Database size={22} /></div>
               <div><strong>数据驱动迭代</strong><p>持续采集训练样本与误报案例，优化模型在不同场景下的鲁棒性。</p></div>
