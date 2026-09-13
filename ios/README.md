@@ -64,6 +64,7 @@ xcodebuild -project ThermalGuard.xcodeproj -scheme ThermalGuardCoreTests \
 | --- | --- |
 | `-demoFire` | 启动即进入火警 / 演练状态 |
 | `-demoFloor 6` | 用户端指定所在楼层 |
+| `-fixedNorth` | 用户端强制固定指北（不申请方向权限，截图与回归用） |
 | `-startTab map\|detect\|alerts\|escape` | 系统端指定初始标签 |
 
 > `-startTab` 还支持 `monitor`（现场监控）。

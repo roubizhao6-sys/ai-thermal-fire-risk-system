@@ -55,6 +55,13 @@ struct UserHomeView: View {
                 store.position.floor = floor
             }
             if arguments.contains("-demoFire") { store.startDrill() }
+            if arguments.contains("-fixedNorth") {
+                store.useDeviceHeading = false
+            } else {
+                // 与原版指南针一致：默认让表盘跟着手机转，拿不到权限时自动退回固定指北
+                store.useDeviceHeading = true
+                heading.start()
+            }
         }
     }
 
