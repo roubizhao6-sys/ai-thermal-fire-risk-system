@@ -28,6 +28,7 @@ import {
   Layers3,
   Link2,
   LoaderCircle,
+  Map,
   MapPin,
   Navigation,
   Plus,
@@ -52,6 +53,7 @@ import {
 
 import AlarmCenterView from './AlarmCenterView.jsx'
 import AlarmOverlay from './AlarmOverlay.jsx'
+import CityMap from './CityMap.jsx'
 import EvacuationView from './EvacuationView.jsx'
 import { positionNodeId } from './building.js'
 import { planRoute } from './evacuation.js'
@@ -74,6 +76,7 @@ const DEMO_LIVE = `${import.meta.env.BASE_URL}demo-live.gif`
 
 const tabs = [
   { id: 'home', label: '检测', navLabel: '首页检测', icon: ScanLine },
+  { id: 'map', label: '地图', navLabel: '城市热力', icon: Map },
   { id: 'camera', label: '监控', navLabel: '现场监控', icon: Video },
   { id: 'alerts', label: '预警', navLabel: '预警记录', icon: BellRing },
   { id: 'evacuation', label: '逃生', navLabel: '逃生指引', icon: Navigation },
@@ -991,6 +994,7 @@ export default function MobileApp() {
 
   const page = useMemo(() => {
     if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
+    if (activeTab === 'map') return <CityMap fire={fire} activeDevice={activeDevice} />
     // 「预警」标签：分段控件在事件记录与报警设置之间切换
     if (activeTab === 'alerts' && alertSection === 'settings') {
       return (
@@ -1029,7 +1033,7 @@ export default function MobileApp() {
     }
     if (activeTab === 'dashboard') return dashView === 'about' ? <AboutPage onBack={() => setDashView('dashboard')} /> : <DashboardPage onOpenAbout={() => setDashView('about')} />
     return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={riskAdjustedResult} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
-  }, [activeTab, alertSection, dashView, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, riskAdjustedResult, phase, alarm, fire, settings, audioReady, route, position, blockedNodes, nowMs])
+  }, [activeTab, alertSection, dashView, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, riskAdjustedResult, phase, alarm, fire, settings, audioReady, route, position, blockedNodes, nowMs, activeDevice])
 
   return (
     <div className={`mobile-app-shell ${alarm ? 'has-alarm' : ''}`}>

@@ -261,7 +261,7 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
   right: 0;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   padding: 6px 4px var(--m-safe-bottom);
   border-top: 1px solid var(--separator-soft);
   background: var(--surface-translucent);
@@ -1354,6 +1354,138 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 /* ============================================================
    12. 弹层
    ============================================================ */
+
+/* 系统端 · 城市热力地图 */
+.city-map-page {
+  position: relative;
+  height: calc(100dvh - 54px - 62px - env(safe-area-inset-top) - var(--m-safe-bottom));
+  overflow: hidden;
+  background: #000;
+}
+.city-map { position: absolute; inset: 0; }
+.city-map .leaflet-container { background: #000; font: inherit; }
+.city-map .leaflet-tile-pane { filter: saturate(.7) brightness(.92); }
+/* 热力斑：用模糊的圆做热区，强度越高越大越红 */
+.heat-blob { filter: blur(14px); }
+.heat-blob-high { fill-opacity: .5; }
+.heat-blob-medium { fill-opacity: .38; }
+.heat-blob-low { fill-opacity: .26; }
+.heat-core { stroke: rgba(0, 0, 0, .5); }
+.heat-core.is-live { animation: pulse 1.4s infinite; }
+
+.city-map-fallback {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  z-index: 500;
+  padding: 6px 12px;
+  color: var(--warning);
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, .72);
+  font-size: var(--t-caption-2);
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+}
+
+.city-map-top {
+  position: absolute;
+  z-index: 500;
+  left: 12px;
+  right: 12px;
+  top: calc(env(safe-area-inset-top) + 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.city-map-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.city-map-stats span {
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, .68);
+  font-size: var(--t-caption-2);
+  font-weight: 500;
+  backdrop-filter: blur(12px);
+}
+.stat-high { color: var(--accent-strong); }
+.stat-medium { color: var(--warning); }
+.stat-low { color: var(--success); }
+.stat-total { color: var(--text-2); }
+.city-map-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 6px 12px;
+  color: #fff;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  font-size: var(--t-caption);
+  font-weight: 600;
+}
+
+.city-map-list {
+  position: absolute;
+  z-index: 500;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--m-safe-bottom) + 10px);
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.city-map-list::-webkit-scrollbar { display: none; }
+.city-point {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 176px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: rgba(28, 28, 30, .82);
+  text-align: left;
+  backdrop-filter: blur(16px);
+}
+.city-point.active { box-shadow: inset 0 0 0 1px var(--accent); }
+.point-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+.point-high .point-dot { background: var(--accent); }
+.point-medium .point-dot { background: var(--warning); }
+.point-low .point-dot { background: var(--success); }
+.city-point > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.city-point strong { overflow: hidden; font-size: var(--t-caption); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.city-point small { color: var(--text-3); font-size: var(--t-caption-2); }
+.city-point > b { font-size: var(--t-caption); font-weight: 600; }
+.point-high > b { color: var(--accent-strong); }
+.point-medium > b { color: var(--warning); }
+.point-low > b { color: var(--success); }
+
+.city-map-detail {
+  position: absolute;
+  z-index: 600;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--m-safe-bottom) + 10px);
+  padding: 14px;
+  border-radius: var(--r-lg);
+  background: rgba(28, 28, 30, .94);
+  backdrop-filter: blur(18px);
+  animation: resultIn .28s var(--ease) both;
+}
+.detail-head { display: flex; align-items: center; gap: 8px; color: var(--accent); }
+.detail-head strong { flex: 1; color: var(--text); font-size: var(--t-subhead); font-weight: 600; }
+.detail-head button { color: var(--text-2); font-size: var(--t-caption); }
+.detail-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.detail-rows > div { display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: var(--t-caption-2); }
+.detail-rows b { margin-left: auto; color: var(--text); font-size: var(--t-caption); font-weight: 600; }
 
 .sheet-backdrop { position: fixed; z-index: 80; inset: 0; display: flex; align-items: flex-end; background: rgba(0, 0, 0, .55); backdrop-filter: blur(4px); }
 .device-sheet {
