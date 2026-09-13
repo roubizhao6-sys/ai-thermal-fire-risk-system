@@ -17,6 +17,10 @@ import {
   Database,
   Edit3,
   Eye,
+  Copy,
+  Globe2,
+  Maximize2,
+  Video,
   Flame,
   Gauge,
   Image as ImageIcon,
@@ -44,13 +48,56 @@ import {
 } from 'lucide-react'
 
 const DEMO_THERMAL = `${import.meta.env.BASE_URL}demo-thermal.jpg`
+const DEMO_LIVE = `${import.meta.env.BASE_URL}demo-live.gif`
 
 const tabs = [
   { id: 'home', label: '首页检测', icon: ScanLine },
+  { id: 'camera', label: '现场监控', icon: Video },
   { id: 'alerts', label: '预警记录', icon: BellRing },
   { id: 'dashboard', label: '数据看板', icon: BarChart3 },
   { id: 'about', label: '关于项目', icon: Layers3 },
 ]
+
+const defaultCameras = [
+  { id: 'demo-live', name: '热感监控演示', location: '三楼东侧走廊', type: 'demo', url: DEMO_LIVE, public: true },
+]
+
+function encodeCamera(camera) {
+  const bytes = new TextEncoder().encode(JSON.stringify(camera))
+  let binary = ''
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte) })
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function decodeCamera(value) {
+  try {
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+    const binary = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='))
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+    return JSON.parse(new TextDecoder().decode(bytes))
+  } catch {
+    return null
+  }
+}
+
+function initialActiveTab() {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('camera') || params.get('view') === 'camera') return 'camera'
+  } catch {}
+  return 'home'
+}
+
+function initialCameraState() {
+  let base = defaultCameras
+  try {
+    const saved = JSON.parse(localStorage.getItem('thermalGuardCameras') || 'null')
+    if (Array.isArray(saved) && saved.length) base = saved
+  } catch {}
+  const shared = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('camera') : null
+  const parsed = shared ? decodeCamera(shared) : null
+  return parsed?.public && parsed?.url ? [{ ...parsed, id: `shared-${parsed.id || Date.now()}` }, ...base] : base
+}
 
 const initialDevices = [
   { id: 'demo-lab', name: '实验室 ESP32', location: '澳门科技大学 P11', url: 'wss://192.168.4.1:81/' },
@@ -341,6 +388,120 @@ function LineChart() {
   return <svg className="line-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none"><defs><linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#38bdf8" stopOpacity=".34" /><stop offset="1" stopColor="#38bdf8" stopOpacity="0" /></linearGradient></defs><polygon points={area} fill="url(#chart-fill)" /><polyline points={line} fill="none" stroke="#38bdf8" strokeWidth="3" vectorEffect="non-scaling-stroke" />{points.map(([x, y], index) => <circle key={index} cx={x} cy={y} r="2.5" fill="#07101e" stroke="#38bdf8" strokeWidth="2" />)}</svg>
 }
 
+
+function LivePlayer({ camera }) {
+  const videoRef = useRef(null)
+  const playerRef = useRef(null)
+  const [currentTime, setCurrentTime] = useState(() => new Date().toLocaleString('zh-CN', { hour12: false }))
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date().toLocaleString('zh-CN', { hour12: false })), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    if (!camera || camera.type === 'demo' || camera.type === 'mjpeg') return undefined
+    const video = videoRef.current
+    if (!video) return undefined
+    let hls
+    let cancelled = false
+    const start = async () => {
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = camera.url
+        video.play().catch(() => {})
+        return
+      }
+      const { default: Hls } = await import('hls.js')
+      if (cancelled || !videoRef.current || !Hls.isSupported()) return
+      hls = new Hls({ liveDurationInfinity: true, lowLatencyMode: true })
+      hls.loadSource(camera.url)
+      hls.attachMedia(videoRef.current)
+      hls.on(Hls.Events.MANIFEST_PARSED, () => videoRef.current?.play().catch(() => {}))
+    }
+    start()
+    return () => {
+      cancelled = true
+      hls?.destroy()
+      if (video) {
+        video.pause()
+        video.removeAttribute('src')
+        video.load()
+      }
+    }
+  }, [camera])
+
+  const enterFullscreen = () => {
+    const element = playerRef.current
+    if (!element) return
+    if (document.fullscreenElement) document.exitFullscreen?.()
+    else element.requestFullscreen?.()
+  }
+
+  return (
+    <div className="live-player" ref={playerRef}>
+      {camera.type === 'demo' && <img src={camera.url} alt={`${camera.name}演示监控`} />}
+      {camera.type === 'mjpeg' && <img src={camera.url} alt={`${camera.name}实时监控`} />}
+      {camera.type === 'hls' && <video ref={videoRef} controls muted autoPlay playsInline />}
+      <div className="live-grid" />
+      {camera.type === 'demo' && <div className="live-scan" />}
+      <div className="live-status"><i />{camera.type === 'demo' ? '公开演示流' : camera.public ? '公开监控' : '本机监控'}</div>
+      <div className="live-camera-name"><Video size={14} /><span>{camera.name}</span><small>{camera.location || '未设置位置'}</small></div>
+      <button className="fullscreen-button" type="button" onClick={enterFullscreen}><Maximize2 size={16} /></button>
+      <div className="live-time">{currentTime}</div>
+    </div>
+  )
+}
+
+function CameraSheet({ editing, onClose, onSave }) {
+  const [name, setName] = useState(editing?.name || '')
+  const [location, setLocation] = useState(editing?.location || '')
+  const [type, setType] = useState(editing?.type || 'hls')
+  const [url, setUrl] = useState(editing?.url || '')
+  const [isPublic, setIsPublic] = useState(Boolean(editing?.public))
+  const valid = name.trim() && (type === 'demo' || /^https?:\/\//i.test(url.trim()))
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <section className="device-sheet" onClick={(event) => event.stopPropagation()}>
+        <div className="sheet-handle" />
+        <div className="sheet-head"><div><span>监控联动</span><strong>{editing ? '编辑监控' : '添加监控'}</strong></div><button type="button" onClick={onClose}><X size={18} /></button></div>
+        <label>监控名称<input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：三楼东侧走廊" /></label>
+        <label>安装位置<input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="例如：消防通道入口" /></label>
+        <label>监控类型<select value={type} onChange={(e) => { setType(e.target.value); if (e.target.value === 'demo') setUrl(DEMO_LIVE) }}><option value="hls">HLS 实时流</option><option value="mjpeg">MJPEG 实时流</option><option value="demo">内置公开演示流</option></select></label>
+        <label>监控地址<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/live.m3u8" inputMode="url" autoCapitalize="none" disabled={type === 'demo'} /></label>
+        <label className="public-toggle"><input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} /><span><strong>允许通过分享链接公开查看</strong><small>请勿公开包含人员、住宅、门禁或消防设施细节的画面</small></span></label>
+        <div className="sheet-tip"><Info size={14} />RTSP 地址不能被手机浏览器直接播放，需要海康、大华 NVR 或媒体网关转换为 HLS/WebRTC。</div>
+        <button className="sheet-save" type="button" disabled={!valid} onClick={() => onSave({ name: name.trim(), location: location.trim(), type, url: type === 'demo' ? DEMO_LIVE : url.trim(), public: isPublic })}><Save size={16} />保存监控</button>
+      </section>
+    </div>
+  )
+}
+
+function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete, canShare, onShare }) {
+  return (
+    <div className="mobile-page">
+      <header className="page-heading camera-heading"><span>现场监控</span><h1>热成像与监控联动</h1><p>实时查看现场画面，高温预警可直接对应到监控区域</p></header>
+      <LivePlayer camera={selectedCamera} />
+      <div className="camera-actions">
+        <button type="button" className={canShare ? '' : 'disabled'} onClick={() => canShare && onShare(selectedCamera)}><Copy size={15} />分享当前监控</button>
+        <button type="button" onClick={onAdd}><Plus size={15} />添加监控</button>
+      </div>
+      <div className="section-title"><strong>监控列表</strong><span>{cameras.length} 路</span></div>
+      <div className="camera-grid">
+        {cameras.map((camera) => (
+          <article className={`camera-card ${selectedCamera?.id === camera.id ? 'active' : ''}`} key={camera.id} onClick={() => onSelect(camera)}>
+            <div className="camera-thumb">{camera.type === 'demo' || camera.type === 'mjpeg' ? <img src={camera.url} alt="" /> : <Video size={25} />}<span>{camera.public ? '公开' : '授权'}</span></div>
+            <div className="camera-info"><strong>{camera.name}</strong><small>{camera.location || '未设置位置'}</small><em>{camera.type === 'demo' ? '演示流' : camera.type === 'mjpeg' ? 'MJPEG' : 'HLS直播'}</em></div>
+            <button type="button" onClick={(event) => { event.stopPropagation(); onEdit(camera) }}><Edit3 size={14} /></button>
+            <button type="button" onClick={(event) => { event.stopPropagation(); onDelete(camera.id) }}><Trash2 size={14} /></button>
+          </article>
+        ))}
+      </div>
+      <div className="monitor-note"><Globe2 size={16} /><p>公开流适合无隐私的演示区域。真实监控建议通过账号授权、临时签名地址或受控网关接入，不建议直接暴露 NVR 地址或长期公开。</p></div>
+    </div>
+  )
+}
+
 function DashboardPage() {
   const stats = [
     ['累计检测图像', '12,846', '张', '+18.6%', ImageIcon, 'blue'],
@@ -372,7 +533,7 @@ function AboutPage() {
 }
 
 export default function MobileApp() {
-  const [activeTab, setActiveTab] = useState('home')
+  const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [showDevices, setShowDevices] = useState(false)
   const [phase, setPhase] = useState(0)
   const [frame, setFrame] = useState(() => createFrame())
@@ -389,6 +550,10 @@ export default function MobileApp() {
   const [activeDevice, setActiveDevice] = useState(null)
   const [connection, setConnection] = useState('simulator')
   const [error, setError] = useState('')
+  const [cameras, setCameras] = useState(initialCameraState)
+  const [selectedCameraId, setSelectedCameraId] = useState(() => initialCameraState()[0].id)
+  const [cameraSheet, setCameraSheet] = useState(null)
+  const [toast, setToast] = useState('')
   const timerRef = useRef(null)
   const socketRef = useRef(null)
   const inputCameraRef = useRef(null)
@@ -397,6 +562,16 @@ export default function MobileApp() {
   useEffect(() => {
     localStorage.setItem('thermalGuardDevices', JSON.stringify(devices))
   }, [devices])
+
+  useEffect(() => {
+    localStorage.setItem('thermalGuardCameras', JSON.stringify(cameras))
+  }, [cameras])
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = window.setTimeout(() => setToast(''), 2400)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   useEffect(() => {
     if (connection === 'connected') return undefined
@@ -494,12 +669,44 @@ export default function MobileApp() {
     else setDevices((current) => [...current, { id: globalThis.crypto?.randomUUID?.() || `${Date.now()}`, ...values }])
   }
 
+  const selectedCamera = cameras.find((camera) => camera.id === selectedCameraId) || cameras[0]
+
+  const saveCamera = (values) => {
+    if (cameraSheet?.camera) {
+      setCameras((current) => current.map((camera) => camera.id === cameraSheet.camera.id ? { ...camera, ...values } : camera))
+    } else {
+      const next = { id: globalThis.crypto?.randomUUID?.() || `camera-${Date.now()}`, ...values }
+      setCameras((current) => [...current, next])
+      setSelectedCameraId(next.id)
+    }
+    setCameraSheet(null)
+  }
+
+  const shareCamera = async (camera) => {
+    if (!camera?.public) {
+      setToast('授权监控不可公开分享')
+      return
+    }
+    const url = new URL(location.href)
+    url.search = ''
+    url.hash = ''
+    url.searchParams.set('camera', encodeCamera(camera))
+    url.searchParams.set('view', 'camera')
+    try {
+      await navigator.clipboard.writeText(url.toString())
+      setToast('公开监控分享链接已复制')
+    } catch {
+      setToast('复制失败，请使用浏览器地址栏分享')
+    }
+  }
+
   const page = useMemo(() => {
+    if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
     if (activeTab === 'alerts') return <AlertsPage alerts={alerts} />
     if (activeTab === 'dashboard') return <DashboardPage />
     if (activeTab === 'about') return <AboutPage />
     return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
-  }, [activeTab, alerts, image, fileName, detecting, progress, detected, result, phase])
+  }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, result, phase])
 
   return (
     <div className="mobile-app-shell">
@@ -512,6 +719,8 @@ export default function MobileApp() {
         {tabs.map(({ id, label, icon: Icon }) => <button type="button" className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}><Icon size={20} /><span>{label}</span></button>)}
       </nav>
       {showDevices && <DeviceSheet devices={devices} activeDevice={activeDevice} connection={connection} error={error} onClose={() => setShowDevices(false)} onConnect={connectDevice} onDisconnect={disconnect} onSave={saveDevice} onDelete={(id) => setDevices((current) => current.filter((device) => device.id !== id))} />}
+      {cameraSheet && <CameraSheet editing={cameraSheet.camera} onClose={() => setCameraSheet(null)} onSave={saveCamera} />}
+      {toast && <div className="toast-message">{toast}</div>}
     </div>
   )
 }

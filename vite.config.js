@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [react()],
   server: { host: '127.0.0.1', port: 5173 },
   build: {
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       input: {
         main: entry('index.html'),
