@@ -42,15 +42,16 @@
   <p class="lead">选择你的手机系统。无需 App Store 或 Apple 开发者账号，安装后会生成独立图标，并像普通 App 一样全屏打开，支持现场监控查看。</p>
 
   <section class="card featured" id="ios-card">
-    <div class="card-head"><h2>iPhone / iPad 安装</h2><span class="tag">推荐</span></div>
-    <p>下载安装描述文件，然后在“设置”中确认。该描述文件只会在主屏幕添加网站快捷方式，不会访问你的隐私数据。</p>
-    <a class="button" href="./thermal-guard.mobileconfig" download>下载手机安装配置</a>
+    <div class="card-head"><h2>iPhone / iPad 描述文件版</h2><span class="tag">设置安装</span></div>
+    <p>此版本通过苹果“描述文件”安装，适合希望在系统设置中确认安装的用户。必须使用 Safari 打开，并确保网页以 HTTPS 访问。</p>
+    <a class="button" id="profile-install-link" href="./thermal-guard.mobileconfig">打开手机描述文件</a>
     <ol class="steps">
       <li>点击上方按钮，选择“允许”。</li>
       <li>打开“设置 → 通用 → VPN与设备管理”。</li>
       <li>点击“已下载的描述文件”，选择“安装”。</li>
       <li>返回主屏幕，点击“热感哨兵”图标。</li>
     </ol>
+    <a class="button secondary" href="./mobile-app.html">改用免描述文件安装版</a>
   </section>
 
   <section class="card" id="android-card">
@@ -76,6 +77,25 @@
   </div>
 </main>
 <script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+
+  const profileLink = document.getElementById('profile-install-link');
+  profileLink.addEventListener('click', async (event) => {
+    if (!('serviceWorker' in navigator)) return;
+    event.preventDefault();
+    try {
+      await navigator.serviceWorker.register('./sw.js');
+      await navigator.serviceWorker.ready;
+      if (!navigator.serviceWorker.controller) {
+        await Promise.race([
+          new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true })),
+          new Promise((resolve) => setTimeout(resolve, 2500))
+        ]);
+      }
+    } catch {}
+    window.location.href = profileLink.href;
+  });
+
   const ua = navigator.userAgent || '';
   const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isAndroid = /Android/i.test(ua);
