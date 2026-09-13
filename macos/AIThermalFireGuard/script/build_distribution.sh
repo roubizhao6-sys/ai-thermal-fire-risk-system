@@ -87,7 +87,8 @@ PY
   "$APP_PATH" \
   "$ZIP_PATH"
 
-/usr/bin/shasum -a 256 "$DMG_PATH" "$ZIP_PATH" > "$DIST_DIR/SHA256.txt"
+cd "$DIST_DIR"
+/usr/bin/shasum -a 256 "$(basename "$DMG_PATH")" "$(basename "$ZIP_PATH")" > SHA256.txt
 file "$APP_PATH/Contents/MacOS/$APP_NAME"
 /usr/bin/lipo -info "$APP_PATH/Contents/MacOS/$APP_NAME"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_PATH"

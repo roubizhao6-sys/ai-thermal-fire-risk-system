@@ -6,3 +6,4 @@ qa-*.png
 .swiftpm/
 *.xcuserstate
 .tools/
+build/

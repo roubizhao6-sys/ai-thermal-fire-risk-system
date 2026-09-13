@@ -256,14 +256,14 @@
 				CODE_SIGN_ENTITLEMENTS = AppStore/AIThermalFireGuard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = AppStore/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.thermalguard.AIThermalFireGuard;
 				PRODUCT_NAME = AIThermalFireGuard;
 				SDKROOT = macosx;
@@ -278,14 +278,14 @@
 				CODE_SIGN_ENTITLEMENTS = AppStore/AIThermalFireGuard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = AppStore/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.thermalguard.AIThermalFireGuard;
 				PRODUCT_NAME = AIThermalFireGuard;
 				SDKROOT = macosx;
