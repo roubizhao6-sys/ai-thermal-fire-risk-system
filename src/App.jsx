@@ -34,6 +34,8 @@ import {
   Zap,
 } from 'lucide-react'
 
+const DEMO_THERMAL_SRC = `${import.meta.env.BASE_URL}demo-thermal.jpg`
+
 const navItems = [
   { label: '首页', href: '#home' },
   { label: '在线检测', href: '#detection' },
@@ -177,7 +179,7 @@ function HeroVisual() {
           <div className="camera-meta"><span>31 帧/秒</span><Wifi size={14} /></div>
         </div>
         <div className="hero-thermal">
-          <img src="/demo-thermal.jpg" alt="工业场景热成像检测预览" />
+          <img src={DEMO_THERMAL_SRC} alt="工业场景热成像检测预览" />
           <div className="thermal-grid" />
           <div className="scan-beam" />
           <div className="hero-box hero-box-a"><span>86.4°C</span></div>
@@ -337,7 +339,7 @@ function DetectionSection() {
   }
 
   const useSample = () => {
-    loadImage('/demo-thermal.jpg', '示例热成像-01.jpg')
+    loadImage(DEMO_THERMAL_SRC, '示例热成像-01.jpg')
   }
 
   const startDetection = () => {
