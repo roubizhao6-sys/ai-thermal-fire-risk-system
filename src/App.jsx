@@ -680,6 +680,7 @@ function Footer() {
         <div className="footer-meta">
           <span><Users size={15} />项目团队：智感安全科研小组</span>
           <span>© 2026 AI 热感火警风险检测系统</span>
+          <a href="./mobile-install.html">手机安装</a>
         </div>
         <a href="#home" className="to-top">返回顶部 <ArrowRight size={14} /></a>
       </div>

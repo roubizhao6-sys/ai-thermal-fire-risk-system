@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="robots" content="index,follow" />
+  <title>手机安装｜AI热感火警风险检测系统</title>
+  <style>
+    :root { color-scheme: dark; --bg:#06101f; --panel:#101d31; --line:rgba(96,165,250,.2); --text:#f3f8ff; --muted:#8ea5c2; --blue:#3b82f6; --cyan:#38bdf8; --orange:#f97316; --green:#22c55e; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 80% 0,rgba(37,99,235,.23),transparent 32%),radial-gradient(circle at 20% 80%,rgba(239,68,68,.12),transparent 30%),var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { width:min(720px,calc(100% - 32px)); margin:0 auto; padding:44px 0 64px; }
+    .brand { display:flex; align-items:center; gap:13px; margin-bottom:30px; }
+    .logo { width:52px; height:52px; border-radius:14px; box-shadow:0 10px 30px rgba(59,130,246,.25); }
+    .brand strong { display:block; font-size:18px; }
+    .brand small { color:var(--muted); letter-spacing:.14em; font-size:10px; }
+    h1 { font-size:34px; line-height:1.2; letter-spacing:-.03em; margin:0 0 14px; }
+    .lead { color:var(--muted); line-height:1.8; margin:0 0 28px; }
+    .card { padding:20px; margin-top:14px; border:1px solid var(--line); border-radius:20px; background:linear-gradient(145deg,rgba(21,38,64,.88),rgba(7,16,31,.9)); box-shadow:0 24px 60px rgba(0,0,0,.25); }
+    .card.featured { border-color:rgba(56,189,248,.38); }
+    .card-head { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:10px; }
+    .card h2 { font-size:20px; margin:0; }
+    .tag { padding:5px 8px; border-radius:999px; font-size:10px; color:#8ce0b0; background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.2); }
+    .card p, .card li { color:var(--muted); font-size:14px; line-height:1.75; }
+    .button { display:flex; align-items:center; justify-content:center; min-height:52px; margin-top:17px; padding:0 18px; border-radius:12px; color:#fff; text-decoration:none; font-weight:700; background:linear-gradient(110deg,var(--blue),var(--cyan)); box-shadow:0 12px 28px rgba(37,99,235,.28); }
+    .button.secondary { color:#d7e7fb; background:rgba(59,130,246,.12); border:1px solid rgba(96,165,250,.25); box-shadow:none; }
+    .notice { margin-top:24px; padding:16px; border:1px solid rgba(249,115,22,.2); border-radius:14px; background:rgba(249,115,22,.07); color:#d9b08e; font-size:12px; line-height:1.7; }
+    code { color:#93c5fd; word-break:break-all; }
+    .steps { margin:16px 0 0; padding-left:20px; }
+    @media (max-width:520px) { main { padding-top:28px; } h1 { font-size:29px; } .card { padding:17px; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <img class="logo" src="./icon-192.png" alt="热感哨兵图标" />
+    <div><strong>热感哨兵</strong><small>手机安装中心</small></div>
+  </div>
+
+  <h1>把热感火警检测装到手机主屏幕</h1>
+  <p class="lead">选择你的手机系统。无需 App Store 或 Apple 开发者账号，安装后会生成独立图标，并像普通 App 一样全屏打开。</p>
+
+  <section class="card featured" id="ios-card">
+    <div class="card-head"><h2>iPhone / iPad 安装</h2><span class="tag">推荐</span></div>
+    <p>下载安装描述文件，然后在“设置”中确认。该描述文件只会在主屏幕添加网站快捷方式，不会访问你的隐私数据。</p>
+    <a class="button" href="./thermal-guard.mobileconfig" download>下载手机安装配置</a>
+    <ol class="steps">
+      <li>点击上方按钮，选择“允许”。</li>
+      <li>打开“设置 → 通用 → VPN与设备管理”。</li>
+      <li>点击“已下载的描述文件”，选择“安装”。</li>
+      <li>返回主屏幕，点击“热感哨兵”图标。</li>
+    </ol>
+  </section>
+
+  <section class="card" id="android-card">
+    <div class="card-head"><h2>Android 安装</h2><span class="tag">PWA</span></div>
+    <p>Android 无法安装 Mac 的 DMG 文件。请使用 Chrome 打开网页版并安装为 Web App。</p>
+    <a class="button secondary" href="./">打开网页并安装</a>
+    <ol class="steps">
+      <li>使用 Chrome 打开网页。</li>
+      <li>点击右上角“⋮”菜单。</li>
+      <li>选择“安装应用”或“添加到主屏幕”。</li>
+      <li>确认后即可从主屏幕运行。</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Mac 电脑安装</h2><span class="tag">DMG</span></div>
+    <p>Mac 用户请下载完整原生 App，支持模拟热像仪、ESP32 串口和 Wi-Fi WebSocket。</p>
+    <a class="button secondary" href="https://github.com/roubizhao6-sys/ai-thermal-fire-risk-system/releases/latest/download/AIThermalFireGuard-macOS-1.0.1.dmg">下载 Mac 安装包</a>
+  </section>
+
+  <div class="notice">
+    <strong>说明：</strong>手机安装版是无需开发者签名的 Web App 安装方式，不是原生 `.ipa` 或 `.apk` 文件。若需要原生手机 App，需要单独开发 iOS/Android 工程并完成对应平台签名。
+  </div>
+</main>
+<script>
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  if (isIOS) document.getElementById('ios-card').scrollIntoView({block:'center'});
+  if (isAndroid) document.getElementById('android-card').scrollIntoView({block:'center'});
+</script>
+</body>
+</html>

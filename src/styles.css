@@ -657,6 +657,8 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.03em; }
 .footer .brand-copy strong { font-size: 14px; }
 .footer-meta { display: flex; align-items: center; gap: 28px; color: #60738d; font-size: 10px; }
 .footer-meta span { display: flex; align-items: center; gap: 7px; }
+.footer-meta a { color: #7ca6d8; transition: color .2s ease; }
+.footer-meta a:hover { color: #c5e1ff; }
 .to-top { display: flex; align-items: center; gap: 7px; color: #6c91bc; font-size: 10px; transition: color .2s ease; }
 .to-top svg { transform: rotate(-45deg); }
 .to-top:hover { color: #a9d1ff; }
