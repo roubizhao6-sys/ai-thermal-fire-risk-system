@@ -786,3 +786,155 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.03em; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ============================================================
+   黑色简约 · 落地页覆盖层
+
+   与移动端（mobile.css）和两个 iOS App 统一视觉语言：
+   纯黑基底、分层灰面、发丝分隔、系统红作为唯一强调色，
+   去掉霓虹光晕与彩色渐变。
+
+   实现方式是"覆盖"而不是重写：整个这一块删掉即可完全回到原样式，
+   队友原来的规则一行没动，方便 review 与回退。
+   ============================================================ */
+
+:root {
+  --bg: #000000;
+  --bg-2: #0b0b0c;
+  --navy: #1c1c1e;
+  --panel: #1c1c1e;
+  --panel-strong: #2c2c2e;
+  --panel-soft: #161618;
+  --line: rgba(84, 84, 88, .65);
+  --line-bright: rgba(255, 59, 48, .45);
+  --text: #ffffff;
+  --text-soft: rgba(235, 235, 245, .72);
+  --muted: rgba(235, 235, 245, .45);
+  --blue: #ff3b30;
+  --blue-bright: #ff453a;
+  --cyan: #ff9f0a;
+  --radius-xl: 20px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --shadow: 0 18px 50px rgba(0, 0, 0, .5);
+}
+
+/* 基底：纯黑，去掉满屏光晕 */
+body {
+  background: #000;
+  color: var(--text);
+}
+
+/* 装饰性光斑全部移除：黑色简约不需要环境光 */
+.hero-orb,
+.visual-glow,
+.about-glow,
+.hero-grid,
+.analysis-scan {
+  display: none;
+}
+
+/* 顶栏：半透明黑 + 发丝线 */
+.topbar {
+  border-bottom: 1px solid rgba(84, 84, 88, .5);
+  background: rgba(0, 0, 0, .72);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+.topbar-scrolled {
+  background: rgba(0, 0, 0, .88);
+  box-shadow: none;
+}
+.brand-mark {
+  color: var(--blue);
+  border-radius: var(--radius-md);
+  background: rgba(255, 59, 48, .16);
+  box-shadow: none;
+}
+.brand-mark::after { display: none; }
+.nav-links a { color: var(--text-soft); }
+.nav-links a:hover { color: var(--text); }
+.nav-cta,
+.primary-btn,
+.detect-btn {
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--blue);
+  box-shadow: none;
+}
+.nav-cta:hover { background: var(--blue-bright); border-color: transparent; }
+.ghost-btn,
+.sample-btn,
+.reset-btn {
+  color: var(--text);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: rgba(120, 120, 128, .22);
+}
+.system-status { color: var(--muted); }
+
+/* 所有容器：统一成分层灰面 + 发丝线，去掉彩色渐变与投影光晕 */
+.camera-card,
+.feature-card,
+.stat-card,
+.chart-card,
+.result-panel,
+.upload-panel,
+.workflow-panel,
+.detection-box,
+.hotspot-list,
+.chart-card,
+.advice-card,
+.notice,
+.risk-card,
+.panel-head {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--panel);
+  box-shadow: none;
+}
+.feature-card::after,
+.feature-card::before,
+.stat-card::after,
+.camera-card::after,
+.camera-card::before,
+.result-panel::after,
+.result-panel::before,
+.risk-card::after,
+.risk-card::before {
+  display: none;
+}
+
+/* 图表与仪表：保留数据语义色，只去掉发光 */
+.primary-btn,
+.detect-btn { box-shadow: none !important; }
+.analysis-orbit,
+.upload-rings > span,
+.metric-icon,
+.feature-icon,
+.workflow-icon {
+  color: var(--blue);
+  border: 1px solid var(--line);
+  background: rgba(120, 120, 128, .16);
+}
+.progress-track { background: rgba(120, 120, 128, .24); }
+.progress-track > span { background: var(--blue); box-shadow: none; }
+
+/* 标题字色统一 */
+.hero-copy h1,
+.section-heading h2,
+.about-copy h2 { color: var(--text); }
+.hero-copy p,
+.section-heading p,
+.about-copy > p,
+.feature-card p { color: var(--text-soft); }
+.eyebrow,
+.feature-tag { color: var(--blue); }
+
+/* 页脚 */
+.footer {
+  border-top: 1px solid var(--line);
+  background: #000;
+}
+.footer-meta { color: var(--muted); }
