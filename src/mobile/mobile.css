@@ -229,6 +229,24 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .disclosure-row small { color: var(--text-3); font-size: var(--t-caption); }
 .disclosure-row > svg { color: var(--text-3); }
 
+/* 跳到用户端的入口行 */
+.app-link-row {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  color: inherit;
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  text-decoration: none;
+}
+.app-link-row > svg { color: var(--accent); }
+.app-link-row > div { display: flex; flex-direction: column; gap: 3px; }
+.app-link-row strong { font-size: var(--t-subhead); font-weight: 500; }
+.app-link-row small { color: var(--text-3); font-size: var(--t-caption); }
+
 /* 报警中心 / 逃生指引页的页头（与 page-heading 同一套字阶） */
 .page-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .page-intro > div { min-width: 0; }

@@ -600,6 +600,25 @@ export default function MobileApp() {
     return () => clearInterval(timer)
   }, [alarm, fire])
 
+  // 把火情同步给用户端：同一浏览器里打开 user-app.html 的标签页会收到 storage 事件，
+  // 于是「系统端触发报警 → 用户端表盘立刻转向撤离方向」可以在一台设备上演示。
+  useEffect(() => {
+    try {
+      if (fire) {
+        localStorage.setItem('thermalGuardFire', JSON.stringify({
+          nodeId: fire.nodeId,
+          floor: fire.floor,
+          startedAt: fire.startedAt,
+          mode: fire.mode,
+        }))
+      } else {
+        localStorage.removeItem('thermalGuardFire')
+      }
+    } catch {
+      /* 隐私模式下不可写，忽略 */
+    }
+  }, [fire])
+
   // 首次用户交互时解锁音频（浏览器自动播放策略）
   useEffect(() => {
     const unlock = async () => {

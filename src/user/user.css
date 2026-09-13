@@ -1,0 +1,184 @@
+/* ============================================================
+   热感哨兵 · 用户端
+   参考 iOS「指南针」：单屏、一个大表盘、读数居中、几乎没有按钮。
+   规则：
+   1. 只有一块内容区，没有标签栏、没有卡片、没有渐变
+   2. 一个数字当主角（等宽数字），其余文字退到次级灰
+   3. 分割只靠留白和发丝线
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --separator: rgba(84, 84, 88, .55);
+  --text: #ffffff;
+  --text-2: rgba(235, 235, 245, .58);
+  --text-3: rgba(235, 235, 245, .3);
+  --alert: #ff3b30;
+  --safe: #30d158;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overscroll-behavior: none; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+p { margin: 0; }
+:focus-visible { outline: 2px solid var(--alert); outline-offset: 3px; border-radius: 8px; }
+
+.compass-app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: calc(env(safe-area-inset-top) + 8px) 0 calc(env(safe-area-inset-bottom) + 4px);
+  background: var(--bg);
+}
+
+/* 火警时唯一出现的一条横幅，细、窄、不抢表盘 */
+.alert-strip {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 16px 10px;
+  color: var(--alert);
+  font-size: 13px;
+  letter-spacing: .02em;
+}
+.alert-strip span { font-weight: 600; }
+.alert-strip em { color: var(--text-3); font-size: 12px; font-style: normal; }
+
+.compass-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 0 20px;
+}
+
+/* 表盘占屏幕的主要面积，居中 */
+.dial-wrap {
+  position: relative;
+  width: min(84vw, 420px);
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+}
+.compass-dial { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dial-ring { fill: none; stroke: rgba(235, 235, 245, .12); stroke-width: 1; }
+.tick { stroke: rgba(235, 235, 245, .22); stroke-width: 1; }
+.tick-medium { stroke: rgba(235, 235, 245, .34); }
+.tick-major { stroke: rgba(235, 235, 245, .5); stroke-width: 1.4; }
+.dial-letter {
+  fill: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-anchor: middle;
+  letter-spacing: .04em;
+}
+.dial-letter.is-north { fill: var(--text); }
+.needle { fill: var(--safe); }
+.needle-line { stroke: var(--safe); stroke-width: 2.5; stroke-linecap: round; }
+.needle.needle-alert { fill: var(--alert); }
+.needle-line.needle-alert { stroke: var(--alert); }
+.dial-pin { fill: var(--text-3); }
+
+/* 表盘正中的读数：一个数字当主角 */
+.dial-center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  pointer-events: none;
+}
+.heading {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.heading .cardinal { font-size: 26px; font-weight: 600; color: var(--text-2); }
+.heading .degrees { font-size: 76px; font-weight: 300; letter-spacing: -.04em; }
+.heading .unit { font-size: 28px; font-weight: 300; color: var(--text-2); }
+.heading.is-alert .degrees, .heading.is-alert .unit { color: var(--alert); }
+.direction-word { margin-top: 2px; color: var(--text-2); font-size: 13px; letter-spacing: .06em; }
+
+.meta { margin-top: 22px; display: flex; flex-direction: column; gap: 8px; width: 210px; text-align: left; }
+.meta > div { display: flex; justify-content: space-between; gap: 12px; }
+.meta span { color: var(--text-3); font-size: 12px; white-space: nowrap; }
+.meta strong { font-size: 12px; font-weight: 500; text-align: right; }
+
+.stage-note { color: var(--text-3); font-size: 12px; text-align: center; }
+
+/* 底部只留三个纯文字按钮，和指南针的「真北 / 水平仪」同一层级 */
+.compass-tools {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 45px;
+  padding: 6px 16px calc(4px + env(safe-area-inset-bottom));
+}
+.compass-tools button {
+  padding: 8px 2px;
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 400;
+}
+.compass-tools button:active { opacity: .5; }
+.compass-app.is-alert .compass-tools button:first-child { color: var(--alert); }
+
+.compass-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  color: var(--text);
+  border-radius: 999px;
+  background: rgba(44, 44, 46, .94);
+  font-size: 12px;
+  white-space: nowrap;
+  animation: toastIn .3s ease both;
+}
+
+/* 位置选择：极简底部弹层 */
+.sheet-backdrop { position: fixed; z-index: 20; inset: 0; display: flex; align-items: flex-end; background: rgba(0, 0, 0, .6); }
+.position-sheet {
+  width: 100%;
+  padding: 10px 20px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+  animation: sheetIn .3s cubic-bezier(.32, .72, 0, 1) both;
+}
+.sheet-handle { width: 36px; height: 5px; margin: 0 auto 16px; border-radius: 999px; background: rgba(235, 235, 245, .3); }
+.position-sheet h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+.position-sheet p { margin-top: 6px; color: var(--text-3); font-size: 12px; line-height: 1.5; }
+.floor-row-picker { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 18px; }
+.spot-row-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.floor-row-picker button, .spot-row-picker button {
+  min-height: 42px;
+  color: var(--text-2);
+  border-radius: 10px;
+  background: rgba(120, 120, 128, .18);
+  font-size: 15px;
+}
+.floor-row-picker button.active, .spot-row-picker button.active { color: #000; background: var(--text); font-weight: 600; }
+.done-button { width: 100%; min-height: 48px; margin-top: 18px; color: var(--text); border-radius: 12px; background: rgba(120, 120, 128, .24); font-size: 16px; font-weight: 500; }
+
+@keyframes sheetIn { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+@media (min-width: 700px) {
+  .compass-app { max-width: 720px; margin: 0 auto; }
+}

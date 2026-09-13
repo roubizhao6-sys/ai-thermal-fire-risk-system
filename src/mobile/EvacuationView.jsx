@@ -257,6 +257,11 @@ export default function EvacuationView({ route, fire, position, blocked, nowMs, 
         ))}
       </section>
 
+      <a className="app-link-row" href="./user-app.html">
+        <Navigation size={16} />
+        <div><strong>打开用户端（极简逃生版）</strong><small>一个表盘告诉你往哪走、还有多远、走哪条楼梯</small></div>
+      </a>
+
       {/* 页面容器带 transform 动画，会让 position: fixed 失效，因此挂到 body 上 */}
       {follow && createPortal(<FollowMode route={route} fire={fire} onClose={() => setFollow(false)} />, document.body)}
     </div>
