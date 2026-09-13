@@ -73,11 +73,11 @@ const DEMO_THERMAL = `${import.meta.env.BASE_URL}demo-thermal.jpg`
 const DEMO_LIVE = `${import.meta.env.BASE_URL}demo-live.gif`
 
 const tabs = [
-  { id: 'home', label: '检测', icon: ScanLine },
-  { id: 'camera', label: '监控', icon: Video },
-  { id: 'alerts', label: '预警', icon: BellRing },
-  { id: 'evacuation', label: '逃生', icon: Navigation },
-  { id: 'dashboard', label: '看板', icon: BarChart3 },
+  { id: 'home', label: '检测', navLabel: '首页检测', icon: ScanLine },
+  { id: 'camera', label: '监控', navLabel: '现场监控', icon: Video },
+  { id: 'alerts', label: '预警', navLabel: '预警记录', icon: BellRing },
+  { id: 'evacuation', label: '逃生', navLabel: '逃生指引', icon: Navigation },
+  { id: 'dashboard', label: '看板', navLabel: '数据看板', icon: BarChart3 },
 ]
 
 // 「预警」标签内部用分段控件切换：事件记录 / 报警设置
@@ -321,7 +321,11 @@ function HomePage({ inputCameraRef, inputGalleryRef, image, fileName, detecting,
           <div className="detail-grid">
             <div><MapPin size={17} /><span>高温区域</span><strong>{result.hotspots.length} 处</strong></div>
             <div><Thermometer size={17} /><span>最高温度</span><strong>{result.maxTemp.toFixed(1)}°C</strong></div>
-            <div><Crosshair size={17} /><span>区域坐标</span><strong>X 31%/Y 24%</strong></div>
+            <div>
+              <Crosshair size={17} />
+              <span>区域坐标</span>
+              <strong>{result.hotspots.length ? `X ${Math.round(result.hotspots[0].x)}% / Y ${Math.round(result.hotspots[0].y)}%` : '未检出'}</strong>
+            </div>
           </div>
           <div className="ai-explain"><span><Cpu size={17} /></span><div><strong>AI判断说明</strong><p>基于温度轮廓、扩散梯度、持续特征多维度综合分析，区分正常热源与火灾隐患，有效降低误报率。</p></div></div>
           <div className="early-warning"><Zap size={15} />可在明火、烟雾出现前识别温度异常，实现灾前预警。</div>
@@ -569,6 +573,7 @@ export default function MobileApp() {
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [audioReady, setAudioReady] = useState(() => isAudioUnlocked())
   const [notice, setNotice] = useState(null)
+  const [scrolled, setScrolled] = useState(false)
   const timerRef = useRef(null)
   const socketRef = useRef(null)
   const inputCameraRef = useRef(null)
@@ -607,6 +612,14 @@ export default function MobileApp() {
       window.removeEventListener('pointerdown', unlock)
       window.removeEventListener('keydown', unlock)
     }
+  }, [])
+
+  // 滚动后把页标题收进顶栏（iOS 大标题收起行为）
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   useEffect(() => {
@@ -1001,8 +1014,15 @@ export default function MobileApp() {
 
   return (
     <div className={`mobile-app-shell ${alarm ? 'has-alarm' : ''}`}>
-      <header className="mobile-topbar">
+      <header className={`mobile-topbar ${scrolled ? 'is-scrolled' : ''}`}>
         <div className="mobile-brand"><span><Flame size={19} /></span><div><strong>热感哨兵</strong><small>AI火警网警</small></div></div>
+        <span className="nav-title">
+          {activeTab === 'alerts'
+            ? (alertSection === 'settings' ? '报警设置' : '预警记录')
+            : activeTab === 'dashboard'
+              ? (dashView === 'about' ? '关于项目' : '数据看板')
+              : tabs.find((item) => item.id === activeTab)?.navLabel || ''}
+        </span>
         <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
       </header>
 
