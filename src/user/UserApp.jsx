@@ -8,6 +8,7 @@ import { planRoute } from '../mobile/evacuation.js'
 // 所有传感器输入（信标定位、火情、热像、朝向、设置）统一从这一层订阅
 import {
   KEYS,
+  readHazardDetail,
   readHazardSources,
   needsOrientationPermission,
   readFire,
@@ -218,11 +219,30 @@ export default function UserApp() {
   }, [sheetOpen])
 
   const elapsedSec = fire ? Math.max(0, (nowMs - fire.startedAt) / 1000) : 0
-  // 多传感器共同定位：系统端判定的火源 + 热像遥测里超阈值的节点，一起喂给寻路
-  const hazardSources = useMemo(
-    () => readHazardSources({ fire, telemetry, thresholds: settings, nowMs }),
+  // 多传感器共同定位：系统端判定的火源 + 热像遥测（经聚类与图上估计，避免"一个火场算成多处")
+  const hazard = useMemo(
+    () => readHazardDetail({ fire, telemetry, thresholds: settings, nowMs }),
     [fire, telemetry, settings, nowMs],
   )
+  const hazardSources = hazard.sources
+
+  // 给用户看的一句话：火源估计 + 不确定度 + 参与判定的传感器数
+  const sensorInfo = useMemo(() => {
+    const estimates = hazard.estimates ?? []
+    if (estimates.length) {
+      const top = estimates[0]
+      const range = top.uncertaintyHops <= 0 ? '位置明确' : `±${top.uncertaintyHops} 层内`
+      const more = estimates.length > 1 ? `（共 ${estimates.length} 处）` : ''
+      return `火源估计 ${top.label}${more} · ${range} · 置信度 ${top.confidence.toFixed(2)} · ${top.contributors.length} 个传感器共同判定`
+    }
+    const watch = hazard.watch ?? []
+    if (watch.length) {
+      const top = watch.reduce((best, item) => (item.temp > (best?.temp ?? -Infinity) ? item : best), null)
+      const floor = BUILDING.nodes[top.nodeId]?.floor ?? position.floor
+      return `观察到升温：${floor} 楼 ${Number(top.temp).toFixed(0)}°C（未达报警阈值）`
+    }
+    return null
+  }, [hazard, position.floor])
   const route = useMemo(
     () => planRoute({ startId: positionNodeId(position.floor, position.spot), fire: hazardSources, elapsedSec }),
     [position.floor, position.spot, hazardSources, elapsedSec],
@@ -265,7 +285,7 @@ export default function UserApp() {
 
   // 给读屏软件的一句话状态：只随路线变化，不随秒数跳动，避免每秒重复播报
   const statusText = route?.ok
-    ? `${fire ? `火警，请立即撤离。${sourceCount > 1 ? `现场 ${sourceCount} 处火源。` : ''}` : '当前无火警。'}撤离至 ${route.exitLabel}，${Math.round(route.meters)} 米，约 ${formatDuration(route.seconds)}，${floorDelta === 0 ? '已在本层' : `剩余 ${Math.abs(floorDelta)} 层，${floorDelta < 0 ? '下行' : '上行'}`}。`
+    ? `${fire ? `火警，请立即撤离。${sourceCount > 1 ? `现场 ${sourceCount} 处火源。` : ''}${hazard.estimates?.length ? `多传感器定位结果：火源估计 ${hazard.estimates[0].label}，不确定范围 ±${hazard.estimates[0].uncertaintyHops} 层内。` : ''}` : '当前无火警。'}撤离至 ${route.exitLabel}，${Math.round(route.meters)} 米，约 ${formatDuration(route.seconds)}，${floorDelta === 0 ? '已在本层' : `剩余 ${Math.abs(floorDelta)} 层，${floorDelta < 0 ? '下行' : '上行'}`}。`
     : `${fire ? '火警。' : ''}${route?.reason || '正在定位当前位置'}`
   const dialLabel = route?.ok
     ? `撤离方向表盘：目标${cardinal.label}方向，距离 ${Math.round(route.meters)} 米`
@@ -391,6 +411,8 @@ export default function UserApp() {
                 : `${route?.ok ? '实时 · ' : ''}${positionSource} · ${position.floor} 楼${SPOTS.find((item) => item.id === position.spot)?.label} · ${route?.ok ? `${Math.round(distanceToNext)} 米后${nextStep?.icon === 'stair' ? '进楼梯' : '到下一个路口'}` : '等待定位'}`}
             </span>
           </div>
+
+          {sensorInfo && <div className="sensor-note">{sensorInfo}</div>}
         </div>
       </main>
 

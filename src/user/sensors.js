@@ -26,6 +26,7 @@
 // 不需要改这一层 —— 这就是"保留所有传感器接口"的含义。
 
 import { DEFAULT_THRESHOLDS } from '../mobile/thermal.js'
+import { fuseReadings } from '../mobile/sensorFusion.js'
 
 export const KEYS = {
   position: 'thermalGuardUserPosition',
@@ -174,33 +175,55 @@ export function normalizeFire(raw) {
 
 // 多传感器共同定位火源：系统端判定的火源 + 热像遥测里超过高温阈值的节点。
 // 每个来源带自己的 elapsedSec（后起的火按自己的时间扩散）。
-export function readHazardSources({ fire, telemetry, thresholds, nowMs = Date.now() } = {}) {
+// 火源 + 多传感器联合定位的完整结果。
+// fire 载荷里的火源按"已判定"处理；遥测读数交给 sensorFusion 聚类+估计，
+// 这样"一个火场被 3 个传感器看到"只会产生 1 处来源，并附带置信度与不确定度。
+export function readHazardDetail({ fire, telemetry, thresholds, nowMs = Date.now() } = {}) {
   const resolvedFire = fire === undefined ? readFire() : normalizeFire(fire)
   const resolvedTelemetry = telemetry === undefined ? readTelemetry(nowMs) : telemetry
   const high = thresholds?.highThreshold ?? DEFAULT_THRESHOLDS.high
+  const medium = thresholds?.mediumThreshold ?? DEFAULT_THRESHOLDS.medium
 
   const sources = []
   const seen = new Set()
-  const push = (nodeId, startedAt, from) => {
-    if (!nodeId || seen.has(nodeId)) return
-    seen.add(nodeId)
-    sources.push({ nodeId, startedAt, from })
+  const push = (source) => {
+    if (!source?.nodeId || seen.has(source.nodeId)) return
+    seen.add(source.nodeId)
+    sources.push(source)
   }
 
-  resolvedFire?.sources?.forEach((source) => {
-    push(source.nodeId, source.startedAt ?? resolvedFire.startedAt, 'fire')
+  resolvedFire?.sources?.forEach((item) => {
+    push({ nodeId: item.nodeId, startedAt: item.startedAt ?? resolvedFire.startedAt, from: 'fire' })
   })
 
-  resolvedTelemetry?.nodes?.forEach((node) => {
-    const temp = Number(node?.temp)
-    if (!Number.isFinite(temp) || temp < high) return
-    push(node.nodeId || (node.floor ? `C${node.floor}` : null), nowMs, 'sensor')
+  const fusion = fuseReadings(resolvedTelemetry?.nodes ?? [], { high, medium })
+  fusion.sources.forEach((item) => {
+    push({
+      nodeId: item.nodeId,
+      startedAt: nowMs,
+      from: 'sensor',
+      confidence: item.confidence,
+      uncertaintyHops: item.uncertaintyHops,
+      contributors: item.contributors,
+      robust: item.robust,
+      maxTemp: item.maxTemp,
+      label: item.label,
+    })
   })
 
-  return sources.map((source) => ({
-    ...source,
-    elapsedSec: Math.max(0, (nowMs - source.startedAt) / 1000),
-  }))
+  return {
+    sources: sources.map((source) => ({
+      ...source,
+      elapsedSec: Math.max(0, (nowMs - source.startedAt) / 1000),
+    })),
+    estimates: fusion.estimates,
+    watch: fusion.watch,
+    readings: fusion.readings,
+  }
+}
+
+export function readHazardSources(options = {}) {
+  return readHazardDetail(options).sources
 }
 
 export function readTelemetry(nowMs = Date.now(), ttlMs = BEACON_TTL_MS) {

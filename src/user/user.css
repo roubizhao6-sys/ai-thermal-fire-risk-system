@@ -187,6 +187,14 @@ p { margin: 0; }
   50% { opacity: .45; transform: scale(.78); }
 }
 
+/* 多传感器联合定位结论：只有真收到遥测时才出现，平时不占位 */
+.sensor-note {
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 /* 底部只留三个纯文字按钮，和指南针的「真北 / 水平仪」同一层级 */
 .compass-tools {
   display: flex;
@@ -278,7 +286,8 @@ p { margin: 0; }
 .compass-app.is-alert .dial-caption,
 .compass-app.is-alert .dial-time,
 .compass-app.is-alert .readout span,
-.compass-app.is-alert .stage-note { color: #fff; }
+.compass-app.is-alert .stage-note,
+.compass-app.is-alert .sensor-note { color: #fff; }
 .compass-app.is-alert .distance-value,
 .compass-app.is-alert .distance-unit,
 .compass-app.is-alert .readout strong { color: #fff; }
