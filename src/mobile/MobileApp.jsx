@@ -82,6 +82,7 @@ const tabs = [
 const defaultCameras = [
   { id: 'thermal-board-sim', name: '模拟热成像板', location: '实验室 P11', type: 'sensor', url: 'sensor://esp32-sim', public: true },
   { id: 'demo-live', name: '热感监控演示', location: '三楼东侧走廊', type: 'demo', url: DEMO_LIVE, public: true },
+  { id: 'local-phone-cam', name: '本机实景摄像头', location: '手机后置摄像头', type: 'local', url: 'local://camera', public: false },
 ]
 
 function encodeCamera(camera) {
@@ -127,6 +128,7 @@ function initialCameraState() {
     const saved = JSON.parse(localStorage.getItem('thermalGuardCameras') || 'null')
     if (Array.isArray(saved) && saved.length) base = saved
     if (!base.some((camera) => camera.type === 'sensor')) base = [defaultCameras[0], ...base]
+    if (!base.some((camera) => camera.type === 'local')) base = [...base, defaultCameras[2]]
   } catch {}
   const shared = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('camera') : null
   const parsed = shared ? decodeCamera(shared) : null
@@ -873,6 +875,48 @@ function Thermal3DScene({ frame, camera }) {
   )
 }
 
+function LocalCameraView() {
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+  const [status, setStatus] = useState('requesting')
+  const [nonce, setNonce] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    setStatus('requesting')
+    const start = async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) { setStatus('unsupported'); return }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
+        if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play().catch(() => {})
+        }
+        setStatus('active')
+      } catch {
+        if (!cancelled) setStatus('denied')
+      }
+    }
+    start()
+    return () => {
+      cancelled = true
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+  }, [nonce])
+
+  return (
+    <div className="local-cam-view">
+      <video ref={videoRef} className="local-cam-video" autoPlay playsInline muted />
+      {status === 'requesting' && <div className="local-cam-state"><LoaderCircle className="spin" size={22} />正在打开手机摄像头…</div>}
+      {status === 'denied' && <div className="local-cam-state warn"><ShieldAlert size={20} />摄像头权限被拒绝<button type="button" onClick={() => setNonce((n) => n + 1)}>重新开启</button></div>}
+      {status === 'unsupported' && <div className="local-cam-state warn"><Camera size={20} />当前浏览器不支持摄像头，请使用 Safari 或 Chrome</div>}
+    </div>
+  )
+}
+
 function LivePlayer({ camera, frame, viewMode, detections = [] }) {
   const videoRef = useRef(null)
   const playerRef = useRef(null)
@@ -884,7 +928,7 @@ function LivePlayer({ camera, frame, viewMode, detections = [] }) {
   }, [])
 
   useEffect(() => {
-    if (!camera || viewMode === 'thermal3d' || viewMode === 'building' || viewMode === 'campus' || camera.type === 'sensor' || camera.type === 'demo' || camera.type === 'mjpeg') return undefined
+    if (!camera || viewMode === 'thermal3d' || viewMode === 'building' || viewMode === 'campus' || camera.type === 'sensor' || camera.type === 'demo' || camera.type === 'mjpeg' || camera.type === 'local') return undefined
     const video = videoRef.current
     if (!video) return undefined
     let hls
@@ -927,10 +971,11 @@ function LivePlayer({ camera, frame, viewMode, detections = [] }) {
       {viewMode !== 'thermal3d' && camera.type === 'demo' && <img src={camera.url} alt={`${camera.name}演示监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'mjpeg' && <img src={camera.url} alt={`${camera.name}实时监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'hls' && <video ref={videoRef} controls muted autoPlay playsInline />}
+      {viewMode !== 'thermal3d' && camera.type === 'local' && <LocalCameraView />}
       <div className="live-grid" />
       {viewMode === 'camera' && <div className="detection-layer">{detections.map((item, index) => { const box = item.bbox || [0, 0, 0.1, 0.1]; const label = item.class === 'smoke' ? '烟雾' : item.class === 'flame' || item.class === 'fire' ? '明火' : item.class === 'person' ? '人员' : '热点'; return <div className={`detection-box detection-${item.class}`} key={`${item.class}-${index}`} style={{ left: `${Number(box[0]) * 100}%`, top: `${Number(box[1]) * 100}%`, width: `${Number(box[2]) * 100}%`, height: `${Number(box[3]) * 100}%` }}><span>{label}</span><b>{Math.round(Number(item.confidence || 0) * 100)}%</b></div> })}</div>}
       {camera.type === 'demo' && <div className="live-scan" />}
-      <div className="live-status"><i />{viewMode === 'campus' ? '科大数字孪生' : viewMode === 'building' ? '3D大楼模拟' : viewMode === 'thermal3d' || camera.type === 'sensor' ? '热感板联动' : camera.type === 'demo' ? '公开演示流' : camera.public ? '公开监控' : '本机监控'}</div>
+      <div className="live-status"><i />{viewMode === 'campus' ? '科大数字孪生' : viewMode === 'building' ? '3D大楼模拟' : viewMode === 'thermal3d' || camera.type === 'sensor' ? '热感板联动' : camera.type === 'local' ? '本机实景' : camera.type === 'demo' ? '公开演示流' : camera.public ? '公开监控' : '本机监控'}</div>
       {viewMode !== 'thermal3d' && viewMode !== 'building' && viewMode !== 'campus' && camera.type !== 'sensor' && <div className="live-camera-name"><Video size={14} /><span>{camera.name}</span><small>{camera.location || '未设置位置'}</small></div>}
       <button className="fullscreen-button" type="button" onClick={enterFullscreen}><Maximize2 size={16} /></button>
       <div className="live-time">{currentTime}</div>
@@ -1191,7 +1236,7 @@ function CameraSheet({ editing, onClose, onSave }) {
   const [type, setType] = useState(editing?.type || 'hls')
   const [url, setUrl] = useState(editing?.url || '')
   const [isPublic, setIsPublic] = useState(Boolean(editing?.public))
-  const valid = name.trim() && (type === 'demo' || type === 'sensor' || /^https?:\/\//i.test(url.trim()))
+  const valid = name.trim() && (type === 'demo' || type === 'sensor' || type === 'local' || /^https?:\/\//i.test(url.trim()))
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -1200,11 +1245,11 @@ function CameraSheet({ editing, onClose, onSave }) {
         <div className="sheet-head"><div><span>监控联动</span><strong>{editing ? '编辑监控' : '添加监控'}</strong></div><button type="button" onClick={onClose}><X size={18} /></button></div>
         <label>监控名称<input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：三楼东侧走廊" /></label>
         <label>安装位置<input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="例如：消防通道入口" /></label>
-        <label>监控类型<select value={type} onChange={(e) => { setType(e.target.value); if (e.target.value === 'demo') setUrl(DEMO_LIVE); if (e.target.value === 'sensor') setUrl('sensor://esp32-sim') }}><option value="hls">HLS 实时流</option><option value="mjpeg">MJPEG 实时流</option><option value="sensor">3D 热感模拟板</option><option value="demo">内置公开演示流</option></select></label>
-        <label>监控地址<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/live.m3u8" inputMode="url" autoCapitalize="none" disabled={type === 'demo' || type === 'sensor'} /></label>
+        <label>监控类型<select value={type} onChange={(e) => { setType(e.target.value); if (e.target.value === 'demo') setUrl(DEMO_LIVE); if (e.target.value === 'sensor') setUrl('sensor://esp32-sim'); if (e.target.value === 'local') setUrl('local://camera') }}><option value="hls">HLS 实时流</option><option value="mjpeg">MJPEG 实时流</option><option value="sensor">3D 热感模拟板</option><option value="demo">内置公开演示流</option><option value="local">本机摄像头</option></select></label>
+        <label>监控地址<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/live.m3u8" inputMode="url" autoCapitalize="none" disabled={type === 'demo' || type === 'sensor' || type === 'local'} /></label>
         <label className="public-toggle"><input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} /><span><strong>允许通过分享链接公开查看</strong><small>请勿公开包含人员、住宅、门禁或消防设施细节的画面</small></span></label>
         <div className="sheet-tip"><Info size={14} />RTSP 地址不能被手机浏览器直接播放，需要海康、大华 NVR 或媒体网关转换为 HLS/WebRTC。</div>
-        <button className="sheet-save" type="button" disabled={!valid} onClick={() => onSave({ name: name.trim(), location: location.trim(), type, url: type === 'demo' ? DEMO_LIVE : type === 'sensor' ? 'sensor://esp32-sim' : url.trim(), public: isPublic })}><Save size={16} />保存监控</button>
+        <button className="sheet-save" type="button" disabled={!valid} onClick={() => onSave({ name: name.trim(), location: location.trim(), type, url: type === 'demo' ? DEMO_LIVE : type === 'sensor' ? 'sensor://esp32-sim' : type === 'local' ? 'local://camera' : url.trim(), public: isPublic })}><Save size={16} />保存监控</button>
       </section>
     </div>
   )
@@ -1283,7 +1328,7 @@ function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete
             <div className={`camera-thumb ${camera.type === 'sensor' ? 'thermal-thumb' : ''}`}>
               {camera.type === 'sensor' ? <><Rotate3D size={27} /><span>{camera.public ? '公开' : '授权'}</span></> : camera.type === 'demo' || camera.type === 'mjpeg' ? <><img src={camera.url} alt="" /><span>{camera.public ? '公开' : '授权'}</span></> : <><Video size={25} /><span>{camera.public ? '公开' : '授权'}</span></>}
             </div>
-            <div className="camera-info"><strong>{camera.name}</strong><small>{camera.location || '未设置位置'}</small><em>{camera.type === 'sensor' ? '3D热感板' : camera.type === 'demo' ? '演示流' : camera.type.toUpperCase()}</em></div>
+            <div className="camera-info"><strong>{camera.name}</strong><small>{camera.location || '未设置位置'}</small><em>{camera.type === 'sensor' ? '3D热感板' : camera.type === 'demo' ? '演示流' : camera.type === 'local' ? '本机摄像头' : camera.type.toUpperCase()}</em></div>
             <button type="button" onClick={(event) => { event.stopPropagation(); onEdit(camera) }}><Edit3 size={14} /></button>
             <button type="button" onClick={(event) => { event.stopPropagation(); onDelete(camera.id) }}><Trash2 size={14} /></button>
           </article>
