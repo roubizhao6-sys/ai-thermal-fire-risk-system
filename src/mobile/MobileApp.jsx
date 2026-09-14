@@ -74,6 +74,7 @@ const tabs = [
   { id: 'camera', label: '现场监控', icon: Video },
   { id: 'alerts', label: '预警记录', icon: BellRing },
   { id: 'dashboard', label: '数据看板', icon: BarChart3 },
+  { id: 'guide', label: '疏散导航', icon: Compass },
   { id: 'about', label: '关于项目', icon: Layers3 },
 ]
 
@@ -227,6 +228,7 @@ const buildingGraph = {
     east: { label: '东侧通道', x: 70, y: 60, type: 'zone' },
     stairs: { label: '东侧安全楼梯', x: 82, y: 44, type: 'exit' },
     north: { label: '北侧安全出口', x: 54, y: 24, type: 'exit' },
+    south: { label: '南门出口', x: 22, y: 80, type: 'exit' },
   },
   edges: {
     'start-west': { from: 'start', to: 'west', weight: 9 },
@@ -236,6 +238,8 @@ const buildingGraph = {
     'east-stairs': { from: 'east', to: 'stairs', weight: 12 },
     'mid-north': { from: 'mid', to: 'north', weight: 15 },
     'east-north': { from: 'east', to: 'north', weight: 14 },
+    'start-south': { from: 'start', to: 'south', weight: 6 },
+    'west-south': { from: 'west', to: 'south', weight: 10 },
   },
 }
 
@@ -272,7 +276,7 @@ function shortestPath(graph, startId, targetIds, blockedIds) {
   return { path, distance: Number.isFinite(dist[target]) ? dist[target] : 42, target }
 }
 
-function planEvacuation(frame) {
+function planEvacuation(frame, targetId = 'auto') {
   const hotspots = frame?.hotspots || []
   const maxTemp = Number(frame?.maxTemp || 0)
   const first = hotspots[0] || { x: 32, y: 34 }
@@ -283,7 +287,8 @@ function planEvacuation(frame) {
   } else if (maxTemp >= 45) {
     blocked.add(first.x > 55 ? 'east' : 'west')
   }
-  const result = shortestPath(buildingGraph, 'start', ['stairs', 'north'], blocked)
+  const targets = targetId === 'auto' ? ['stairs', 'north', 'south'] : [targetId]
+  const result = shortestPath(buildingGraph, 'start', targets, blocked)
   const from = buildingGraph.nodes[result.path[0]]
   const next = buildingGraph.nodes[result.path[1] || result.path[0]]
   const dx = next.x - from.x
@@ -564,11 +569,40 @@ function shortestTurn(target, heading) {
   return ((target - heading + 540) % 360) - 180
 }
 
-function EscapeCompass({ risk, maxTemp, route }) {
-  const exitBearing = route?.bearing ?? (risk === 'high' ? 18 : 42)
+function CompassRouteMap({ route }) {
+  const nodes = buildingGraph.nodes
+  const path = route?.path || ['start', 'mid', 'stairs']
+  const blocked = new Set(route?.blocked || [])
+  return (
+    <div className="compass-route-map">
+      <svg viewBox="0 0 100 82" aria-label="疏散路线简图">
+        <rect x="7" y="7" width="86" height="68" rx="7" fill="#071426" stroke="#2f6ba3" strokeOpacity=".42" />
+        {Object.values(buildingGraph.edges).map((edge) => {
+          const a = nodes[edge.from]
+          const b = nodes[edge.to]
+          const hot = blocked.has(edge.from) || blocked.has(edge.to)
+          return <line key={`${edge.from}-${edge.to}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={hot ? '#ef4444' : '#3b82f6'} strokeOpacity={hot ? '.7' : '.22'} strokeWidth={hot ? '1' : '.6'} strokeDasharray={hot ? '2 1' : ''} />
+        })}
+        <polyline points={path.map((id) => `${nodes[id].x},${nodes[id].y}`).join(' ')} fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 2"><animate attributeName="stroke-dashoffset" from="8" to="0" dur="1.2s" repeatCount="indefinite" /></polyline>
+        {path.map((id, index) => <g key={id}><circle cx={nodes[id].x} cy={nodes[id].y} r={index === 0 ? '2.6' : '1.8'} fill={nodes[id].type === 'exit' ? '#22c55e' : '#38bdf8'} /><text x={nodes[id].x} y={nodes[id].y + 6} textAnchor="middle" fontSize="4" fill="#cfe4f7">{nodes[id].label}</text></g>)}
+      </svg>
+    </div>
+  )
+}
+
+function CompassPage({ frame }) {
+  const targets = [
+    { id: 'stairs', label: '东侧安全楼梯', icon: '↗' },
+    { id: 'north', label: '北侧安全出口', icon: '↑' },
+    { id: 'south', label: '南门出口', icon: '↙' },
+  ]
+  const [target, setTarget] = useState('stairs')
   const [heading, setHeading] = useState(24)
   const [tracking, setTracking] = useState(false)
   const [permission, setPermission] = useState('prompt')
+  const [voiceOn, setVoiceOn] = useState(false)
+  const route = useMemo(() => planEvacuation(frame, target), [frame, target])
+  const targetRoutes = useMemo(() => targets.map((item) => ({ ...item, route: planEvacuation(frame, item.id) })), [frame])
 
   useEffect(() => {
     if (!tracking) return undefined
@@ -594,52 +628,80 @@ function EscapeCompass({ risk, maxTemp, route }) {
         setPermission('granted')
       }
       setTracking(true)
+      navigator.vibrate?.(80)
+      try { await navigator.wakeLock?.request('screen') } catch {}
     } catch {
       setPermission('denied')
     }
   }
 
-  const turn = shortestTurn(exitBearing, heading)
+  const turn = shortestTurn(route?.bearing ?? 42, heading)
   const turnText = Math.abs(turn) < 15
     ? '保持当前方向直行'
     : turn > 0
-      ? `向右转 ${Math.round(Math.abs(turn))}° 后前进`
-      : `向左转 ${Math.round(Math.abs(turn))}° 后前进`
+      ? `向右转 ${Math.round(Math.abs(turn))}°`
+      : `向左转 ${Math.round(Math.abs(turn))}°`
+  const speak = () => {
+    try {
+      const utterance = new SpeechSynthesisUtterance(`请前往${targets.find((item) => item.id === target)?.label}，${turnText}，距离${route?.distance}米，预计${route?.eta}秒。`)
+      utterance.lang = 'zh-CN'
+      utterance.rate = 0.95
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.speak(utterance)
+      navigator.vibrate?.([160, 80, 240])
+      setVoiceOn(true)
+      window.setTimeout(() => setVoiceOn(false), 3800)
+    } catch {}
+  }
 
   return (
-    <section className="mobile-card escape-card">
-      <div className="card-head">
-        <div><strong>指南针疏散导航</strong><small>结合风险等级与安全出口方向动态引导</small></div>
-        <Compass size={19} />
-      </div>
-      <div className="compass-layout">
-        <div className="compass-dial" style={{ '--heading': `${-heading}deg`, '--turn': `${turn}deg` }}>
-          <span className="compass-n">N</span>
-          <span className="compass-e">E</span>
-          <span className="compass-s">S</span>
-          <span className="compass-w">W</span>
-          <i className="compass-ring" />
-          <b className="compass-arrow"><Navigation size={20} /></b>
+    <div className="mobile-page compass-page">
+      <header className="page-heading compass-heading"><span>疏散导航</span><h1>指南针逃生路线</h1><p>实时磁力计、动态风险路线与语音引导</p></header>
+      <section className="compass-hero-card">
+        <div className="compass-page-dial" style={{ '--heading': `${-heading}deg`, '--turn': `${turn}deg` }}>
+          <span className="compass-n">N</span><span className="compass-e">E</span><span className="compass-s">S</span><span className="compass-w">W</span>
+          <i className="compass-page-ring" />
+          <b className="compass-page-arrow"><Navigation size={28} /></b>
           <em />
+          <strong>{Math.round(heading)}°</strong>
+          <small>{directionLabel(heading)}</small>
         </div>
-        <div className="route-summary">
-          <span className={`route-risk route-${risk}`}>{riskTitle(risk)} · {risk === 'high' ? '建议立即撤离' : '建议预防性撤离'}</span>
-          <strong>{directionLabel(exitBearing)}向安全出口</strong>
-          <p>{turnText}</p>
-          <div className="route-stats"><span><Route size={12} />{route?.distance ?? 86} 米</span><span><LocateFixed size={12} />约 {route?.eta ?? 42} 秒</span></div>
+        <div className="compass-main-copy">
+          <span className={`route-risk route-${frame?.risk || 'low'}`}>{riskTitle(frame?.risk || 'low')} · 动态路线</span>
+          <h2>{turnText}</h2>
+          <p>前往 {targets.find((item) => item.id === target)?.label}</p>
+          <div className="compass-main-stats"><span><Route size={13} />{route?.distance} 米</span><span><Clock3 size={13} />约 {route?.eta} 秒</span><span><Compass size={13} />{Math.round(route?.bearing ?? 42)}°</span></div>
         </div>
+      </section>
+
+      {!tracking && <button type="button" className="compass-enable compass-enable-large" onClick={enableCompass}><Compass size={16} />开启手机指南针并开始引导</button>}
+      <div className="compass-status compass-status-page"><span><i className={tracking ? 'online' : ''} />{tracking ? `实时方向 ${Math.round(heading)}°` : permission === 'denied' ? '未授权，使用模拟方向演示' : '当前为模拟方向'}</span><b>最高温 {Number(frame?.maxTemp || 0).toFixed(1)}°C</b></div>
+
+      <div className="section-title"><strong>选择最近安全出口</strong><span>根据风险动态排序</span></div>
+      <div className="exit-choice-list">
+        {targetRoutes.sort((a, b) => a.route.eta - b.route.eta).map((item, index) => (
+          <button type="button" className={target === item.id ? 'active' : ''} key={item.id} onClick={() => setTarget(item.id)}>
+            <span>{index === 0 ? '推荐' : item.icon}</span><div><strong>{item.label}</strong><small>{item.route.distance} 米 · {item.route.eta} 秒</small></div><b>{index + 1}</b>
+          </button>
+        ))}
       </div>
-      <div className="escape-steps">
-        {(route?.steps || ['离开当前高温区域', '前往东侧安全楼梯', '低姿通过烟区', '到达一楼集合点']).slice(0, 4).map((step) => <span key={step}>{step}</span>)}
+
+      <CompassRouteMap route={route} />
+
+      <section className="mobile-card compass-route-steps-card">
+        <div className="card-head"><div><strong>实时疏散步骤</strong><small>路线会随热区和封控节点重算</small></div><Route size={18} /></div>
+        <div className="command-route-steps">{route?.steps?.map((step) => <span key={step}>{step}</span>)}</div>
+      </section>
+
+      <div className="compass-action-bar">
+        <button type="button" className={voiceOn ? 'active' : ''} onClick={speak}><Megaphone size={16} />{voiceOn ? '语音播报中' : '语音导航'}</button>
+        <a href="tel:119"><Siren size={16} />拨打119</a>
+        <button type="button" onClick={() => { navigator.vibrate?.([300, 100, 300]); setHeading((value) => (value + 180) % 360) }}><Waves size={16} />震动提醒</button>
       </div>
-      <div className="compass-status">
-        <span><i className={tracking ? 'online' : ''} />{tracking ? `实时方向 ${Math.round(heading)}°` : permission === 'denied' ? '未授权，正在使用模拟方向' : '待开启手机指南针'}</span>
-        <b>最高温 {Number(maxTemp || 0).toFixed(1)}°C</b>
-      </div>
-      {!tracking && <button type="button" className="compass-enable" onClick={enableCompass}><Compass size={15} />开启指南针并开始引导</button>}
-    </section>
+    </div>
   )
 }
+
 
 function Thermal3DScene({ frame, camera }) {
   const fallbackHotspots = [
@@ -946,7 +1008,6 @@ function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete
 
       {viewMode === 'campus' && <CampusBuildingPanel />}
       <DigitalTwinView frame={frame} route={route} />
-      <EscapeCompass risk={frame?.risk || 'low'} maxTemp={frame?.maxTemp} route={route} />
 
       <div className="section-title"><strong>监控列表</strong><span>{cameras.length} 路</span></div>
       <div className="camera-grid">
@@ -1315,6 +1376,7 @@ export default function MobileApp() {
     if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} inference={inference} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
     if (activeTab === 'alerts') return <AlertsPage alerts={alerts} onExportEvidence={exportEvidence} />
     if (activeTab === 'dashboard') return <DashboardPage frame={frame} inference={inference} onOpenCommand={() => setShowCommandCenter(true)} />
+    if (activeTab === 'guide') return <CompassPage frame={frame} />
     if (activeTab === 'about') return <AboutPage onStartDrill={() => setShowDrill(true)} />
     return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} inference={inference} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
   }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, frame, connection, inference, image, fileName, detecting, progress, detected, result, phase])

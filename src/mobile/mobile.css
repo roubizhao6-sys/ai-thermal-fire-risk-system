@@ -314,7 +314,7 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .public-toggle small { color: #6e86a3; font-size: 8px; line-height: 1.5; }
 .device-sheet select { width: 100%; height: 43px; padding: 0 10px; color: #e8f3ff; border: 1px solid rgba(96,165,250,.18); border-radius: 11px; outline: none; background: #071322; font-size: 11px; }
 .toast-message { position: fixed; z-index: 100; left: 50%; bottom: calc(82px + var(--m-safe-bottom)); transform: translateX(-50%); padding: 10px 14px; color: #e8f5ff; border: 1px solid rgba(96,165,250,.25); border-radius: 999px; background: rgba(8,20,37,.95); box-shadow: 0 12px 32px rgba(0,0,0,.36); font-size: 9px; white-space: nowrap; backdrop-filter: blur(10px); }
-.mobile-tabs { grid-template-columns: repeat(5, 1fr); }
+.mobile-tabs { grid-template-columns: repeat(6, 1fr); }
 
 .view-switcher { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 0 0 9px; padding: 4px; border: 1px solid rgba(96,165,250,.14); border-radius: 12px; background: rgba(8,17,31,.75); }
 .view-switcher button { min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 4px; color: #7188a5; border-radius: 9px; background: transparent; font-size: 8px; transition: color .2s ease, background .2s ease; }
@@ -585,3 +585,42 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .command-actions button { min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #dcecff; border: 1px solid rgba(96,165,250,.17); border-radius: 10px; background: rgba(59,130,246,.08); font-size: 9px; }
 .command-actions button:first-child { color: white; background: linear-gradient(110deg, #b91c1c, #f97316); }
 .command-actions button.active { animation: pulse 1s infinite; }
+
+.compass-page { padding-bottom: 34px; }
+.compass-heading { padding-bottom: 16px; }
+.compass-hero-card { display: grid; grid-template-columns: 160px 1fr; align-items: center; gap: 16px; padding: 18px 14px; border: 1px solid rgba(56,189,248,.18); border-radius: 20px; background: radial-gradient(circle at 18% 50%, rgba(37,99,235,.18), transparent 45%), linear-gradient(150deg, rgba(17,31,53,.94), rgba(7,15,28,.94)); box-shadow: 0 18px 46px rgba(0,0,0,.22); }
+.compass-page-dial { position: relative; width: 158px; height: 158px; border: 1px solid rgba(56,189,248,.3); border-radius: 50%; background: radial-gradient(circle, rgba(15,50,86,.76), rgba(3,10,22,.96) 68%); box-shadow: inset 0 0 32px rgba(56,189,248,.08), 0 0 28px rgba(37,99,235,.12); }
+.compass-page-dial > span { position: absolute; z-index: 4; color: #718ba6; font-family: ui-monospace, monospace; font-size: 9px; font-weight: 800; }
+.compass-page-dial .compass-n { left: 50%; top: 10px; color: #fb7185 !important; transform: translateX(-50%); }
+.compass-page-dial .compass-e { right: 12px; top: 50%; transform: translateY(-50%); }
+.compass-page-dial .compass-s { left: 50%; bottom: 10px; transform: translateX(-50%); }
+.compass-page-dial .compass-w { left: 12px; top: 50%; transform: translateY(-50%); }
+.compass-page-ring { position: absolute; inset: 21px; border: 1px dashed rgba(96,165,250,.36); border-radius: 50%; transform: rotate(var(--heading)); }
+.compass-page-ring::before { content: ""; position: absolute; left: 50%; top: -4px; width: 7px; height: 7px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 10px #38bdf8; transform: translateX(-50%); }
+.compass-page-arrow { position: absolute; z-index: 5; left: 50%; top: 50%; width: 52px; height: 52px; display: grid; place-items: center; color: white; border-radius: 50%; background: linear-gradient(145deg, #2563eb, #38bdf8); box-shadow: 0 0 28px rgba(56,189,248,.7); transform: translate(-50%,-50%) rotate(var(--turn)); }
+.compass-page-arrow svg { transform: rotate(-45deg); }
+.compass-page-dial em { position: absolute; left: 50%; top: 50%; width: 68px; height: 68px; border: 1px solid rgba(34,197,94,.3); border-radius: 50%; transform: translate(-50%,-50%); }
+.compass-page-dial strong { position: absolute; left: 50%; top: 66%; color: #b9dffa; font-family: ui-monospace, monospace; font-size: 10px; transform: translateX(-50%); }
+.compass-page-dial small { position: absolute; left: 50%; top: 75%; color: #6987a4; font-size: 7px; transform: translateX(-50%); }
+.compass-main-copy { min-width: 0; }
+.compass-main-copy h2 { margin: 10px 0 0; font-size: 21px; line-height: 1.2; }
+.compass-main-copy p { margin-top: 6px; color: #8ba5be; font-size: 10px; }
+.compass-main-stats { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; color: #6eb7e8; font-size: 8px; }
+.compass-main-stats span { display: inline-flex; align-items: center; gap: 4px; }
+.compass-enable-large { min-height: 45px; margin-top: 10px; font-size: 10px; }
+.compass-status-page { margin-top: 9px; padding: 0 3px; }
+.exit-choice-list { display: flex; flex-direction: column; gap: 7px; }
+.exit-choice-list button { display: grid; grid-template-columns: 38px 1fr 24px; align-items: center; gap: 9px; padding: 10px; color: #9db3c9; border: 1px solid rgba(96,165,250,.13); border-radius: 12px; background: rgba(5,15,29,.64); text-align: left; }
+.exit-choice-list button.active { border-color: rgba(56,189,248,.4); background: rgba(37,99,235,.15); }
+.exit-choice-list button > span { display: grid; place-items: center; width: 34px; height: 34px; color: #86d5ff; border-radius: 9px; background: rgba(59,130,246,.1); font-size: 9px; }
+.exit-choice-list button > div { display: flex; flex-direction: column; gap: 3px; }
+.exit-choice-list strong { color: #d9ecfb; font-size: 10px; }
+.exit-choice-list small { color: #6f8aa5; font-size: 8px; }
+.exit-choice-list b { color: #5f7c99; font-size: 8px; }
+.compass-route-map { height: 220px; margin-top: 10px; overflow: hidden; border: 1px solid rgba(56,189,248,.16); border-radius: 15px; background: #030a15; }
+.compass-route-map svg { width: 100%; height: 100%; }
+.compass-route-steps-card { margin-top: 10px; padding: 14px; border-radius: 16px; }
+.compass-action-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin-top: 10px; }
+.compass-action-bar button, .compass-action-bar a { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 5px; color: #d9ecfb; border: 1px solid rgba(96,165,250,.17); border-radius: 10px; background: rgba(59,130,246,.08); font-size: 8px; text-decoration: none; }
+.compass-action-bar button:first-child { color: white; background: linear-gradient(110deg, #b91c1c, #f97316); }
+.compass-action-bar button.active { animation: pulse 1s infinite; }
