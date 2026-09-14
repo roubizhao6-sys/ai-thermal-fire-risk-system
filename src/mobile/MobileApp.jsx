@@ -101,6 +101,7 @@ function initialCameraState() {
   try {
     const saved = JSON.parse(localStorage.getItem('thermalGuardCameras') || 'null')
     if (Array.isArray(saved) && saved.length) base = saved
+    if (!base.some((camera) => camera.type === 'sensor')) base = [defaultCameras[0], ...base]
   } catch {}
   const shared = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('camera') : null
   const parsed = shared ? decodeCamera(shared) : null
