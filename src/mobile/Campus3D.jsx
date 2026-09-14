@@ -1,43 +1,47 @@
 // 澳门科技大学校园微缩 3D（three.js）
 //
-// 布局按校方校园图重建（楼名与相对位置来自对地图的 OCR）。
-// 交互：
-//   · 拖动旋转 / 滚轮缩放 / 缓慢自动旋转；
-//   · **点楼体进入楼层模式**：镜头逐层抬升，选中层高亮、其余层半透明，可逐层切换、可"楼层展开"；
-//   · 火源所在楼层整层转红 + 光柱 + 地面脉冲环 + "火源 · X 樓"标签，支持多处火源。
+// 布局与楼名：校园图 OCR（Vision 带坐标）+ 校方 720° 全景场景清单
+// （A座行政樓 / C座教學樓 / D座禮堂 / O座教學樓 / N座圖書館 / J座體育館 / G座宿舍 /
+//  科技大樓 / 科大醫院 / 澳門國際學校 / 田徑運動場 …）
+//
+// 外立面：裙楼 + 逐层幕墙（层间板 + 玻璃带）+ 竖向肋 + 角柱 + 入口雨棚 + 女儿墙 +
+// 屋面设备 + 楼座招牌（A/C/D/O/N…）+ 天空环境反射。
+//
+// 交互：拖动旋转 / 滚轮缩放 / 自动缓慢旋转；点楼体进入楼层视角，可逐层切换、
+// 动态缩放（＋ / － / 复位 / 放大该层）放大到对应楼层、楼层展开合并、返回校园；
+// 火源楼层整层转红并可一键定位。
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import { CAMPUS_BUILDINGS, CAMPUS_FLOOR_HEIGHT, CAMPUS_LANDMARKS, CAMPUS_ROADS, campusLocationForNode } from './campus.js'
 
-const STYLE_COLORS = {
-  glass: { body: '#1b3550', window: '#7dd3fc', roof: '#0e1c2c' },
-  warm: { body: '#3a2f22', window: '#fbbf24', roof: '#1c150e' },
-  clean: { body: '#243542', window: '#a7f3d0', roof: '#101d24' },
-  lab: { body: '#17333a', window: '#5eead4', roof: '#0a1b1f' },
-  office: { body: '#1d2a3d', window: '#93c5fd', roof: '#0d1520' },
-  dorm: { body: '#22283a', window: '#c7d2fe', roof: '#101423' },
-  sport: { body: '#2b2440', window: '#c4b5fd', roof: '#160f24' },
+const STYLE = {
+  glass: { spandrel: '#243d57', glass: '#8fd3f4', metal: '#c8d8e8', stone: '#1b2836' },
+  warm: { spandrel: '#4a3a24', glass: '#ffd88a', metal: '#d8c9a8', stone: '#2c2418' },
+  clean: { spandrel: '#2b3c46', glass: '#b6f2df', metal: '#d5e6e0', stone: '#1d2a2e' },
+  lab: { spandrel: '#1e3c42', glass: '#93f0e2', metal: '#bfe6e2', stone: '#12262a' },
+  office: { spandrel: '#25334a', glass: '#a9cbff', metal: '#cfdcf5', stone: '#182233' },
+  dorm: { spandrel: '#2a3050', glass: '#cfd8ff', metal: '#c9cff0', stone: '#181d2e' },
+  sport: { spandrel: '#332a4c', glass: '#cbb8ff', metal: '#ded4ff', stone: '#201a33' },
 }
 
-function facadeTexture(color) {
+function skyTexture() {
   const canvas = document.createElement('canvas')
-  canvas.width = 64
-  canvas.height = 32
+  canvas.width = 128
+  canvas.height = 64
   const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#000'
-  ctx.fillRect(0, 0, 64, 32)
-  ctx.fillStyle = color
-  for (let row = 2; row < 30; row += 6) {
-    for (let col = 3; col < 60; col += 8) {
-      ctx.globalAlpha = 0.35 + Math.random() * 0.6
-      ctx.fillRect(col, row, 5, 3)
-    }
-  }
+  const gradient = ctx.createLinearGradient(0, 0, 0, 64)
+  gradient.addColorStop(0, '#0b1930')
+  gradient.addColorStop(0.45, '#1b3a5c')
+  gradient.addColorStop(0.52, '#3f6f96')
+  gradient.addColorStop(0.56, '#0e1a26')
+  gradient.addColorStop(1, '#05080f')
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, 128, 64)
   const texture = new THREE.CanvasTexture(canvas)
-  texture.wrapS = THREE.RepeatWrapping
-  texture.wrapT = THREE.RepeatWrapping
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  texture.colorSpace = THREE.SRGBColorSpace
   return texture
 }
 
@@ -60,22 +64,40 @@ function groundTexture() {
   return texture
 }
 
+function signTexture(letter) {
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#07131f'
+  ctx.fillRect(0, 0, 128, 128)
+  ctx.strokeStyle = '#38bdf8'
+  ctx.lineWidth = 6
+  ctx.strokeRect(6, 6, 116, 116)
+  ctx.fillStyle = '#e8f6ff'
+  ctx.font = 'bold 76px -apple-system, "PingFang SC", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(letter, 64, 70)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
 const lerp = (from, to, t) => from + (to - from) * t
 
-export default function Campus3D({ fires = [], onPick, onFocusChange }) {
+export default function Campus3D({ fires = [], onPick }) {
   const wrapRef = useRef(null)
   const stageRef = useRef(null)
   const apiRef = useRef(null)
   const pickRef = useRef(onPick)
   pickRef.current = onPick
-  const [focus, setFocus] = useState(null) // { building, floor }
+  const [focus, setFocus] = useState(null)
   const [exploded, setExploded] = useState(false)
-  const focusRef = useRef(null)
-  focusRef.current = focus
-  const reportRef = useRef(onFocusChange)
-  reportRef.current = onFocusChange
+  const [zoom, setZoom] = useState(1)
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
 
-  // 建场景（只建一次）
   useEffect(() => {
     const wrap = wrapRef.current
     const stage = stageRef.current
@@ -83,9 +105,9 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color('#05080f')
-    scene.fog = new THREE.Fog('#05080f', 620, 1500)
+    scene.fog = new THREE.Fog('#05080f', 700, 1900)
 
-    const camera = new THREE.PerspectiveCamera(42, 1, 1, 3200)
+    const camera = new THREE.PerspectiveCamera(42, 1, 1, 3600)
     camera.position.set(470, 430, 640)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -93,7 +115,7 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFShadowMap
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.15
+    renderer.toneMappingExposure = 1.18
     stage.appendChild(renderer.domElement)
 
     const labelRenderer = new CSS2DRenderer()
@@ -106,65 +128,81 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
     controls.target.set(0, 30, 40)
     controls.enableDamping = true
     controls.dampingFactor = 0.08
-    controls.minDistance = 160
-    controls.maxDistance = 1800
+    controls.minDistance = 90
+    controls.maxDistance = 2200
     controls.maxPolarAngle = Math.PI * 0.47
     controls.autoRotate = true
     controls.autoRotateSpeed = 0.3
 
-    scene.add(new THREE.HemisphereLight('#9ec9ff', '#050a12', 0.6))
-    const key = new THREE.DirectionalLight('#cfe6ff', 1.5)
-    key.position.set(320, 520, 260)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    const sky = skyTexture()
+    const envTarget = pmrem.fromEquirectangular(sky)
+    scene.environment = envTarget.texture
+
+    scene.add(new THREE.HemisphereLight('#9ec9ff', '#050a12', 0.65))
+    const key = new THREE.DirectionalLight('#e2efff', 1.6)
+    key.position.set(360, 560, 300)
     key.castShadow = true
     key.shadow.mapSize.set(2048, 2048)
-    key.shadow.camera.near = 100
-    key.shadow.camera.far = 1800
-    key.shadow.camera.left = -700
-    key.shadow.camera.right = 700
-    key.shadow.camera.top = 700
-    key.shadow.camera.bottom = -700
+    key.shadow.camera.near = 120
+    key.shadow.camera.far = 2000
+    key.shadow.camera.left = -760
+    key.shadow.camera.right = 760
+    key.shadow.camera.top = 760
+    key.shadow.camera.bottom = -760
     key.shadow.bias = -0.0006
     scene.add(key)
-    const rim = new THREE.DirectionalLight('#3b82f6', 0.5)
-    rim.position.set(-400, 240, -320)
+    const rim = new THREE.DirectionalLight('#3b82f6', 0.55)
+    rim.position.set(-440, 260, -360)
     scene.add(rim)
 
     const disposables = []
     const track = (object) => { disposables.push(object); return object }
 
-    // 地面
     const ground = track(new THREE.Mesh(
-      track(new THREE.PlaneGeometry(2600, 2600)),
-      track(new THREE.MeshStandardMaterial({ map: groundTexture(), color: '#101c2a', roughness: 0.95, metalness: 0.05 })),
+      track(new THREE.PlaneGeometry(2800, 2800)),
+      track(new THREE.MeshStandardMaterial({ map: groundTexture(), color: '#101c2a', roughness: 0.95 })),
     ))
     ground.rotation.x = -Math.PI / 2
     ground.receiveShadow = true
     scene.add(ground)
 
     const lawn = track(new THREE.Mesh(
-      track(new THREE.CircleGeometry(520, 72)),
-      track(new THREE.MeshStandardMaterial({ color: '#0d2a22', roughness: 1 })),
+      track(new THREE.CircleGeometry(540, 72)),
+      track(new THREE.MeshStandardMaterial({ color: '#0e2b23', roughness: 1 })),
     ))
     lawn.rotation.x = -Math.PI / 2
     lawn.position.y = 0.05
     lawn.receiveShadow = true
     scene.add(lawn)
 
-    // 道路（按地图主动线）
-    const roadMat = track(new THREE.MeshStandardMaterial({ color: '#1d2937', roughness: 0.85 }))
+    const roadMaterial = track(new THREE.MeshStandardMaterial({ color: '#1d2937', roughness: 0.85 }))
     CAMPUS_ROADS.forEach((road) => {
-      const mesh = track(new THREE.Mesh(track(new THREE.BoxGeometry(road.w, 1.2, road.d)), roadMat))
+      const mesh = track(new THREE.Mesh(track(new THREE.BoxGeometry(road.w, 1.2, road.d)), roadMaterial))
       mesh.position.set(road.x, 0.6, road.z)
       mesh.rotation.y = -road.angle
       mesh.receiveShadow = true
       scene.add(mesh)
     })
 
-    // 地标：南北门 + 轻轨科大站
-    const gateMat = track(new THREE.MeshStandardMaterial({ color: '#27506f', roughness: 0.5, metalness: 0.4 }))
+    const materials = {}
+    Object.entries(STYLE).forEach(([styleKey, palette]) => {
+      materials[styleKey] = {
+        spandrel: track(new THREE.MeshStandardMaterial({ color: palette.spandrel, roughness: 0.6, metalness: 0.25 })),
+        glass: track(new THREE.MeshPhysicalMaterial({ color: palette.glass, roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.62, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.5 })),
+        metal: track(new THREE.MeshStandardMaterial({ color: palette.metal, roughness: 0.35, metalness: 0.75 })),
+        stone: track(new THREE.MeshStandardMaterial({ color: palette.stone, roughness: 0.85 })),
+      }
+    })
+    const roofMaterial = track(new THREE.MeshStandardMaterial({ color: '#26313d', roughness: 0.7, metalness: 0.3 }))
+    const hvacMaterial = track(new THREE.MeshStandardMaterial({ color: '#4b5563', roughness: 0.6, metalness: 0.5 }))
+    const accentMaterial = track(new THREE.MeshStandardMaterial({ color: '#38bdf8', emissive: '#0ea5e9', emissiveIntensity: 1.1, roughness: 0.3, metalness: 0.25 }))
+    const fireMaterial = track(new THREE.MeshStandardMaterial({ color: '#ff5a3c', emissive: '#ff3b30', emissiveIntensity: 1.6, roughness: 0.35 }))
+
+    const landmarkMaterial = track(new THREE.MeshStandardMaterial({ color: '#2a5578', roughness: 0.5, metalness: 0.4 }))
     CAMPUS_LANDMARKS.forEach((landmark) => {
       const height = landmark.kind === 'station' ? 14 : 12
-      const mesh = track(new THREE.Mesh(track(new THREE.BoxGeometry(landmark.w, height, landmark.d)), gateMat))
+      const mesh = track(new THREE.Mesh(track(new THREE.BoxGeometry(landmark.w, height, landmark.d)), landmarkMaterial))
       mesh.position.set(landmark.x, height / 2, landmark.z)
       mesh.castShadow = true
       scene.add(mesh)
@@ -176,130 +214,201 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
       scene.add(label)
     })
 
-    // 楼体：每层一个独立材质的楼板盒子
-    const baseMaterials = {}
-    const accentMaterial = track(new THREE.MeshStandardMaterial({ color: '#38bdf8', emissive: '#0ea5e9', emissiveIntensity: 1.1, roughness: 0.3, metalness: 0.25 }))
-    const fireMaterial = track(new THREE.MeshStandardMaterial({ color: '#ff5a3c', emissive: '#ff3b30', emissiveIntensity: 1.6, roughness: 0.35, metalness: 0.2 }))
     const buildings = {}
-
     CAMPUS_BUILDINGS.forEach((building) => {
-      const palette = STYLE_COLORS[building.style] ?? STYLE_COLORS.glass
-      if (!baseMaterials[building.style]) {
-        baseMaterials[building.style] = {
-          body: track(new THREE.MeshStandardMaterial({ color: palette.body, emissive: new THREE.Color(palette.window), emissiveMap: track(facadeTexture(palette.window)), emissiveIntensity: 0.55, roughness: 0.45, metalness: 0.35 })),
-          roof: track(new THREE.MeshStandardMaterial({ color: palette.roof, roughness: 0.8 })),
-        }
-      }
-      const materials = baseMaterials[building.style]
+      const palette = materials[building.style] ?? materials.glass
       const group = new THREE.Group()
       group.position.set(building.x, 0, building.z)
       scene.add(group)
 
-      const plinth = track(new THREE.Mesh(
-        track(new THREE.BoxGeometry(building.w + 8, 3, building.d + 8)),
-        track(new THREE.MeshStandardMaterial({ color: '#14202c', roughness: 0.9 })),
-      ))
-      plinth.position.y = 1.5
-      plinth.receiveShadow = true
-      group.add(plinth)
+      const podiumFloors = Math.min(2, building.floors)
+      const podiumHeight = podiumFloors * CAMPUS_FLOOR_HEIGHT
+      const towerFloors = Math.max(0, building.floors - podiumFloors)
+      const towerW = building.w * 0.88
+      const towerD = building.d * 0.88
+      const totalHeight = podiumHeight + towerFloors * CAMPUS_FLOOR_HEIGHT
 
-      const floorMeshes = []
-      for (let floor = 1; floor <= building.floors; floor += 1) {
-        // 每层独立材质：这样才能单独高亮 / 半透明
-        const slabMaterial = track(materials.body.clone())
-        const slab = track(new THREE.Mesh(
-          track(new THREE.BoxGeometry(building.w, CAMPUS_FLOOR_HEIGHT - 0.9, building.d)),
-          slabMaterial,
+      const podium = track(new THREE.Mesh(
+        track(new THREE.BoxGeometry(building.w * 1.1, podiumHeight, building.d * 1.1)),
+        palette.stone,
+      ))
+      podium.position.y = podiumHeight / 2
+      podium.castShadow = true
+      podium.receiveShadow = true
+      group.add(podium)
+      const podiumGlass = track(new THREE.Mesh(
+        track(new THREE.BoxGeometry(building.w * 1.11, podiumHeight * 0.42, building.d * 1.11)),
+        palette.glass,
+      ))
+      podiumGlass.position.y = podiumHeight * 0.42
+      group.add(podiumGlass)
+
+      const floorParts = []
+      for (let index = 0; index < towerFloors; index += 1) {
+        const level = podiumFloors + index + 1
+        const baseY = podiumHeight + (index + 0.5) * CAMPUS_FLOOR_HEIGHT
+        const spandrelMaterial = track(palette.spandrel.clone())
+        const glassMaterial = track(palette.glass.clone())
+        const spandrel = track(new THREE.Mesh(
+          track(new THREE.BoxGeometry(towerW, CAMPUS_FLOOR_HEIGHT * 0.42, towerD)),
+          spandrelMaterial,
         ))
-        const baseY = (floor - 0.5) * CAMPUS_FLOOR_HEIGHT
-        slab.position.y = baseY
-        slab.castShadow = true
-        slab.receiveShadow = true
-        slab.userData = { buildingId: building.id, floor, baseY, material: slabMaterial }
-        group.add(slab)
-        floorMeshes.push(slab)
+        spandrel.position.y = baseY + CAMPUS_FLOOR_HEIGHT * 0.22
+        spandrel.castShadow = true
+        spandrel.receiveShadow = true
+        const glass = track(new THREE.Mesh(
+          track(new THREE.BoxGeometry(towerW + 1.2, CAMPUS_FLOOR_HEIGHT * 0.5, towerD + 1.2)),
+          glassMaterial,
+        ))
+        glass.position.y = baseY - CAMPUS_FLOOR_HEIGHT * 0.12
+        group.add(spandrel, glass)
+        floorParts.push({
+          floor: level,
+          meshes: [spandrel, glass],
+          materials: [spandrelMaterial, glassMaterial],
+          baseY,
+          spandrelOffset: CAMPUS_FLOOR_HEIGHT * 0.22,
+          glassOffset: -CAMPUS_FLOOR_HEIGHT * 0.12,
+        })
       }
 
-      const roof = track(new THREE.Mesh(
-        track(new THREE.BoxGeometry(building.w + 3, 3.4, building.d + 3)),
-        materials.roof,
+      const finCount = Math.max(3, Math.round(towerW / 12))
+      for (let index = 1; index < finCount; index += 1) {
+        const x = -towerW / 2 + (towerW / finCount) * index
+        const fin = track(new THREE.Mesh(
+          track(new THREE.BoxGeometry(1.1, Math.max(totalHeight, CAMPUS_FLOOR_HEIGHT), 1.6)),
+          palette.metal,
+        ))
+        fin.position.set(x, Math.max(totalHeight, CAMPUS_FLOOR_HEIGHT) / 2, towerD / 2)
+        const finBack = fin.clone()
+        finBack.position.z = -towerD / 2
+        group.add(fin, finBack)
+      }
+
+      ;[[-towerW / 2, -towerD / 2], [towerW / 2, -towerD / 2], [-towerW / 2, towerD / 2], [towerW / 2, towerD / 2]].forEach(([x, z]) => {
+        const column = track(new THREE.Mesh(
+          track(new THREE.BoxGeometry(1.8, Math.max(totalHeight, CAMPUS_FLOOR_HEIGHT), 1.8)),
+          palette.metal,
+        ))
+        column.position.set(x, Math.max(totalHeight, CAMPUS_FLOOR_HEIGHT) / 2, z)
+        column.castShadow = true
+        group.add(column)
+      })
+
+      const parapet = track(new THREE.Mesh(
+        track(new THREE.BoxGeometry(towerW + 2.4, 2.6, towerD + 2.4)),
+        roofMaterial,
       ))
-      roof.position.y = building.floors * CAMPUS_FLOOR_HEIGHT + 1.2
-      roof.castShadow = true
-      group.add(roof)
+      parapet.position.y = totalHeight + 1.2
+      parapet.castShadow = true
+      group.add(parapet)
+      for (let index = 0; index < 2; index += 1) {
+        const hvac = track(new THREE.Mesh(
+          track(new THREE.BoxGeometry(6 + index * 2, 3.2, 6)),
+          hvacMaterial,
+        ))
+        hvac.position.set(-towerW / 4 + (index * towerW) / 2.4, totalHeight + 3.6, 0)
+        hvac.castShadow = true
+        group.add(hvac)
+      }
+
+      const canopy = track(new THREE.Mesh(
+        track(new THREE.BoxGeometry(building.w * 0.42, 1.4, 10)),
+        palette.metal,
+      ))
+      canopy.position.set(0, podiumHeight + 1.2, building.d * 0.55 + 4)
+      canopy.castShadow = true
+      group.add(canopy)
+      if (building.letter) {
+        const sign = track(new THREE.Mesh(
+          track(new THREE.PlaneGeometry(11, 11)),
+          track(new THREE.MeshBasicMaterial({ map: track(signTexture(building.letter)), transparent: true })),
+        ))
+        sign.position.set(0, podiumHeight + 9, building.d * 0.56 + 0.4)
+        group.add(sign)
+      }
 
       const labelEl = document.createElement('div')
       labelEl.className = 'campus-label'
       labelEl.textContent = building.short
       const label = new CSS2DObject(labelEl)
-      label.position.set(0, building.floors * CAMPUS_FLOOR_HEIGHT + 16, 0)
+      label.position.set(0, totalHeight + 20, 0)
       group.add(label)
 
-      buildings[building.id] = { building, group, floorMeshes, labelEl }
+      buildings[building.id] = { building, group, floorParts, labelEl, height: totalHeight, podiumFloors }
     })
 
-    // 火源标记（最多 6 处）
-    const beaconMat = track(new THREE.MeshBasicMaterial({ color: '#ff6b4a', transparent: true, opacity: 0.4, depthWrite: false }))
-    const beaconGeo = track(new THREE.CylinderGeometry(3.6, 5.6, 1, 20, 1, true))
-    const fireRingMat = track(new THREE.MeshBasicMaterial({ color: '#ff3b30', transparent: true, opacity: 0.6, side: THREE.DoubleSide }))
-    const fireRingGeo = track(new THREE.RingGeometry(26, 34, 48))
-    const fireGlowMat = track(new THREE.MeshBasicMaterial({ color: '#ffd166', transparent: true, opacity: 0.85 }))
-    const fireGlowGeo = track(new THREE.SphereGeometry(6.8, 18, 18))
+    const markerGeo = track(new THREE.CylinderGeometry(3.6, 5.6, 1, 20, 1, true))
+    const markerMat = track(new THREE.MeshBasicMaterial({ color: '#ff6b4a', transparent: true, opacity: 0.4, depthWrite: false }))
+    const ringGeo = track(new THREE.RingGeometry(26, 34, 48))
+    const ringMat = track(new THREE.MeshBasicMaterial({ color: '#ff3b30', transparent: true, opacity: 0.6, side: THREE.DoubleSide }))
+    const glowGeo = track(new THREE.SphereGeometry(6.8, 18, 18))
+    const glowMat = track(new THREE.MeshBasicMaterial({ color: '#ffd166', transparent: true, opacity: 0.85 }))
     const markers = []
     for (let index = 0; index < 6; index += 1) {
-      const beacon = new THREE.Mesh(beaconGeo, beaconMat)
-      const ringMesh = new THREE.Mesh(fireRingGeo, fireRingMat)
-      ringMesh.rotation.x = -Math.PI / 2
-      const glow = new THREE.Mesh(fireGlowGeo, fireGlowMat)
+      const beacon = new THREE.Mesh(markerGeo, markerMat)
+      const ring = new THREE.Mesh(ringGeo, ringMat)
+      ring.rotation.x = -Math.PI / 2
+      const glow = new THREE.Mesh(glowGeo, glowMat)
       const el = document.createElement('div')
       el.className = 'campus-fire-label'
       const label = new CSS2DObject(el)
-      scene.add(beacon, ringMesh, glow, label)
-      markers.push({ beacon, ring: ringMesh, glow, label, el, location: null })
+      scene.add(beacon, ring, glow, label)
+      markers.push({ beacon, ring, glow, label, el, location: null })
     }
 
-    // 画面刷新：根据"火源 + 当前聚焦楼层 + 是否展开"决定每层的外观
     let fireLocations = []
     let focusState = null
     let explodeState = false
+    let manual = false
     const desired = { position: camera.position.clone(), target: controls.target.clone() }
 
     const refresh = () => {
       Object.values(buildings).forEach((entry) => {
         const isFocusedBuilding = focusState?.buildingId === entry.building.id
-        entry.floorMeshes.forEach((slab) => {
-          const { floor, material } = slab.userData
-          const isFire = fireLocations.some((location) => location.buildingId === entry.building.id && location.floor === floor)
-          const isFocused = isFocusedBuilding && focusState.floor === floor
-          let target = baseMaterials[entry.building.style].body
-          material.color.copy(target.color)
-          material.emissive.copy(target.emissive)
-          material.emissiveMap = target.emissiveMap
-          material.emissiveIntensity = target.emissiveIntensity
-          material.roughness = target.roughness
-          material.metalness = target.metalness
-          material.opacity = 1
-          material.transparent = false
+        const palette = materials[entry.building.style] ?? materials.glass
+        entry.floorParts.forEach((part) => {
+          const isFire = fireLocations.some((location) => location.buildingId === entry.building.id && location.floor === part.floor)
+          const isFocused = isFocusedBuilding && focusState.floor === part.floor
+          const [spandrelMaterial, glassMaterial] = part.materials
+          spandrelMaterial.color.copy(palette.spandrel.color)
+          spandrelMaterial.emissive.set('#000000')
+          spandrelMaterial.emissiveIntensity = 0
+          spandrelMaterial.opacity = 1
+          spandrelMaterial.transparent = false
+          glassMaterial.color.copy(palette.glass.color)
+          glassMaterial.emissive.set('#000000')
+          glassMaterial.emissiveIntensity = 0
+          glassMaterial.opacity = palette.glass.opacity
+          glassMaterial.transparent = true
 
           if (isFire) {
-            material.color.set('#ff5a3c')
-            material.emissive.set('#ff3b30')
-            material.emissiveIntensity = 1.6
+            spandrelMaterial.color.set('#ff5a3c')
+            spandrelMaterial.emissive.set('#ff3b30')
+            spandrelMaterial.emissiveIntensity = 1.5
+            glassMaterial.color.set('#ff8a70')
+            glassMaterial.emissive.set('#ff3b30')
+            glassMaterial.emissiveIntensity = 1.2
           } else if (isFocused) {
-            material.color.set('#38bdf8')
-            material.emissive.set('#0ea5e9')
-            material.emissiveIntensity = 1.1
+            spandrelMaterial.color.set('#38bdf8')
+            spandrelMaterial.emissive.set('#0ea5e9')
+            spandrelMaterial.emissiveIntensity = 1
+            glassMaterial.color.set('#bfe9ff')
           } else if (focusState && !isFocusedBuilding) {
-            material.transparent = true
-            material.opacity = 0.22
+            spandrelMaterial.transparent = true
+            spandrelMaterial.opacity = 0.22
+            glassMaterial.opacity = 0.12
           } else if (isFocusedBuilding) {
-            material.transparent = true
-            material.opacity = 0.4
+            spandrelMaterial.transparent = true
+            spandrelMaterial.opacity = 0.42
+            glassMaterial.opacity = 0.3
           }
-          material.needsUpdate = true
+          spandrelMaterial.needsUpdate = true
+          glassMaterial.needsUpdate = true
 
-          const offset = focusState && explodeState ? (floor - 1) * 4.2 : 0
-          slab.position.y = slab.userData.baseY + offset
+          const offset = focusState && explodeState ? (part.floor - 1) * 4.2 : 0
+          part.meshes[0].position.y = part.baseY + part.spandrelOffset + offset
+          part.meshes[1].position.y = part.baseY + part.glassOffset + offset
         })
         entry.labelEl.classList.toggle('is-fire', fireLocations.some((location) => location.buildingId === entry.building.id))
         entry.labelEl.classList.toggle('is-focused', focusState?.buildingId === entry.building.id)
@@ -322,24 +431,27 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
         marker.el.textContent = `火源 · ${location.label}`
       })
 
-      // 镜头目标：聚焦某楼某层 → 飞到该层侧面；否则回到校园全景
       if (focusState) {
         const entry = buildings[focusState.buildingId]
         if (entry) {
-          const { building } = entry
-          const floorY = (focusState.floor - 0.5) * CAMPUS_FLOOR_HEIGHT
-          const distance = Math.max(building.w, building.d) * 2.4 + 130
-          desired.target.set(building.x, floorY + 8, building.z)
-          desired.position.set(building.x + distance * 0.85, floorY + 72, building.z + distance * 0.95)
+          const { building, podiumFloors } = entry
+          const focusY = focusState.floor <= podiumFloors
+            ? (focusState.floor - 0.5) * CAMPUS_FLOOR_HEIGHT
+            : podiumFloors * CAMPUS_FLOOR_HEIGHT + (focusState.floor - podiumFloors - 0.5) * CAMPUS_FLOOR_HEIGHT
+          const base = Math.max(building.w, building.d) * 2.2 + 150
+          const distance = base * zoomRef.current
+          desired.target.set(building.x, focusY, building.z)
+          desired.position.set(building.x + distance * 0.8, focusY + distance * 0.42, building.z + distance * 0.9)
         }
       } else {
+        const base = 470
         desired.target.set(0, 30, 40)
-        desired.position.set(470, 430, 640)
+        desired.position.set(base * (0.8 + 0.2 * zoomRef.current), 430 * zoomRef.current + 140, base * (1.05 * zoomRef.current + 0.25))
       }
       controls.autoRotate = !focusState
+      manual = false
     }
 
-    // 对外 API
     apiRef.current = {
       setFires: (list) => {
         fireLocations = []
@@ -359,9 +471,12 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
         explodeState = Boolean(nextExploded)
         refresh()
       },
+      setZoom: (nextZoom) => {
+        zoomRef.current = nextZoom
+        refresh()
+      },
     }
 
-    // 点击拾取：点楼层 → 进入该楼该层的视角
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
     const onClick = (event) => {
@@ -369,16 +484,20 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
       raycaster.setFromCamera(pointer, camera)
-      const hits = raycaster.intersectObjects(Object.values(buildings).flatMap((entry) => entry.floorMeshes), false)
+      const entries = Object.values(buildings)
+      const targets = entries.flatMap((entry) => entry.floorParts.flatMap((part) => part.meshes))
+      const hits = raycaster.intersectObjects(targets, false)
       if (!hits.length) return
-      const { buildingId, floor } = hits[0].object.userData
-      const entry = buildings[buildingId]
-      if (!entry) return
-      setFocus({ buildingId, floor })
-      pickRef.current?.({ building: entry.building, floor })
-      reportRef.current?.({ building: entry.building, floor })
+      const hit = hits[0].object
+      const entry = entries.find((item) => item.floorParts.some((part) => part.meshes.includes(hit)))
+      const part = entry?.floorParts.find((item) => item.meshes.includes(hit))
+      if (!entry || !part) return
+      setFocus({ buildingId: entry.building.id, floor: part.floor })
+      pickRef.current?.({ building: entry.building, floor: part.floor })
     }
     renderer.domElement.addEventListener('click', onClick)
+    const onUserStart = () => { manual = true }
+    controls.addEventListener('start', onUserStart)
 
     const resize = () => {
       const width = stage.clientWidth || 360
@@ -397,21 +516,21 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
     const animate = () => {
       raf = requestAnimationFrame(animate)
       const time = (performance.now() - startedAt) / 1000
-      // 平滑飞向目标视角
-      camera.position.set(
-        lerp(camera.position.x, desired.position.x, 0.075),
-        lerp(camera.position.y, desired.position.y, 0.075),
-        lerp(camera.position.z, desired.position.z, 0.075),
-      )
-      controls.target.set(
-        lerp(controls.target.x, desired.target.x, 0.09),
-        lerp(controls.target.y, desired.target.y, 0.09),
-        lerp(controls.target.z, desired.target.z, 0.09),
-      )
+      if (!manual) {
+        camera.position.set(
+          lerp(camera.position.x, desired.position.x, 0.08),
+          lerp(camera.position.y, desired.position.y, 0.08),
+          lerp(camera.position.z, desired.position.z, 0.08),
+        )
+        controls.target.set(
+          lerp(controls.target.x, desired.target.x, 0.1),
+          lerp(controls.target.y, desired.target.y, 0.1),
+          lerp(controls.target.z, desired.target.z, 0.1),
+        )
+      }
       markers.forEach((marker, index) => {
         if (!marker.location) return
-        const pulse = 1 + 0.16 * Math.sin(time * 3 + index)
-        marker.glow.scale.setScalar(pulse)
+        marker.glow.scale.setScalar(1 + 0.16 * Math.sin(time * 3 + index))
         marker.ring.scale.setScalar(1 + 0.1 * Math.sin(time * 2 + index))
         marker.ring.material.opacity = 0.32 + 0.3 * (0.5 + 0.5 * Math.sin(time * 2 + index))
         marker.beacon.material.opacity = 0.26 + 0.18 * (0.5 + 0.5 * Math.sin(time * 1.6 + index))
@@ -429,9 +548,13 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
       cancelAnimationFrame(raf)
       observer.disconnect()
       renderer.domElement.removeEventListener('click', onClick)
+      controls.removeEventListener('start', onUserStart)
       controls.dispose()
       apiRef.current = null
       disposables.forEach((item) => item.dispose?.())
+      envTarget.dispose()
+      sky.dispose()
+      pmrem.dispose()
       scene.traverse((object) => {
         if (object instanceof CSS2DObject) object.element?.remove()
       })
@@ -441,13 +564,9 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
     }
   }, [])
 
-  useEffect(() => {
-    apiRef.current?.setFires(fires)
-  }, [fires])
-
-  useEffect(() => {
-    apiRef.current?.setFocus(focus, exploded)
-  }, [focus, exploded])
+  useEffect(() => { apiRef.current?.setFires(fires) }, [fires])
+  useEffect(() => { apiRef.current?.setFocus(focus, exploded) }, [focus, exploded])
+  useEffect(() => { apiRef.current?.setZoom(zoom) }, [zoom])
 
   const focusedBuilding = focus ? CAMPUS_BUILDINGS.find((item) => item.id === focus.buildingId) : null
   const fireLocation = fires.length ? campusLocationForNode(typeof fires[0] === 'string' ? fires[0] : fires[0]?.nodeId) : null
@@ -461,7 +580,7 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
           <div className="campus-floor-head">
             <div>
               <strong>{focusedBuilding.name}</strong>
-              <small>共 {focusedBuilding.floors} 層 · 当前第 {focus.floor} 層</small>
+              <small>共 {focusedBuilding.floors} 層 · 当前第 {focus.floor} 層 · 视距 {Math.round(zoom * 100)}%</small>
             </div>
             <button type="button" onClick={() => setFocus(null)}>返回校园</button>
           </div>
@@ -480,6 +599,9 @@ export default function Campus3D({ fires = [], onPick, onFocusChange }) {
           <div className="campus-floor-actions">
             <button type="button" disabled={focus.floor <= 1} onClick={() => setFocus({ buildingId: focusedBuilding.id, floor: focus.floor - 1 })}>下一层</button>
             <button type="button" disabled={focus.floor >= focusedBuilding.floors} onClick={() => setFocus({ buildingId: focusedBuilding.id, floor: focus.floor + 1 })}>上一层</button>
+            <button type="button" onClick={() => setZoom((value) => Math.max(0.32, Number((value - 0.16).toFixed(2))))}>放大 ＋</button>
+            <button type="button" onClick={() => setZoom((value) => Math.min(1.6, Number((value + 0.16).toFixed(2))))}>缩小 －</button>
+            <button type="button" onClick={() => setZoom(0.5)}>放大该层</button>
             <button type="button" className={exploded ? 'active' : ''} onClick={() => setExploded((value) => !value)}>{exploded ? '楼层合并' : '楼层展开'}</button>
           </div>
           {focusedBuilding.note && <p className="campus-floor-note">{focusedBuilding.note}</p>}

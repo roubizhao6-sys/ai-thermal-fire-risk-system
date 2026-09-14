@@ -21,20 +21,22 @@ const toModel = (px, py) => ({
   z: Number(((py - MAP_H / 2) * SCALE).toFixed(1)),
 })
 
+// 楼名与座号对照：校园图 OCR + 校方 720° 全景的场景清单（A座行政樓、C座教學樓、D座禮堂、
+// O座教學樓、E座點聚餐廳、N座圖書館、J座室內體育館、G座宿舍、科大醫院、澳門國際學校…）
 const BUILDINGS = [
-  { id: 'admin', name: '行政大樓', short: '行政大樓', px: 350, py: 967, w: 58, d: 46, floors: 5, style: 'office' },
-  { id: 'academic-left', name: '教學大樓', short: '教學大樓', px: 350, py: 1042, w: 62, d: 52, floors: 6, style: 'glass' },
-  { id: 'recreation', name: '活動中心', short: '活動中心', px: 600, py: 990, w: 66, d: 50, floors: 3, style: 'warm' },
-  { id: 'science', name: '科技大樓', short: '科技大樓', px: 600, py: 1225, w: 60, d: 52, floors: 6, style: 'lab' },
-  { id: 'dorm-mid', name: '宿舍（中）', short: '宿舍', px: 600, py: 1150, w: 52, d: 40, floors: 10, style: 'dorm' },
-  { id: 'stadium', name: '田徑運動場', short: '田徑場', px: 900, py: 985, w: 150, d: 96, floors: 1, style: 'sport' },
-  { id: 'gym', name: '室內體育館', short: '體育館', px: 900, py: 1062, w: 86, d: 60, floors: 3, style: 'sport' },
-  { id: 'tis', name: '澳門國際學校', short: '國際學校', px: 900, py: 1128, w: 70, d: 52, floors: 4, style: 'clean' },
-  { id: 'dorm-right', name: '宿舍（右）', short: '宿舍', px: 900, py: 1210, w: 52, d: 40, floors: 10, style: 'dorm' },
-  { id: 'library', name: '圖書館', short: '圖書館', px: 900, py: 1258, w: 74, d: 54, floors: 6, style: 'warm', note: '图中标注"圖書館六樓"' },
-  { id: 'academic-right', name: '教學大樓（右）', short: '教學大樓', px: 1075, py: 986, w: 58, d: 48, floors: 6, style: 'glass' },
-  { id: 'dorm-far', name: 'Dormitory', short: '宿舍', px: 1075, py: 1080, w: 52, d: 40, floors: 10, style: 'dorm' },
-  { id: 'complex', name: '綜合教學大樓', short: '綜合教學樓', px: 1075, py: 1259, w: 96, d: 62, floors: 9, style: 'glass', note: '含演藝廳 / 電影院 / 體育設施' },
+  { id: 'admin', letter: 'A', name: 'A 座 行政樓', short: 'A 座行政樓', px: 350, py: 967, w: 58, d: 46, floors: 5, style: 'office', note: '校方全景：A座行政樓前 / 大堂' },
+  { id: 'academic-left', letter: 'C', name: 'C 座 教學樓', short: 'C 座教學樓', px: 350, py: 1042, w: 62, d: 52, floors: 6, style: 'glass', note: '含停車場、學生便利店、廚藝學教學實驗室' },
+  { id: 'recreation', letter: 'D', name: 'D 座 禮堂', short: 'D 座禮堂', px: 600, py: 990, w: 66, d: 50, floors: 3, style: 'warm', note: '活動中心 / 禮堂' },
+  { id: 'science', letter: 'H', name: '科技大樓', short: '科技大樓', px: 600, py: 1225, w: 60, d: 52, floors: 6, style: 'lab', note: '科研與實驗室' },
+  { id: 'dorm-mid', letter: 'E', name: 'E 座 宿舍', short: 'E 座宿舍', px: 600, py: 1150, w: 52, d: 40, floors: 10, style: 'dorm', note: '校方全景：E座點聚餐廳' },
+  { id: 'stadium', letter: '', name: '足球 / 田徑運動場', short: '田徑場', px: 900, py: 985, w: 150, d: 96, floors: 1, style: 'sport', note: '校方全景：足球/田徑運動場、籃球場' },
+  { id: 'gym', letter: 'J', name: 'J 座 室內體育館', short: 'J 座體育館', px: 900, py: 1062, w: 86, d: 60, floors: 3, style: 'sport', note: '校方全景：J座室內體育館' },
+  { id: 'tis', letter: '', name: '澳門國際學校', short: '國際學校', px: 900, py: 1128, w: 70, d: 52, floors: 4, style: 'clean', note: '校方全景：澳門國際學校入口' },
+  { id: 'dorm-right', letter: 'G', name: 'G 座 宿舍', short: 'G 座宿舍', px: 900, py: 1210, w: 52, d: 40, floors: 10, style: 'dorm', note: '校方全景：G座宿舍入口 / 大堂 / 五人間' },
+  { id: 'library', letter: 'N', name: 'N 座 圖書館', short: 'N 座圖書館', px: 900, py: 1258, w: 74, d: 54, floors: 6, style: 'warm', note: '校方全景：圖書館一至四樓、N座大堂' },
+  { id: 'academic-right', letter: 'O', name: 'O 座 教學樓', short: 'O 座教學樓', px: 1075, py: 986, w: 58, d: 48, floors: 7, style: 'glass', note: '校方全景：O201/O202/O203/O205/O702 教室' },
+  { id: 'dorm-far', letter: '', name: '宿舍（東）', short: '宿舍', px: 1075, py: 1080, w: 52, d: 40, floors: 10, style: 'dorm', note: '宿舍區' },
+  { id: 'complex', letter: 'R', name: '綜合教學大樓', short: '綜合教學樓', px: 1075, py: 1259, w: 96, d: 62, floors: 9, style: 'glass', note: '含演藝廳 / 電影院 / 體育設施' },
 ]
 
 export const CAMPUS_BUILDINGS = BUILDINGS.map((building) => {
