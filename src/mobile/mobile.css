@@ -524,3 +524,13 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .pano-sheet iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #020713; }
 .pano-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); color: #718aa5; font-size: 8px; }
 .pano-foot a { display: flex; align-items: center; gap: 5px; color: #a5d9ff; text-decoration: none; }
+
+.twin-live-tag { display: flex; align-items: center; gap: 4px; color: #8ee1a8; font-size: 7px; }
+.twin-live-tag i { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 7px #22c55e; animation: pulse 1.1s infinite; }
+.twin-status-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.twin-status-row span { display: inline-flex; align-items: center; gap: 4px; padding: 5px 6px; color: #9bb6d2; border: 1px solid rgba(96,165,250,.12); border-radius: 7px; background: rgba(4,13,27,.58); font-size: 7px; }
+.twin-route-mode { display: flex; gap: 5px; margin-top: 8px; }
+.twin-route-mode button { padding: 5px 8px; color: #718aa6; border: 1px solid rgba(96,165,250,.13); border-radius: 7px; background: rgba(4,13,27,.58); font-size: 8px; }
+.twin-route-mode button.active { color: #dff4ff; border-color: rgba(56,189,248,.42); background: rgba(37,99,235,.2); }
+.twin-route span { display: inline-flex; align-items: center; gap: 4px; }
+.twin-route span b { color: #6fc7f4; font-size: 7px; }

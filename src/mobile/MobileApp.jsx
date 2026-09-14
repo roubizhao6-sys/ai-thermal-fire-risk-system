@@ -284,8 +284,8 @@ function planEvacuation(frame) {
   return {
     ...result,
     bearing: Math.round(bearing),
-    distance: Math.round(result.distance * 4),
-    eta: Math.round(result.distance * 3.1),
+    distance: Math.round(result.distance * 2.8),
+    eta: Math.round(result.distance * 2.1),
     blocked: [...blocked],
     path: result.path,
     steps: result.path.map((id, index) => `${String(index + 1).padStart(2, '0')} ${buildingGraph.nodes[id].label}`),
@@ -752,53 +752,63 @@ function LivePlayer({ camera, frame, viewMode }) {
 
 
 function DigitalTwinView({ frame, route }) {
+  const [routeMode, setRouteMode] = useState('safe')
   const nodes = buildingGraph.nodes
   const edges = Object.values(buildingGraph.edges)
-  const pathIds = route?.path || ['start', 'mid', 'stairs']
+  const safePath = route?.path || ['start', 'mid', 'stairs']
+  const fastPath = ['start', 'mid', 'east', 'stairs']
+  const activePath = routeMode === 'safe' ? safePath : fastPath
   const blocked = new Set(route?.blocked || [])
   const hotspots = frame?.hotspots || []
-  const pathPoints = pathIds.map((id) => `${nodes[id].x},${nodes[id].y}`).join(' ')
+  const pathPoints = activePath.map((id) => `${nodes[id].x},${nodes[id].y}`).join(' ')
+  const distance = routeMode === 'safe' ? (route?.distance || 86) : Math.max(48, Math.round((route?.distance || 86) * 0.72))
+  const eta = routeMode === 'safe' ? (route?.eta || 42) : Math.max(24, Math.round((route?.eta || 42) * 0.72))
   return (
     <section className="mobile-card digital-twin-card">
-      <div className="card-head"><div><strong>3D 数字孪生 · 动态疏散图</strong><small>热区、传感器节点与推荐路线实时联动</small></div><Box size={18} /></div>
+      <div className="card-head"><div><strong>动态疏散图</strong><small>热区封控、路线重算和安全出口联动</small></div><div className="twin-live-tag"><i />实时重算</div></div>
+      <div className="twin-status-row">
+        <span><AlertTriangle size={13} />{hotspots.length} 个高温热区</span>
+        <span><ShieldAlert size={13} />{blocked.size} 个封控节点</span>
+        <span><Navigation size={13} />出口 {route?.bearing ?? 42}°</span>
+      </div>
       <div className="twin-map">
-        <svg viewBox="0 0 100 84" role="img" aria-label="楼层数字孪生地图">
+        <svg viewBox="0 0 100 84" role="img" aria-label="楼层动态疏散地图">
           <defs>
-            <linearGradient id="twin-room" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#0b2440" /><stop offset="1" stopColor="#071224" />
-            </linearGradient>
+            <linearGradient id="twin-room" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#0b2440" /><stop offset="1" stopColor="#071224" /></linearGradient>
             <filter id="twin-glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
           </defs>
           <rect x="7" y="10" width="86" height="66" rx="6" fill="url(#twin-room)" stroke="#2f6ba3" strokeOpacity=".45" />
           <path d="M7 18 L93 18 M7 30 L34 30 M64 30 L93 30 M7 52 L34 52 M64 52 L93 52 M34 18 L34 68 M64 18 L64 68" fill="none" stroke="#3b82f6" strokeOpacity=".16" />
+          <path d="M34 30 L64 30 M34 52 L64 52" fill="none" stroke="#8ba9c4" strokeOpacity=".24" strokeWidth=".7" />
           {edges.map((edge) => {
             const a = nodes[edge.from]
             const b = nodes[edge.to]
             const isBlocked = blocked.has(edge.from) || blocked.has(edge.to)
-            return <line key={edge.from + edge.to} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={isBlocked ? '#ef4444' : '#3b82f6'} strokeOpacity={isBlocked ? '.55' : '.28'} strokeWidth={isBlocked ? '.9' : '.6'} strokeDasharray={isBlocked ? '2 1' : ''} />
+            return <line key={edge.from + edge.to} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={isBlocked ? '#ef4444' : '#3b82f6'} strokeOpacity={isBlocked ? '.62' : '.24'} strokeWidth={isBlocked ? '.9' : '.6'} strokeDasharray={isBlocked ? '2 1' : ''} />
           })}
-          {hotspots.slice(0, 4).map((spot, index) => {
+          {hotspots.slice(0, 5).map((spot, index) => {
             const x = 14 + (Number(spot.x || 0) / 100) * 74
             const y = 18 + (Number(spot.y || 0) / 100) * 50
-            return <g key={index}><circle cx={x} cy={y} r={3.4 + index * .4} fill={Number(spot.temp || 0) >= 65 ? '#ef4444' : '#f59e0b'} opacity=".22" /><circle cx={x} cy={y} r="2" fill={Number(spot.temp || 0) >= 65 ? '#ff5a4e' : '#ffae45'} filter="url(#twin-glow)" /><text x={x + 3} y={y - 2} fontSize="4.2" fill="#ffd7c2">{Number(spot.temp || 0).toFixed(0)}°</text></g>
+            const temp = Number(spot.temp || 0)
+            return <g key={index}><circle cx={x} cy={y} r={3.4 + index * .4} fill={temp >= 65 ? '#ef4444' : '#f59e0b'} opacity=".22"><animate attributeName="r" values={`${2.8 + index * .3};${4.6 + index * .4};${2.8 + index * .3}`} dur="1.8s" repeatCount="indefinite" /></circle><circle cx={x} cy={y} r="2" fill={temp >= 65 ? '#ff5a4e' : '#ffae45'} filter="url(#twin-glow)" /><text x={x + 3} y={y - 2} fontSize="4.2" fill="#ffd7c2">{temp.toFixed(0)}°</text></g>
           })}
-          <polyline points={pathPoints} fill="none" stroke="#22c55e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" filter="url(#twin-glow)" />
-          {pathIds.map((id, index) => {
+          <polyline points={pathPoints} fill="none" stroke="#22c55e" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 2" filter="url(#twin-glow)"><animate attributeName="stroke-dashoffset" from="8" to="0" dur="1.2s" repeatCount="indefinite" /></polyline>
+          {activePath.map((id, index) => {
             const node = nodes[id]
             return <g key={id}><circle cx={node.x} cy={node.y} r={index === 0 ? '2.6' : '1.8'} fill={node.type === 'exit' ? '#22c55e' : '#38bdf8'} /><text x={node.x} y={node.y + 6.5} textAnchor="middle" fontSize="4" fill="#cfe4f7">{node.label}</text></g>
           })}
-          <g transform="translate(13 9)"><circle cx="0" cy="0" r="1.8" fill="#38bdf8" /><text x="3.5" y="1.4" fontSize="4" fill="#8db8dd">热感节点</text></g>
-          <g transform="translate(36 9)"><circle cx="0" cy="0" r="1.8" fill="#22c55e" /><text x="3.5" y="1.4" fontSize="4" fill="#8dd5a9">安全出口</text></g>
-          {blocked.size > 0 && <g transform="translate(61 9)"><line x1="-2" y1="0" x2="2" y2="0" stroke="#ef4444" strokeWidth="1.4" /><text x="4" y="1.4" fontSize="4" fill="#f2a2a2">封控区域</text></g>}
+          <g transform="translate(13 9)"><circle cx="0" cy="0" r="1.8" fill="#38bdf8" /><text x="3.5" y="1.4" fontSize="4" fill="#8db8dd">当前位置</text></g>
+          <g transform="translate(39 9)"><circle cx="0" cy="0" r="1.8" fill="#22c55e" /><text x="3.5" y="1.4" fontSize="4" fill="#8dd5a9">安全出口</text></g>
+          {blocked.size > 0 && <g transform="translate(68 9)"><line x1="-2" y1="0" x2="2" y2="0" stroke="#ef4444" strokeWidth="1.4" /><text x="4" y="1.4" fontSize="4" fill="#f2a2a2">封控</text></g>}
         </svg>
       </div>
-      <div className="twin-route">
-        {route?.steps?.length ? route.steps.map((step) => <span key={step}>{step}</span>) : <span>正在根据热区风险计算推荐路线</span>}
-      </div>
-      <div className="twin-metrics"><span><Route size={13} />{route?.distance || 86} 米</span><span><Clock3 size={13} />约 {route?.eta || 42} 秒</span><span><Navigation size={13} />出口方向 {route?.bearing ?? 42}°</span></div>
+      <div className="twin-route-mode"><button type="button" className={routeMode === 'safe' ? 'active' : ''} onClick={() => setRouteMode('safe')}>安全优先</button><button type="button" className={routeMode === 'fast' ? 'active' : ''} onClick={() => setRouteMode('fast')}>距离优先</button></div>
+      <div className="twin-route">{activePath.map((id, index) => <span key={id}><b>{String(index + 1).padStart(2, '0')}</b>{nodes[id].label}</span>)}</div>
+      <div className="twin-metrics"><span><Route size={13} />{distance} 米</span><span><Clock3 size={13} />约 {eta} 秒</span><span><Navigation size={13} />出口方向 {route?.bearing ?? 42}°</span></div>
     </section>
   )
 }
+
 
 function DrillMode({ frame, onClose, onComplete }) {
   const [phase, setPhase] = useState('ready')

@@ -76,6 +76,7 @@ function makeSensor(x, y, z, rotationY = 0) {
 
 function makeBuilding({ x, z, w, h, d, color, emissive = 0x000000, floors = 4, label, labelColor = '#8fd8ff', windowColor = 0x46b8e8, front = true }) {
   const root = new THREE.Group()
+  root.userData.isFallbackBuilding = true
   const body = buildingBox(w, h, d, color, emissive)
   body.position.set(0, h / 2, 0)
   root.add(body)
@@ -190,6 +191,41 @@ function makeCampus() {
   return root
 }
 
+
+function addOsmCampus(data, group) {
+  const scale = 0.045
+  const color = new THREE.Color()
+  for (const building of data.buildings || []) {
+    if (!building.polygon?.length) continue
+    const shape = new THREE.Shape()
+    const centerX = building.polygon.reduce((sum, point) => sum + Number(point[0]), 0) / building.polygon.length
+    const centerZ = building.polygon.reduce((sum, point) => sum + Number(point[1]), 0) / building.polygon.length
+    building.polygon.forEach((point, index) => {
+      const x = Number(point[0]) * scale
+      const y = -Number(point[1]) * scale
+      if (index === 0) shape.moveTo(x, y)
+      else shape.lineTo(x, y)
+    })
+    shape.closePath()
+    const height = Math.max(4.5, Number(building.height || building.floors * 3.3) * scale)
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false })
+    geometry.rotateX(-Math.PI / 2)
+    color.set(building.color || '#4b9fd4')
+    const mesh = new THREE.Mesh(geometry, standard({ color: color.clone(), emissive: color.clone().multiplyScalar(0.13), roughness: 0.43, metalness: 0.2 }))
+    mesh.position.y = 0.1
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+    mesh.userData = { code: building.code, name: building.name, floors: building.floors, type: building.type }
+    group.add(mesh)
+
+    const outline = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color: 0x7ed7ff, transparent: true, opacity: 0.32 }))
+    outline.position.y = 0.1
+    group.add(outline)
+
+    addLabel(group, `${building.code} ${building.name}`, centerX * scale, height + 0.85, -centerZ * scale, '#bdefff')
+  }
+}
+
 export default function Campus3DView({ frame }) {
   const containerRef = useRef(null)
   const rootRef = useRef(null)
@@ -225,7 +261,20 @@ export default function Campus3DView({ frame }) {
     sun.castShadow = true
     scene.add(sun)
 
-    root.add(makeCampus())
+    const fallbackCampus = makeCampus()
+    root.add(fallbackCampus)
+    let cancelled = false
+    fetch(`${import.meta.env.BASE_URL}models/must-campus-osm.json`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled) return
+        fallbackCampus.traverse((object) => { if (object.userData.isFallbackBuilding) object.visible = false })
+        const osmGroup = new THREE.Group()
+        osmGroup.name = 'osm-campus-buildings'
+        addOsmCampus(data, osmGroup)
+        root.add(osmGroup)
+      })
+      .catch(() => {})
     const hotspots = new THREE.Group()
     root.add(hotspots)
     hotspotsRef.current = hotspots
@@ -282,6 +331,7 @@ export default function Campus3DView({ frame }) {
     animate()
 
     return () => {
+      cancelled = true
       cancelAnimationFrame(frameId)
       observer.disconnect()
       renderer.domElement.removeEventListener('pointerdown', down)
