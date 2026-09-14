@@ -14,7 +14,8 @@
   --separator: rgba(84, 84, 88, .55);
   --text: #ffffff;
   --text-2: rgba(235, 235, 245, .58);
-  --text-3: rgba(235, 235, 245, .3);
+  /* 三级灰只留给纯装饰（刻度针脚）；所有需要读的文字一律不低于 58% 白 */
+  --text-3: rgba(235, 235, 245, .42);
   --alert: #ff3b30;
   --safe: #30d158;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
@@ -120,7 +121,7 @@ p { margin: 0; }
 .dial-distance.is-alert .distance-value,
 .dial-distance.is-alert .distance-unit { color: var(--alert); }
 .dial-distance.is-blocked .distance-value { font-size: clamp(38px, 12vw, 54px); color: var(--alert); }
-.dial-time { margin-top: 6px; color: var(--text-3); font-size: 13px; font-variant-numeric: tabular-nums; }
+.dial-time { margin-top: 6px; color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
 
 /* 表盘下方两块读数，只用一条发丝线分隔 */
 .stage-readouts {
@@ -132,12 +133,12 @@ p { margin: 0; }
   max-width: 360px;
 }
 .readout { display: flex; flex: 1; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
-.readout span { color: var(--text-3); font-size: 12px; }
+.readout span { color: var(--text-2); font-size: 12px; }
 .readout strong { font-size: 15px; font-weight: 500; text-align: center; }
 .readout-wide strong { color: var(--text-2); font-size: 12px; font-weight: 400; line-height: 1.5; }
 .readout-sep { width: 1px; background: var(--separator); }
 
-.stage-note { color: var(--text-3); font-size: 12px; text-align: center; }
+.stage-note { color: var(--text-2); font-size: 12px; text-align: center; }
 
 /* 底部只留三个纯文字按钮，和指南针的「真北 / 水平仪」同一层级 */
 .compass-tools {
