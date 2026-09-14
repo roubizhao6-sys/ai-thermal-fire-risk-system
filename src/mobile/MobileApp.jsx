@@ -55,7 +55,7 @@ import AlarmCenterView from './AlarmCenterView.jsx'
 import AlarmOverlay from './AlarmOverlay.jsx'
 import CityMap from './CityMap.jsx'
 import EvacuationView from './EvacuationView.jsx'
-import { positionNodeId } from './building.js'
+import { FLOOR_COUNT, positionNodeId } from './building.js'
 import { planRoute } from './evacuation.js'
 import { DEFAULT_THRESHOLDS, createFrame, normalizePacket, riskFromMaxTemp } from './thermal.js'
 import {
@@ -613,6 +613,8 @@ export default function MobileApp() {
           floor: fire.floor,
           startedAt: fire.startedAt,
           mode: fire.mode,
+          // 多火源：系统端判定了多个起火节点时一并同步给用户端
+          ...(Array.isArray(fire.nodes) && fire.nodes.length > 1 ? { nodes: fire.nodes } : {}),
         }))
       } else {
         localStorage.removeItem('thermalGuardFire')
@@ -947,6 +949,28 @@ export default function MobileApp() {
     setFire(null)
   }
 
+  // 演示多火源：让火势蔓延到上一层走廊，路线需要同时避开两处
+  const spreadFireUp = () => {
+    if (!fire) {
+      setNotice({ id: Date.now(), text: '请先点燃起火点，再让火势蔓延', tone: 'info' })
+      return
+    }
+    const nodes = Array.isArray(fire.nodes) && fire.nodes.length ? fire.nodes : [fire.nodeId]
+    const topFloor = Math.max(...nodes.map((id) => Number(String(id).replace(/\D/g, '')) || 1))
+    if (topFloor >= FLOOR_COUNT) {
+      setNotice({ id: Date.now(), text: '已经蔓延到顶层，无法继续向上', tone: 'info' })
+      return
+    }
+    const added = `C${topFloor + 1}`
+    if (nodes.includes(added)) return
+    setFire({ ...fire, nodes: [...nodes, added] })
+    setNotice({
+      id: Date.now(),
+      text: `火势已蔓延到 ${topFloor + 1} 楼走廊：系统端与用户端现在都要同时避开 ${nodes.length + 1} 处火源`,
+      tone: 'warn',
+    })
+  }
+
   // 保证中风险阈值始终低于高温报警阈值
   const updateSettings = (patch) => setSettings((current) => {
     const next = { ...current, ...patch }
@@ -1008,7 +1032,7 @@ export default function MobileApp() {
           onManualAlarm={() => pushAlarm({ mode: 'manual', startedAt: Date.now(), temp: result.maxTemp, hotspots: result.hotspots.length, location: '手动触发（自检）', sourceLabel: '手动报警' })}
           onStartDrill={startDrill}
           onStopDrill={stopDrill}
-          onClearFire={() => setFire(null)}
+          onClearFire={() => (alarm ? stopDrill() : setFire(null))}
           onEnableSound={enableSound}
           onMarkHandled={(id) => setAlerts((current) => current.map((item) => (item.id === id ? { ...item, handled: true } : item)))}
           onClearAlerts={() => setAlerts([])}
@@ -1027,6 +1051,7 @@ export default function MobileApp() {
           onPositionChange={setPosition}
           onToggleBlock={toggleBlockedNode}
           onStartDrillAt={(nodeId, floor) => startDrill(floor, nodeId[0])}
+          onSpreadFire={spreadFireUp}
           onClearFire={() => setFire(null)}
         />
       )
@@ -1112,6 +1137,7 @@ export default function MobileApp() {
           onReenforce={reenforceAlarm}
           onResolve={resolveAlarm}
           onStopDrill={stopDrill}
+          onSpreadFire={spreadFireUp}
           onEnableSound={enableSound}
         />
       )}

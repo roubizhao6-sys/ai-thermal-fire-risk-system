@@ -33,14 +33,38 @@ export const HAZARD_META = {
   clear: { label: '正常', description: '无明显烟气' },
 }
 
-// 以火源节点为起点做加权跳数扩散，再按扩散系数换算危险等级
-export function computeHazard(fire, elapsedSec = 0) {
-  const hazard = new Map()
-  Object.keys(BUILDING.nodes).forEach((id) => hazard.set(id, { level: 'clear', depth: Infinity }))
+// 火源入参归一化：支持单个火源、火源数组、或 { sources: [...] }。
+// 每一项可以是节点 id 字符串，也可以是 { nodeId, elapsedSec?, startedAt? }。
+export function normalizeFireSources(fire) {
+  if (!fire) return []
+  const list = Array.isArray(fire)
+    ? fire
+    : Array.isArray(fire.sources)
+      ? fire.sources
+      : Array.isArray(fire.nodes)
+        ? fire.nodes
+        : [fire]
+  return list
+    .map((item) => {
+      if (typeof item === 'string') return { nodeId: item, elapsedSec: null }
+      return {
+        nodeId: item?.nodeId ?? null,
+        elapsedSec: typeof item?.elapsedSec === 'number' ? item.elapsedSec : null,
+        startedAt: typeof item?.startedAt === 'number' ? item.startedAt : null,
+      }
+    })
+    .filter((item) => item.nodeId && BUILDING.nodes[item.nodeId])
+}
 
-  const originId = fire?.nodeId
-  if (!originId || !BUILDING.nodes[originId]) return hazard
+function levelFromDepth(effective) {
+  if (effective <= FIRE_DEPTH) return 'fire'
+  if (effective <= SMOKE_DEPTH) return 'smoke'
+  if (effective <= WARN_DEPTH) return 'warn'
+  return 'clear'
+}
 
+// 单个火源的加权跳数扩散：返回 id -> 有效深度
+function spreadFromOrigin(originId, elapsedSec) {
   const spread = 1 + Math.min(Math.max(elapsedSec, 0) / 55, 1.5)
   const depths = new Map([[originId, 0]])
   const settled = new Set()
@@ -68,15 +92,27 @@ export function computeHazard(fire, elapsedSec = 0) {
     })
   }
 
-  depths.forEach((depth, id) => {
-    const effective = depth / spread
-    let level = 'clear'
-    if (effective <= FIRE_DEPTH) level = 'fire'
-    else if (effective <= SMOKE_DEPTH) level = 'smoke'
-    else if (effective <= WARN_DEPTH) level = 'warn'
-    hazard.set(id, { level, depth: effective })
+  const effective = new Map()
+  depths.forEach((depth, id) => effective.set(id, depth / spread))
+  return effective
+}
+
+// 多火源危险场：每个火源各自扩散，节点取"最危险"的那一个（有效深度最小）。
+// 单个火源时结果与旧版完全一致。
+export function computeHazard(fire, elapsedSec = 0) {
+  const sources = normalizeFireSources(fire)
+  const best = new Map()
+  Object.keys(BUILDING.nodes).forEach((id) => best.set(id, Infinity))
+
+  sources.forEach((source) => {
+    const depths = spreadFromOrigin(source.nodeId, source.elapsedSec ?? elapsedSec)
+    depths.forEach((depth, id) => {
+      if (depth < best.get(id)) best.set(id, depth)
+    })
   })
 
+  const hazard = new Map()
+  best.forEach((depth, id) => hazard.set(id, { level: levelFromDepth(depth), depth }))
   return hazard
 }
 
@@ -136,15 +172,16 @@ function aStar(startId, goalId, entry) {
 //   1. 起火点本身永远不可通行，路线不会穿过明火。
 //   2. 核心火源区的其他节点默认禁止进入，但若紧邻使用者当前位置则允许迈出这一步，
 //      否则站在起火层的人将永远无法离开。
-function buildEntryRules(startId, originId, hazard, blockedSet) {
+function buildEntryRules(startId, originIds, hazard, blockedSet) {
   const startNeighbors = new Set(BUILDING.adjacency[startId].map((edge) => edge.to))
   const depthOf = (id) => hazard.get(id)?.depth ?? Infinity
+  const origins = new Set(Array.isArray(originIds) ? originIds : originIds ? [originIds] : [])
 
   return {
     allowed(id) {
       if (blockedSet.has(id)) return false
       if (id === startId) return true
-      if (id === originId) return false
+      if (origins.has(id)) return false
       if (depthOf(id) <= FIRE_DEPTH) return startNeighbors.has(id)
       return true
     },
@@ -274,10 +311,12 @@ function pathMeters(path) {
 }
 
 export function planRoute({ startId, fire = null, elapsedSec = 0, blocked = [] }) {
-  const hazard = computeHazard(fire, elapsedSec)
+  const sources = normalizeFireSources(fire)
+  const originIds = sources.map((source) => source.nodeId)
+  const hazard = computeHazard(sources.length ? sources : null, elapsedSec)
   const blockedSet = new Set(blocked)
   const start = BUILDING.nodes[startId] ? startId : 'C3'
-  const entry = buildEntryRules(start, fire?.nodeId, hazard, blockedSet)
+  const entry = buildEntryRules(start, originIds, hazard, blockedSet)
   const candidates = []
 
   EXIT_LIST.forEach((exit) => {
@@ -302,6 +341,8 @@ export function planRoute({ startId, fire = null, elapsedSec = 0, blocked = [] }
       ok: false,
       hazard,
       startId: start,
+      originIds,
+      originCount: originIds.length,
       blocked: [...blockedSet],
       reason: '所有常规逃生通道均已受阻，请退回房间关闭房门、封堵门缝并等待救援',
     }
@@ -316,6 +357,9 @@ export function planRoute({ startId, fire = null, elapsedSec = 0, blocked = [] }
   }
   if (startHazard === 'fire') notices.unshift('您所在位置正处于火源核心区，请立刻沿指引撤离，不要收整物品')
   else if (startHazard === 'smoke') notices.unshift('您所在区域已有浓烟，请保持低姿并尽快离开')
+  if (originIds.length > 1) {
+    notices.unshift(`现场判定 ${originIds.length} 处火源（${originIds.map((id) => nodeLabel(id)).join('、')}），路线已同时避开`)
+  }
 
   // 只有备选出口代价接近时才作为「备用路线」提示，否则天台等避难层只是最后手段
   const runnerUp = candidates[1]
@@ -327,6 +371,8 @@ export function planRoute({ startId, fire = null, elapsedSec = 0, blocked = [] }
     ok: true,
     hazard,
     startId: start,
+    originIds,
+    originCount: originIds.length,
     path: best.path,
     exitId: best.exitId,
     exitLabel: best.exitMeta.label,

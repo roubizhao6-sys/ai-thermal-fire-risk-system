@@ -128,5 +128,41 @@ console.log('\n[11] 烟气扩散后，起火层上方住户应改走天台')
   console.log(`        0s -> ${early.exitId} ｜ 300s -> ${late.exitId}`)
 }
 
+console.log('\n[12] 多火源：危险场取最危险者，路线同时避开两处')
+{
+  const single = computeHazard({ nodeId: 'C4' })
+  const multi = computeHazard([{ nodeId: 'C4' }, { nodeId: 'B6' }])
+  const severity = { clear: 0, warn: 1, smoke: 2, fire: 3 }
+  check('4 楼起火时 6 楼不是核心区', single.get('C6').level !== 'fire', single.get('C6').level)
+  check('第二处火源自身在核心区', multi.get('B6').level === 'fire', multi.get('B6').level)
+  check('6 楼走廊危险度随之升高', severity[multi.get('C6').level] > severity[single.get('C6').level], `${single.get('C6').level} -> ${multi.get('C6').level}`)
+  check('原火源仍在核心区', multi.get('C4').level === 'fire', multi.get('C4').level)
+  check('危险深度取两者更危险的一个', multi.get('C5').depth <= single.get('C5').depth, `${multi.get('C5').depth} <= ${single.get('C5').depth}`)
+
+  const route = planRoute({ startId: 'C5', fire: [{ nodeId: 'C4' }, { nodeId: 'C6' }] })
+  check('五楼用户仍能撤离', route.ok, route.reason || '')
+  check('识别到 2 处火源', route.originCount === 2, `${route.originCount}`)
+  check('路径不含 4 楼火源节点', !route.path.includes('C4'), route.path.join('→'))
+  check('路径不含 6 楼火源节点', !route.path.includes('C6'), route.path.join('→'))
+  check('提示里说明了多火源', route.warnings.some((text) => text.includes('2 处火源')), route.warnings.join(' | '))
+  console.log(`        用户 5 楼走廊 → ${route.exitLabel}｜${route.path.map((id) => nodeLabel(id)).join(' → ')}`)
+}
+
+console.log('\n[13] 兼容性：单个火源与「单元素数组」结果一致，且支持各自的起火时间')
+{
+  const before = computeHazard({ nodeId: 'A4' }, 120)
+  const wrapped = computeHazard([{ nodeId: 'A4' }], 120)
+  const sameDepths = [...before.keys()].every((id) => before.get(id).depth === wrapped.get(id).depth)
+  check('危险场完全一致', sameDepths)
+
+  const routeBefore = planRoute({ startId: 'C7', fire: { nodeId: 'A4' }, elapsedSec: 120 })
+  const routeWrapped = planRoute({ startId: 'C7', fire: [{ nodeId: 'A4' }], elapsedSec: 120 })
+  check('路线完全一致', routeBefore.path.join('→') === routeWrapped.path.join('→'), `${routeBefore.path.join('→')} vs ${routeWrapped.path.join('→')}`)
+
+  const staggered = computeHazard([{ nodeId: 'A4', elapsedSec: 0 }, { nodeId: 'B6', elapsedSec: 900 }])
+  const fresh = computeHazard([{ nodeId: 'A4', elapsedSec: 0 }, { nodeId: 'B6', elapsedSec: 0 }])
+  check('后起火的火源按自己的时间扩散', staggered.get('C6').depth <= fresh.get('C6').depth, `${staggered.get('C6').depth} <= ${fresh.get('C6').depth}`)
+}
+
 console.log(`\n结果：${failures === 0 ? '全部通过' : `${failures} 项失败`}`)
 process.exit(failures === 0 ? 0 : 1)

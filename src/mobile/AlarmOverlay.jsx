@@ -16,6 +16,7 @@ export default function AlarmOverlay({
   onReenforce,
   onResolve,
   onStopDrill,
+  onSpreadFire,
   onEnableSound,
 }) {
   if (!alarm) return null
@@ -77,9 +78,16 @@ export default function AlarmOverlay({
           )}
 
           {isDrill && (
-            <button className="alarm-ghost" type="button" onClick={onStopDrill}>
-              <X size={16} />结束演练
-            </button>
+            <div className="alarm-row">
+              {onSpreadFire && (
+                <button type="button" onClick={onSpreadFire}>
+                  <Flame size={16} />蔓延到上一层
+                </button>
+              )}
+              <button className="alarm-ghost" type="button" onClick={onStopDrill}>
+                <X size={16} />结束演练
+              </button>
+            </div>
           )}
         </div>
 

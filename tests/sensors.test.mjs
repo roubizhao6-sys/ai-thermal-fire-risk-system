@@ -29,6 +29,8 @@ globalThis.window = {
 const {
   BEACON_TTL_MS,
   KEYS,
+  normalizeFire,
+  readHazardSources,
   readFire,
   readSettings,
   readTelemetry,
@@ -150,6 +152,37 @@ console.log('\n[9] 订阅通道：只对关心的 key 触发')
     .filter((item) => item.type === 'storage')
     .forEach((item) => item.fn({ key: KEYS.beacon }))
   check('取消订阅后不再触发', hits === 1, `${hits}`)
+}
+
+console.log('\n[10] 多火源：载荷归一化与多传感器合并')
+{
+  clear()
+  const legacy = normalizeFire({ nodeId: 'C4', floor: 4, startedAt: 1000, mode: 'live' })
+  check('旧格式 → 单火源', legacy.sources.length === 1 && legacy.sources[0].nodeId === 'C4', JSON.stringify(legacy.sources))
+  check('保留起始时间与模式', legacy.startedAt === 1000 && legacy.mode === 'live')
+
+  const multi = normalizeFire({ nodeId: 'C4', nodes: ['C4', 'C6'], startedAt: 2000, mode: 'drill' })
+  check('nodes 数组 → 两个火源', multi.sources.length === 2, JSON.stringify(multi.sources))
+  check('主节点仍为首个火源', multi.nodeId === 'C4', multi.nodeId)
+
+  const staggered = normalizeFire({ sources: [{ nodeId: 'A4', startedAt: 0 }, { nodeId: 'B6', startedAt: 60000 }], startedAt: 0 })
+  check('各火源保留自己的起火时间', staggered.sources[1].startedAt === 60000, JSON.stringify(staggered.sources))
+
+  const nowMs = 600000
+  clear()
+  writeJson(KEYS.fire, { nodeId: 'C4', startedAt: nowMs - 120000, mode: 'live' })
+  writeJson(KEYS.telemetry, { at: nowMs, nodes: [{ nodeId: 'C6', temp: 88 }, { nodeId: 'C7', temp: 30 }, { floor: 5, temp: 70 }] })
+  const sources = readHazardSources({ nowMs, thresholds: { highThreshold: 65 } })
+  check('火源 + 超阈值节点都成为来源', sources.length === 3, JSON.stringify(sources.map((item) => item.nodeId)))
+  check('低于阈值的节点不算火源', !sources.some((item) => item.nodeId === 'C7'))
+  check('只给楼层也能定位到走廊节点', sources.some((item) => item.nodeId === 'C5'))
+  check('火源来源排在最先', sources[0].from === 'fire', sources[0].from)
+  check('每个来源各带已流逝时间', sources[0].elapsedSec === 120, `${sources[0].elapsedSec}`)
+
+  clear()
+  writeJson(KEYS.fire, { nodes: ['C6'], startedAt: nowMs, mode: 'live' })
+  writeJson(KEYS.telemetry, { at: nowMs, nodes: [{ nodeId: 'C6', temp: 90 }] })
+  check('同一节点不会重复计入', readHazardSources({ nowMs }).length === 1)
 }
 
 console.log(`\n结果：${failures === 0 ? '全部通过' : `${failures} 项失败`}`)

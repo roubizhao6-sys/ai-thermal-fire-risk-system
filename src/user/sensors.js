@@ -25,6 +25,8 @@
 // 原生端（iOS 系统端/用户端）只要按同样的 key 与 JSON 结构写入，Web 端即时生效，
 // 不需要改这一层 —— 这就是"保留所有传感器接口"的含义。
 
+import { DEFAULT_THRESHOLDS } from '../mobile/thermal.js'
+
 export const KEYS = {
   position: 'thermalGuardUserPosition',
   beacon: 'thermalGuardBeaconPosition',
@@ -134,9 +136,71 @@ export function saveManualPosition(position) {
 }
 
 export function readFire() {
-  const stored = readJson(KEYS.fire, null)
-  if (!stored?.nodeId) return null
-  return { ...stored, startedAt: stored.startedAt || Date.now() }
+  return normalizeFire(readJson(KEYS.fire, null))
+}
+
+export function floorFromNodeId(nodeId) {
+  const floor = Number(String(nodeId || '').replace(/\D/g, ''))
+  return Number.isFinite(floor) && floor > 0 ? floor : null
+}
+
+// 火源载荷归一化：支持单个 nodeId、nodes: ['C4','C6']、sources: [{nodeId, startedAt}]
+export function normalizeFire(raw) {
+  if (!raw) return null
+  const list = Array.isArray(raw.sources)
+    ? raw.sources
+    : Array.isArray(raw.nodes)
+      ? raw.nodes
+      : raw.nodeId
+        ? [raw.nodeId]
+        : []
+  const startedAt = Number(raw.startedAt) || Date.now()
+  const sources = list
+    .map((item) => {
+      if (typeof item === 'string') return { nodeId: item, startedAt }
+      return { nodeId: item?.nodeId ?? null, startedAt: Number(item?.startedAt) || startedAt }
+    })
+    .filter((item) => item.nodeId)
+  if (!sources.length) return null
+  return {
+    ...raw,
+    sources,
+    nodeId: raw.nodeId || sources[0].nodeId,
+    floor: raw.floor ?? floorFromNodeId(sources[0].nodeId),
+    startedAt,
+    mode: raw.mode || 'live',
+  }
+}
+
+// 多传感器共同定位火源：系统端判定的火源 + 热像遥测里超过高温阈值的节点。
+// 每个来源带自己的 elapsedSec（后起的火按自己的时间扩散）。
+export function readHazardSources({ fire, telemetry, thresholds, nowMs = Date.now() } = {}) {
+  const resolvedFire = fire === undefined ? readFire() : normalizeFire(fire)
+  const resolvedTelemetry = telemetry === undefined ? readTelemetry(nowMs) : telemetry
+  const high = thresholds?.highThreshold ?? DEFAULT_THRESHOLDS.high
+
+  const sources = []
+  const seen = new Set()
+  const push = (nodeId, startedAt, from) => {
+    if (!nodeId || seen.has(nodeId)) return
+    seen.add(nodeId)
+    sources.push({ nodeId, startedAt, from })
+  }
+
+  resolvedFire?.sources?.forEach((source) => {
+    push(source.nodeId, source.startedAt ?? resolvedFire.startedAt, 'fire')
+  })
+
+  resolvedTelemetry?.nodes?.forEach((node) => {
+    const temp = Number(node?.temp)
+    if (!Number.isFinite(temp) || temp < high) return
+    push(node.nodeId || (node.floor ? `C${node.floor}` : null), nowMs, 'sensor')
+  })
+
+  return sources.map((source) => ({
+    ...source,
+    elapsedSec: Math.max(0, (nowMs - source.startedAt) / 1000),
+  }))
 }
 
 export function readTelemetry(nowMs = Date.now(), ttlMs = BEACON_TTL_MS) {
@@ -148,7 +212,12 @@ export function readTelemetry(nowMs = Date.now(), ttlMs = BEACON_TTL_MS) {
 }
 
 export function readSettings() {
-  return { ...DEFAULT_SETTINGS, ...readJson(KEYS.settings, {}) }
+  return {
+    ...DEFAULT_SETTINGS,
+    highThreshold: DEFAULT_THRESHOLDS.high,
+    mediumThreshold: DEFAULT_THRESHOLDS.medium,
+    ...readJson(KEYS.settings, {}),
+  }
 }
 
 export function supportsOrientation() {

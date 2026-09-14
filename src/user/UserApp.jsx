@@ -8,9 +8,11 @@ import { planRoute } from '../mobile/evacuation.js'
 // 所有传感器输入（信标定位、火情、热像、朝向、设置）统一从这一层订阅
 import {
   KEYS,
+  readHazardSources,
   needsOrientationPermission,
   readFire,
   readSettings,
+  readTelemetry,
   requestOrientationPermission,
   resolvePosition,
   saveManualPosition,
@@ -74,6 +76,7 @@ function formatDuration(seconds) {
 export default function UserApp() {
   const [position, setPosition] = useState(() => resolvePosition())
   const [fire, setFire] = useState(() => readFire())
+  const [telemetry, setTelemetry] = useState(() => readTelemetry())
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [sheetOpen, setSheetOpen] = useState(false)
   // north = 固定指北；device = 跟随手机朝向。不需要授权（非 iOS）时默认跟随，方向指示才"实时"
@@ -92,10 +95,12 @@ export default function UserApp() {
     const offPosition = subscribe([KEYS.position, KEYS.beacon], () => setPosition(resolvePosition()))
     const offHazard = subscribe([KEYS.fire], () => setFire(readFire()))
     const offSettings = subscribe([KEYS.settings], () => setSettings(readSettings()))
+    const offTelemetry = subscribe([KEYS.telemetry], () => setTelemetry(readTelemetry()))
     return () => {
       offPosition()
       offHazard()
       offSettings()
+      offTelemetry()
     }
   }, [])
 
@@ -213,10 +218,18 @@ export default function UserApp() {
   }, [sheetOpen])
 
   const elapsedSec = fire ? Math.max(0, (nowMs - fire.startedAt) / 1000) : 0
-  const route = useMemo(
-    () => planRoute({ startId: positionNodeId(position.floor, position.spot), fire, elapsedSec }),
-    [position.floor, position.spot, fire, elapsedSec],
+  // 多传感器共同定位：系统端判定的火源 + 热像遥测里超阈值的节点，一起喂给寻路
+  const hazardSources = useMemo(
+    () => readHazardSources({ fire, telemetry, thresholds: settings, nowMs }),
+    [fire, telemetry, settings, nowMs],
   )
+  const route = useMemo(
+    () => planRoute({ startId: positionNodeId(position.floor, position.spot), fire: hazardSources, elapsedSec }),
+    [position.floor, position.spot, hazardSources, elapsedSec],
+  )
+
+  const sourceCount = route?.originCount ?? hazardSources.length
+  const originFloors = [...new Set((route?.originIds || []).map((id) => BUILDING.nodes[id]?.floor).filter(Boolean))]
 
   const startNode = BUILDING.nodes[route?.startId] || BUILDING.nodes[positionNodeId(position.floor, position.spot)]
   const nextNodeId = route?.ok ? route.path[1] : null
@@ -252,7 +265,7 @@ export default function UserApp() {
 
   // 给读屏软件的一句话状态：只随路线变化，不随秒数跳动，避免每秒重复播报
   const statusText = route?.ok
-    ? `${fire ? '火警，请立即撤离。' : '当前无火警。'}撤离至 ${route.exitLabel}，${Math.round(route.meters)} 米，约 ${formatDuration(route.seconds)}，${floorDelta === 0 ? '已在本层' : `剩余 ${Math.abs(floorDelta)} 层，${floorDelta < 0 ? '下行' : '上行'}`}。`
+    ? `${fire ? `火警，请立即撤离。${sourceCount > 1 ? `现场 ${sourceCount} 处火源。` : ''}` : '当前无火警。'}撤离至 ${route.exitLabel}，${Math.round(route.meters)} 米，约 ${formatDuration(route.seconds)}，${floorDelta === 0 ? '已在本层' : `剩余 ${Math.abs(floorDelta)} 层，${floorDelta < 0 ? '下行' : '上行'}`}。`
     : `${fire ? '火警。' : ''}${route?.reason || '正在定位当前位置'}`
   const dialLabel = route?.ok
     ? `撤离方向表盘：目标${cardinal.label}方向，距离 ${Math.round(route.meters)} 米`
@@ -310,7 +323,11 @@ export default function UserApp() {
         >
           <span>{fire.mode === 'drill' ? '火警演练 · 立即撤离' : '火警 · 立即撤离'}</span>
           <em>
-            {BUILDING.nodes[fire.nodeId]?.floor ?? position.floor} 楼起火 · {muted ? '已静音，点此恢复鸣响' : '点此静音'}
+            {sourceCount > 1
+              ? `${originFloors.join(' / ')} 楼共 ${sourceCount} 处火源`
+              : `${originFloors[0] ?? BUILDING.nodes[fire.nodeId]?.floor ?? position.floor} 楼起火`}
+            {' · '}
+            {muted ? '已静音，点此恢复鸣响' : '点此静音'}
           </em>
         </button>
       )}
@@ -370,7 +387,7 @@ export default function UserApp() {
             <span className={`live-dot ${route?.ok ? 'is-live' : ''}`} aria-hidden="true" />
             <span>
               {fire
-                ? `实时 · 距起火点 ${Math.round(elapsedSec)} 秒，路线每秒重算`
+                ? `实时 · ${sourceCount > 1 ? `${sourceCount} 处火源 · ` : ''}距起火点 ${Math.round(elapsedSec)} 秒，路线每秒重算`
                 : `${route?.ok ? '实时 · ' : ''}${positionSource} · ${position.floor} 楼${SPOTS.find((item) => item.id === position.spot)?.label} · ${route?.ok ? `${Math.round(distanceToNext)} 米后${nextStep?.icon === 'stair' ? '进楼梯' : '到下一个路口'}` : '等待定位'}`}
             </span>
           </div>

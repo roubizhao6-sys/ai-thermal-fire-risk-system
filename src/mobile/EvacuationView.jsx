@@ -46,7 +46,7 @@ function formatDuration(seconds) {
   return `约 ${minutes} 分 ${String(seconds % 60).padStart(2, '0')} 秒`
 }
 
-export default function EvacuationView({ route, fire, position, blocked, nowMs, onPositionChange, onToggleBlock, onStartDrillAt, onClearFire }) {
+export default function EvacuationView({ route, fire, position, blocked, nowMs, onPositionChange, onToggleBlock, onStartDrillAt, onSpreadFire, onClearFire }) {
   const [viewFloor, setViewFloor] = useState(position.floor)
   const [follow, setFollow] = useState(false)
 
@@ -238,16 +238,19 @@ export default function EvacuationView({ route, fire, position, blocked, nowMs, 
       </section>
 
       <section className="mobile-card">
-        <div className="card-title"><div><strong>火情演练</strong><small>以当前楼层作为起火点</small></div><Flame size={18} /></div>
+        <div className="card-title"><div><strong>火情演练</strong><small>以当前楼层作为起火点，可蔓延出多火源</small></div><Flame size={18} /></div>
         <div className="drill-row">
           <button type="button" className="drill-start" onClick={() => onStartDrillAt(positionNodeId(position.floor, position.spot), position.floor)}>
             <Play size={15} />在 {position.floor} 楼{SPOTS.find((spot) => spot.id === position.spot)?.label}点燃起火点
+          </button>
+          <button type="button" className="drill-start" onClick={onSpreadFire} disabled={!fire}>
+            <Flame size={15} />蔓延到上一层
           </button>
           <button type="button" className="drill-stop" onClick={onClearFire} disabled={!fire}>
             <RotateCcw size={15} />清除火源
           </button>
         </div>
-        <p className="card-hint">演练会触发完整报警流程（警笛、语音、全屏警报），用于向评委演示人机协作闭环。</p>
+        <p className="card-hint">演练会触发完整报警流程（警笛、语音、全屏警报）；点「蔓延到上一层」可造出多火源场景，用户端会同时避开两处火源。</p>
       </section>
 
       <section className="mobile-card">
