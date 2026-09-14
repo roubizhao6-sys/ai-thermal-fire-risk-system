@@ -1,0 +1,334 @@
+/* ============================================================
+   热感哨兵 · 用户端
+   参考 iOS「指南针」：单屏、一个大表盘、读数居中、几乎没有按钮。
+   规则：
+   1. 只有一块内容区，没有标签栏、没有卡片、没有渐变
+   2. 一个数字当主角（等宽数字），其余文字退到次级灰
+   3. 分割只靠留白和发丝线
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --separator: rgba(84, 84, 88, .55);
+  --text: #ffffff;
+  --text-2: rgba(235, 235, 245, .58);
+  /* 三级灰只留给纯装饰（刻度针脚）；所有需要读的文字一律不低于 58% 白 */
+  --text-3: rgba(235, 235, 245, .42);
+  --alert: #ff3b30;
+  /* 火警整页底色：比系统红略深一点，白字对比度才够（实测约 5:1） */
+  --alert-bg: #d32f2f;
+  --safe: #30d158;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overscroll-behavior: none; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+p { margin: 0; }
+:focus-visible { outline: 2px solid var(--alert); outline-offset: 3px; border-radius: 8px; }
+
+/* 只给读屏软件的一句话状态：视觉上不存在，但会被播报 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.compass-app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: calc(env(safe-area-inset-top) + 8px) 0 calc(env(safe-area-inset-bottom) + 4px);
+  background: var(--bg);
+}
+
+/* 火警时唯一出现的一条横幅，细、窄、不抢表盘 */
+.alert-strip {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 16px 10px;
+  color: var(--alert);
+  font-size: 13px;
+  letter-spacing: .02em;
+}
+.alert-strip span { font-weight: 600; }
+.alert-strip em { color: var(--text-3); font-size: 12px; font-style: normal; }
+
+.compass-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 0 12px;
+}
+
+/* 表盘占屏幕的主要面积，居中 */
+.dial-wrap {
+  position: relative;
+  /* 表盘同时受宽与高约束：横屏或矮屏时自动收缩，保证读数与底部工具始终留在屏内 */
+  width: min(94vw, 480px, calc(100vh - 13rem));
+  width: min(94vw, 480px, calc(100dvh - 13rem));
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+}
+.compass-dial { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dial-ring { fill: none; stroke: rgba(235, 235, 245, .12); stroke-width: 1; }
+.tick { stroke: rgba(235, 235, 245, .22); stroke-width: 1; }
+.tick-medium { stroke: rgba(235, 235, 245, .34); }
+.tick-major { stroke: rgba(235, 235, 245, .5); stroke-width: 1.4; }
+.dial-letter {
+  fill: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-anchor: middle;
+  letter-spacing: .04em;
+}
+.dial-letter.is-north { fill: var(--text); }
+.needle { fill: var(--safe); }
+.needle-line { stroke: var(--safe); stroke-width: 3; stroke-linecap: round; }
+.needle.needle-alert { fill: var(--alert); }
+.needle-line.needle-alert { stroke: var(--alert); }
+.dial-pin { fill: var(--text-3); }
+
+/* 表盘正中的读数：距离当主角，方向退到上面一行小字 */
+.dial-center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  pointer-events: none;
+}
+.dial-caption {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  font-variant-numeric: tabular-nums;
+}
+.dial-distance {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.dial-distance .distance-value {
+  font-size: clamp(60px, 20vw, 88px);
+  font-weight: 300;
+  letter-spacing: -.045em;
+}
+.dial-distance .distance-unit { font-size: clamp(20px, 6vw, 26px); font-weight: 300; color: var(--text-2); }
+.dial-distance.is-alert .distance-value,
+.dial-distance.is-alert .distance-unit { color: var(--alert); }
+.dial-distance.is-blocked .distance-value { font-size: clamp(38px, 12vw, 54px); color: var(--alert); }
+.dial-time { margin-top: 6px; color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* 表盘下方两块读数，只用一条发丝线分隔 */
+.stage-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+}
+.stage-readouts {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 18px;
+  width: 100%;
+  max-width: 360px;
+}
+.readout { display: flex; flex: 1; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.readout span { color: var(--text-2); font-size: 12px; }
+.readout strong { font-size: 15px; font-weight: 500; text-align: center; }
+.readout-wide strong { color: var(--text-2); font-size: 12px; font-weight: 400; line-height: 1.5; }
+.readout-sep { width: 1px; background: var(--separator); }
+
+/* 实时状态行：左边一个呼吸点，右边一行小字 */
+.stage-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 12px;
+  text-align: center;
+}
+.live-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.live-dot.is-live { background: var(--safe); animation: livePulse 1.8s ease-in-out infinite; }
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .45; transform: scale(.78); }
+}
+
+/* 多传感器联合定位结论：只有真收到遥测时才出现，平时不占位 */
+.sensor-note {
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* 底部只留三个纯文字按钮，和指南针的「真北 / 水平仪」同一层级 */
+.compass-tools {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  padding: 6px 16px calc(4px + env(safe-area-inset-bottom));
+}
+.compass-tools button {
+  /* Apple HIG：可点区域不小于 44×44，外观仍是纯文字 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 10px;
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 400;
+}
+.compass-tools button:active { opacity: .5; }
+
+.compass-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  color: var(--text);
+  border-radius: 999px;
+  background: rgba(44, 44, 46, .94);
+  font-size: 12px;
+  white-space: nowrap;
+  animation: toastIn .3s ease both;
+}
+
+/* 位置选择：极简底部弹层 */
+.sheet-backdrop { position: fixed; z-index: 20; inset: 0; display: flex; align-items: flex-end; background: rgba(0, 0, 0, .6); }
+.position-sheet {
+  width: 100%;
+  padding: 10px 20px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+  animation: sheetIn .3s cubic-bezier(.32, .72, 0, 1) both;
+}
+.sheet-handle { width: 36px; height: 5px; margin: 0 auto 16px; border-radius: 999px; background: rgba(235, 235, 245, .3); }
+.position-sheet h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+.position-sheet p { margin-top: 6px; color: var(--text-3); font-size: 12px; line-height: 1.5; }
+/* 楼层选择：窄屏两行四列，保证每个可点区域都有 44px 宽 */
+.floor-row-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 18px; }
+.spot-row-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.floor-row-picker button, .spot-row-picker button {
+  min-height: 44px;
+  color: var(--text-2);
+  border-radius: 10px;
+  background: rgba(120, 120, 128, .18);
+  font-size: 15px;
+}
+.floor-row-picker button.active, .spot-row-picker button.active { color: #000; background: var(--text); font-weight: 600; }
+.done-button { width: 100%; min-height: 48px; margin-top: 18px; color: var(--text); border-radius: 12px; background: rgba(120, 120, 128, .24); font-size: 16px; font-weight: 500; }
+
+@keyframes sheetIn { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ---------- 火警：整页转红，所有元素都要在红底上依然清晰 ---------- */
+.compass-app.is-alert { background: var(--alert-bg); }
+.compass-app.is-alert::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: #fff;
+  opacity: 0;
+  animation: alertFlash 2.6s ease-in-out infinite;
+}
+.compass-app.is-alert .alert-strip { background: rgba(0, 0, 0, .22); }
+.compass-app.is-alert .alert-strip span { color: #fff; }
+.compass-app.is-alert .alert-strip em { color: rgba(255, 255, 255, .88); }
+.compass-app.is-alert .dial-ring { stroke: rgba(255, 255, 255, .4); }
+.compass-app.is-alert .tick { stroke: rgba(255, 255, 255, .45); }
+.compass-app.is-alert .tick-medium { stroke: rgba(255, 255, 255, .65); }
+.compass-app.is-alert .tick-major { stroke: rgba(255, 255, 255, .85); }
+.compass-app.is-alert .dial-letter { fill: rgba(255, 255, 255, .9); }
+.compass-app.is-alert .dial-letter.is-north { fill: #fff; }
+.compass-app.is-alert .needle { fill: #fff; }
+.compass-app.is-alert .needle-line { stroke: #fff; }
+.compass-app.is-alert .dial-pin { fill: rgba(255, 255, 255, .7); }
+.compass-app.is-alert .dial-caption,
+.compass-app.is-alert .dial-time,
+.compass-app.is-alert .readout span,
+.compass-app.is-alert .stage-note,
+.compass-app.is-alert .sensor-note { color: #fff; }
+.compass-app.is-alert .distance-value,
+.compass-app.is-alert .distance-unit,
+.compass-app.is-alert .readout strong { color: #fff; }
+.compass-app.is-alert .readout-sep { background: rgba(255, 255, 255, .45); }
+.compass-app.is-alert .compass-tools button { color: #fff; }
+.compass-app.is-alert .compass-toast { background: rgba(0, 0, 0, .55); }
+.compass-app.is-alert .live-dot { background: rgba(255, 255, 255, .6); }
+.compass-app.is-alert .live-dot.is-live { background: #fff; }
+
+@keyframes alertFlash { 0%, 100% { opacity: 0; } 50% { opacity: .07; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+@media (min-width: 440px) {
+  .floor-row-picker { grid-template-columns: repeat(8, 1fr); }
+}
+
+/* 横屏（矮屏）专属布局：表盘居左、读数居右 —— 比单纯把表盘缩小更可用 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .compass-stage {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    padding: 0 22px;
+  }
+  .dial-wrap {
+    width: min(70vh, 42vw);
+    width: min(70dvh, 42vw);
+    flex: 0 0 auto;
+  }
+  .stage-side {
+    flex: 0 1 360px;
+    min-width: 0;
+    gap: 16px;
+  }
+  .stage-readouts { max-width: 100%; }
+}
+
+@media (min-width: 700px) {
+  .compass-app { max-width: 720px; margin: 0 auto; }
+}

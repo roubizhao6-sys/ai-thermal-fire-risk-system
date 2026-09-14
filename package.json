@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node tests/thermal.test.mjs && node tests/evacuation.test.mjs && node tests/sensors.test.mjs && node tests/sensorFusion.test.mjs && node tests/detection.test.mjs",
+    "eval:detection": "node tools/detection-eval.mjs"
   },
   "dependencies": {
     "hls.js": "^1.7.3",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

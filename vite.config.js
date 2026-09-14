@@ -13,7 +13,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: entry('index.html'),
-        mobile: entry('mobile-app.html')
+        mobile: entry('mobile-app.html'),
+        user: entry('user-app.html')
       }
     }
   }

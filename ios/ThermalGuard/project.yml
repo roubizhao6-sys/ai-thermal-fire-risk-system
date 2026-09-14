@@ -1,0 +1,84 @@
+name: ThermalGuard
+options:
+  bundleIdPrefix: com.thermalguard
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    CODE_SIGNING_ALLOWED: NO
+targets:
+  ThermalGuardUser:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/Core
+      - path: Sources/User
+      # XcodeGen 按文件类型自动归类：.xcassets / .gif 会进 Copy Bundle Resources
+      - path: Resources
+    info:
+      path: Info/User.plist
+      properties:
+        CFBundleDisplayName: 逃生指引
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UIUserInterfaceStyle: Dark
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSLocationWhenInUseUsageDescription: 用于读取手机朝向，把撤离方向对准真实世界。
+        # 系统端可以用 thermalguarduser://fire?floor=6 直接把警情推到这个 App
+        CFBundleURLTypes:
+          - CFBundleURLName: com.thermalguard.user.fire
+            CFBundleURLSchemes:
+              - thermalguarduser
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thermalguard.user
+        PRODUCT_NAME: ThermalGuardUser
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  ThermalGuardSystem:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/Core
+      - path: Sources/System
+      - path: Resources
+    info:
+      path: Info/System.plist
+      properties:
+        CFBundleDisplayName: 热感哨兵
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UIUserInterfaceStyle: Dark
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSLocationWhenInUseUsageDescription: 用于在城市热力地图上定位火警点位。
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thermalguard.system
+        PRODUCT_NAME: ThermalGuardSystem
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  ThermalGuardCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Sources/Core
+      - path: Tests/CoreTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thermalguard.coretests
+        GENERATE_INFOPLIST_FILE: YES
