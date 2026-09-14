@@ -5,8 +5,34 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BUILDING, positionNodeId } from '../mobile/building.js'
 import { planRoute } from '../mobile/evacuation.js'
+// 所有传感器输入（信标定位、火情、热像、朝向、设置）统一从这一层订阅
+import {
+  KEYS,
+  needsOrientationPermission,
+  readFire,
+  readSettings,
+  requestOrientationPermission,
+  resolvePosition,
+  saveManualPosition,
+  subscribe,
+  subscribeOrientation,
+  supportsOrientation,
+} from './sensors.js'
+// 报警引擎与系统端共用同一套 Web Audio 警笛/播报/震动
+import {
+  ALARM_VIBRATION_INTERVAL,
+  isAudioUnlocked,
+  speak,
+  startSiren,
+  stopSiren,
+  stopSpeak,
+  stopVibrate,
+  supportsVibration,
+  unlockAudio,
+  vibrateAlarm,
+} from '../mobile/alarm.js'
 
-const FIRE_KEY = 'thermalGuardFire'
+const FIRE_KEY = KEYS.fire
 
 const CARDINALS = [
   { short: 'N', label: '北' },
@@ -45,67 +71,115 @@ function formatDuration(seconds) {
   return `${Math.floor(seconds / 60)} 分 ${String(seconds % 60).padStart(2, '0')} 秒`
 }
 
-function readStored(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-function readFire() {
-  const stored = readStored(FIRE_KEY, null)
-  if (!stored?.nodeId || !BUILDING.nodes[stored.nodeId]) return null
-  return { ...stored, startedAt: stored.startedAt || Date.now() }
-}
-
 export default function UserApp() {
-  const [position, setPosition] = useState(() => readStored('thermalGuardUserPosition', { floor: 4, spot: 'C' }))
+  const [position, setPosition] = useState(() => resolvePosition())
   const [fire, setFire] = useState(() => readFire())
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [dialMode, setDialMode] = useState('north') // north = 固定指北；device = 跟随手机朝向
+  // north = 固定指北；device = 跟随手机朝向。不需要授权（非 iOS）时默认跟随，方向指示才"实时"
+  const [dialMode, setDialMode] = useState(() => (supportsOrientation() && !needsOrientationPermission() ? 'device' : 'north'))
   const [deviceHeading, setDeviceHeading] = useState(null)
   const [hint, setHint] = useState('')
+  // 声音/播报/震动设置由系统端维护，用户端跟随，避免两边不一致
+  const [settings, setSettings] = useState(() => readSettings())
+  const [audioReady, setAudioReady] = useState(() => isAudioUnlocked())
+  const [sirenOn, setSirenOn] = useState(false)
+  const [muted, setMuted] = useState(false)
   const sheetTitleRef = useRef(null)
 
+  // 位置（信标优先，回退手动）、火情、设置，全部通过传感器层订阅
   useEffect(() => {
-    localStorage.setItem('thermalGuardUserPosition', JSON.stringify(position))
-  }, [position])
-
-  // 与系统端联动：系统端触发报警时会把火情写进 localStorage
-  useEffect(() => {
-    const onStorage = (event) => {
-      if (event.key !== FIRE_KEY) return
-      setFire(readFire())
+    const offPosition = subscribe([KEYS.position, KEYS.beacon], () => setPosition(resolvePosition()))
+    const offHazard = subscribe([KEYS.fire], () => setFire(readFire()))
+    const offSettings = subscribe([KEYS.settings], () => setSettings(readSettings()))
+    return () => {
+      offPosition()
+      offHazard()
+      offSettings()
     }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  // 火警期间每秒重算（烟气扩散会改变路线）
+  // 心跳：火警时每秒重算（烟气扩散会改变路线），平时两秒刷新一次实时状态
   useEffect(() => {
-    if (!fire) return undefined
     setNowMs(Date.now())
-    const timer = setInterval(() => setNowMs(Date.now()), 1000)
-    return () => clearInterval(timer)
+    const timer = window.setInterval(() => setNowMs(Date.now()), fire ? 1000 : 2000)
+    return () => window.clearInterval(timer)
   }, [fire])
 
-  // 手机朝向（可选，需要用户授权）
+  // 手机朝向：订阅罗盘/IMU，方向指示随真实朝向实时更新
   useEffect(() => {
     if (dialMode !== 'device') return undefined
-    const onOrientation = (event) => {
-      const heading = typeof event.webkitCompassHeading === 'number'
-        ? event.webkitCompassHeading
-        : event.alpha != null
-          ? 360 - event.alpha
-          : null
+    return subscribeOrientation(({ heading }) => {
       if (heading != null) setDeviceHeading(heading)
-    }
-    window.addEventListener('deviceorientation', onOrientation, true)
-    return () => window.removeEventListener('deviceorientation', onOrientation, true)
+    })
   }, [dialMode])
+
+  // 浏览器要求音频必须由用户手势解锁：首次触摸/点击/按键时静默解锁
+  useEffect(() => {
+    if (audioReady) return undefined
+    const unlock = () => {
+      unlockAudio().then((ok) => { if (ok) setAudioReady(true) })
+    }
+    const options = { once: true, passive: true }
+    window.addEventListener('pointerdown', unlock, options)
+    window.addEventListener('touchstart', unlock, options)
+    window.addEventListener('keydown', unlock)
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('touchstart', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [audioReady])
+
+  // 鸣笛（静音后只保留视觉警报）
+  useEffect(() => {
+    if (!fire || muted || !audioReady || !settings.sound) {
+      setSirenOn(false)
+      return undefined
+    }
+    setSirenOn(Boolean(startSiren(fire.mode === 'drill' ? 'drill' : 'normal')))
+    return () => {
+      stopSiren()
+      setSirenOn(false)
+    }
+  }, [fire, muted, audioReady, settings.sound])
+
+  // 语音播报
+  useEffect(() => {
+    if (!fire || muted || !audioReady || !settings.voice) return undefined
+    const say = () => speak(fire.mode === 'drill'
+      ? '这是一次火警演练，请沿逃生路线离开'
+      : '检测到火警，请立即沿逃生路线撤离，不要搭乘电梯')
+    say()
+    const timer = window.setInterval(say, 9000)
+    return () => {
+      window.clearInterval(timer)
+      stopSpeak()
+    }
+  }, [fire, muted, audioReady, settings.voice])
+
+  // 震动（iOS Safari 不支持，函数内部会自行判断）
+  useEffect(() => {
+    if (!fire || muted || !settings.vibrate || !supportsVibration()) return undefined
+    vibrateAlarm()
+    const timer = window.setInterval(vibrateAlarm, ALARM_VIBRATION_INTERVAL)
+    return () => {
+      window.clearInterval(timer)
+      stopVibrate()
+    }
+  }, [fire, muted, settings.vibrate])
+
+  // 报警结束时解除静音，下次报警照常鸣响
+  useEffect(() => {
+    if (!fire) setMuted(false)
+  }, [fire])
+
+  // 音频还没解锁就报警时，提示用户点一下屏幕
+  useEffect(() => {
+    if (!fire || audioReady || !settings.sound) return undefined
+    setHint('点击屏幕以启用报警声音')
+    return () => setHint('')
+  }, [fire, audioReady, settings.sound])
 
   // 位置弹层：打开时把焦点交给标题，Esc 可关闭
   useEffect(() => {
@@ -171,6 +245,11 @@ export default function UserApp() {
       : `${Math.abs(floorDelta)} 层 · ${floorDelta < 0 ? '下行' : '上行'}`
     : '—'
 
+  // 位置来源：信标实时定位 / 手动选点，直接显示出来便于判断导航精度
+  const positionSource = position.source === 'beacon'
+    ? `信标定位${position.accuracy ? ` ±${position.accuracy} 米` : ''}`
+    : '手动选点'
+
   // 给读屏软件的一句话状态：只随路线变化，不随秒数跳动，避免每秒重复播报
   const statusText = route?.ok
     ? `${fire ? '火警，请立即撤离。' : '当前无火警。'}撤离至 ${route.exitLabel}，${Math.round(route.meters)} 米，约 ${formatDuration(route.seconds)}，${floorDelta === 0 ? '已在本层' : `剩余 ${Math.abs(floorDelta)} 层，${floorDelta < 0 ? '下行' : '上行'}`}。`
@@ -184,20 +263,24 @@ export default function UserApp() {
       setDialMode('north')
       return
     }
-    try {
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        const result = await DeviceOrientationEvent.requestPermission()
-        if (result !== 'granted') {
-          setHint('未获得方向权限，已保持固定指北')
-          window.setTimeout(() => setHint(''), 2600)
-          return
-        }
-      }
-      setDialMode('device')
-    } catch {
+    if (!supportsOrientation()) {
       setHint('该设备不支持方向感应，已保持固定指北')
       window.setTimeout(() => setHint(''), 2600)
+      return
     }
+    if (needsOrientationPermission() && !(await requestOrientationPermission())) {
+      setHint('未获得方向权限，已保持固定指北')
+      window.setTimeout(() => setHint(''), 2600)
+      return
+    }
+    setDialMode('device')
+  }
+
+  // 手动选点（演示用）：写入手动位置键，信标不可用时即以此为准
+  const applyManualPosition = (patch) => {
+    const next = { floor: patch.floor ?? position.floor, spot: patch.spot ?? position.spot }
+    saveManualPosition(next)
+    setPosition(resolvePosition())
   }
 
   const toggleDrill = () => {
@@ -212,12 +295,24 @@ export default function UserApp() {
   }
 
   return (
-    <div className={`compass-app ${fire ? 'is-alert' : ''}`}>
+    <div
+      className={`compass-app ${fire ? 'is-alert' : ''}`}
+      data-audio={audioReady ? 'ready' : 'locked'}
+      data-siren={sirenOn ? 'on' : 'off'}
+      data-muted={muted ? 'true' : 'false'}
+    >
       {fire && (
-        <div className="alert-strip">
-          <span>火警 · 立即撤离</span>
-          <em>{BUILDING.nodes[fire.nodeId]?.floor ?? position.floor} 楼起火</em>
-        </div>
+        <button
+          type="button"
+          className="alert-strip"
+          aria-pressed={muted}
+          onClick={() => setMuted((current) => !current)}
+        >
+          <span>{fire.mode === 'drill' ? '火警演练 · 立即撤离' : '火警 · 立即撤离'}</span>
+          <em>
+            {BUILDING.nodes[fire.nodeId]?.floor ?? position.floor} 楼起火 · {muted ? '已静音，点此恢复鸣响' : '点此静音'}
+          </em>
+        </button>
       )}
 
       <p className="sr-only" role="status" aria-live={fire ? 'assertive' : 'polite'} aria-atomic="true">
@@ -249,31 +344,36 @@ export default function UserApp() {
           </div>
         </div>
 
-        <div className="stage-readouts" role="list">
-          {route?.ok ? (
-            <>
-              <div className="readout" role="listitem">
-                <span>{fire ? '撤离至' : '最近出口'}</span>
-                <strong>{route.exitLabel}</strong>
+        <div className="stage-side">
+          <div className="stage-readouts" role="list">
+            {route?.ok ? (
+              <>
+                <div className="readout" role="listitem">
+                  <span>{fire ? '撤离至' : '最近出口'}</span>
+                  <strong>{route.exitLabel}</strong>
+                </div>
+                <div className="readout-sep" aria-hidden="true" />
+                <div className="readout" role="listitem">
+                  <span>剩余楼层</span>
+                  <strong>{remainingFloors}</strong>
+                </div>
+              </>
+            ) : (
+              <div className="readout readout-wide" role="listitem">
+                <span>提示</span>
+                <strong>{route?.reason || '等待定位'}</strong>
               </div>
-              <div className="readout-sep" aria-hidden="true" />
-              <div className="readout" role="listitem">
-                <span>剩余楼层</span>
-                <strong>{remainingFloors}</strong>
-              </div>
-            </>
-          ) : (
-            <div className="readout readout-wide" role="listitem">
-              <span>提示</span>
-              <strong>{route?.reason || '等待定位'}</strong>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div className="stage-note">
-          {fire
-            ? `距起火点 ${Math.round(elapsedSec)} 秒，路线每秒重算`
-            : `${position.floor} 楼${SPOTS.find((item) => item.id === position.spot)?.label} · ${route?.ok ? `${Math.round(distanceToNext)} 米后${nextStep?.icon === 'stair' ? '进楼梯' : '到下一个路口'}` : '等待定位'}`}
+          <div className="stage-note">
+            <span className={`live-dot ${route?.ok ? 'is-live' : ''}`} aria-hidden="true" />
+            <span>
+              {fire
+                ? `实时 · 距起火点 ${Math.round(elapsedSec)} 秒，路线每秒重算`
+                : `${route?.ok ? '实时 · ' : ''}${positionSource} · ${position.floor} 楼${SPOTS.find((item) => item.id === position.spot)?.label} · ${route?.ok ? `${Math.round(distanceToNext)} 米后${nextStep?.icon === 'stair' ? '进楼梯' : '到下一个路口'}` : '等待定位'}`}
+            </span>
+          </div>
         </div>
       </main>
 
@@ -310,7 +410,7 @@ export default function UserApp() {
                   type="button"
                   className={position.floor === floor ? 'active' : ''}
                   aria-pressed={position.floor === floor}
-                  onClick={() => setPosition((current) => ({ ...current, floor }))}
+                  onClick={() => applyManualPosition({ floor })}
                 >
                   {floor}
                 </button>
@@ -323,7 +423,7 @@ export default function UserApp() {
                   type="button"
                   className={position.spot === spot.id ? 'active' : ''}
                   aria-pressed={position.spot === spot.id}
-                  onClick={() => setPosition((current) => ({ ...current, spot: spot.id }))}
+                  onClick={() => applyManualPosition({ spot: spot.id })}
                 >
                   {spot.label}
                 </button>
