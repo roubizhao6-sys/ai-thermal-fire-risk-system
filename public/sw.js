@@ -1,12 +1,43 @@
-const CACHE = 'thermal-guard-v4'
-const CORE = ['./', './index.html', './mobile-app.html', './mobile-install.html', './thermal-guard.mobileconfig', './demo-live.gif', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png']
+const CACHE = 'thermal-guard-v6'
+// 逃生指引页与它的 manifest 必须预缓存：断网时用户最需要这个页面
+const CORE = ['./', './index.html', './mobile-app.html', './user-app.html', './mobile-install.html', './thermal-guard.mobileconfig', './demo-live.gif', './manifest.webmanifest', './manifest-user.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png']
+const SHELLS = ['./index.html', './mobile-app.html', './user-app.html']
+
+// Vite 产物文件名带 hash，没法写死在清单里。首次加载时 Service Worker 还没接管页面，
+// 这些 JS/CSS 不会被运行时缓存接到，断网时就会出现"HTML 打开了但白屏"。
+// 所以安装阶段就从各页面 HTML 里解析出引用的脚本与样式，一并预缓存。
+async function precacheShellAssets(cache) {
+  const assets = new Set()
+  for (const page of SHELLS) {
+    const response = await cache.match(page)
+    if (!response) continue
+    const html = await response.text()
+    for (const match of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
+      const url = match[1]
+      if (url.startsWith('./assets/') || url.startsWith('/assets/')) assets.add(url)
+    }
+  }
+  // 单个资源失败不该让整个安装失败
+  await Promise.allSettled([...assets].map((url) => cache.add(url)))
+  return assets.size
+}
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()))
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE)
+    await cache.addAll(CORE)
+    await precacheShellAssets(cache)
+    await self.skipWaiting()
+  })())
 })
 
 self.addEventListener('activate', event => {
-  event.waitUntil(self.clients.claim())
+  event.waitUntil((async () => {
+    // 清掉旧版本缓存，避免版本升级后缓存无限堆积
+    const keys = await caches.keys()
+    await Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))
+    await self.clients.claim()
+  })())
 })
 
 self.addEventListener('fetch', event => {
