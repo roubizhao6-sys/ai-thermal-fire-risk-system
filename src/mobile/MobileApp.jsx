@@ -39,6 +39,7 @@ import {
   Navigation,
   Play,
   Plus,
+  Radar,
   RadioTower,
   Radio,
   RotateCcw,
@@ -48,7 +49,13 @@ import {
   ScanLine,
   ShieldAlert,
   ShieldCheck,
+  Siren,
   Sparkles,
+  BrainCircuit,
+  ClipboardCheck,
+  DoorOpen,
+  Megaphone,
+  Waves,
   Thermometer,
   Trash2,
   TrendingUp,
@@ -960,7 +967,9 @@ function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete
   )
 }
 
-function DashboardPage() {
+function DashboardPage({ frame, inference, onOpenCommand }) {
+  const riskIndex = Math.round(Math.min(99, 42 + Number(frame?.maxTemp || 0) / 2 + (frame?.hotspots?.length || 0) * 6 + (inference?.confidence || 0) * 12))
+  const spreadMinutes = Math.max(2, Math.round(12 - (frame?.hotspots?.length || 0) * 1.4 - Math.max(0, Number(frame?.maxTemp || 0) - 45) / 8))
   const stats = [
     ['累计检测图像', '12,846', '张', '+18.6%', ImageIcon, 'blue'],
     ['预警总次数', '1,329', '次', '+12.4%', BellRing, 'orange'],
@@ -970,6 +979,15 @@ function DashboardPage() {
   return (
     <div className="mobile-page">
       <header className="page-heading"><span>数据看板</span><h1>风险数据洞察</h1><p>用于消防安全管理数据分析与隐患排查优化</p></header>
+      <section className="mobile-card ai-command-card">
+        <div className="card-head"><div><strong>AI火警网警指挥中心</strong><small>风险预测 · 出口分流 · 语音疏散 · 处置单</small></div><BrainCircuit size={19} /></div>
+        <div className="ai-command-metrics">
+          <div><span>风险指数</span><strong>{riskIndex}</strong><small>/100</small></div>
+          <div><span>预计蔓延</span><strong>{spreadMinutes}</strong><small>分钟</small></div>
+          <div><span>推荐出口</span><strong>北门</strong><small>分流优先</small></div>
+        </div>
+        <button type="button" className="command-open" onClick={onOpenCommand}><Siren size={16} />进入指挥中心</button>
+      </section>
       <div className="dashboard-grid">{stats.map(([label, value, unit, change, Icon, tone]) => <article className={`dashboard-stat tone-${tone}`} key={label}><span><Icon size={16} /></span><p>{label}</p><strong>{value}<small>{unit}</small></strong><em>{change}</em></article>)}</div>
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>风险趋势</strong><small>近30日最高温度预警指数</small></div><TrendingUp size={18} /></div><LineChart /></section>
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>隐患类型分布</strong><small>高频隐患分类统计</small></div><BarChart3 size={18} /></div><div className="bar-chart">{[['电气过热', 72], ['设备异常', 58], ['环境温升', 44], ['线路老化', 31], ['其他', 26]].map(([label, value], index) => <div className="bar-row" key={label}><span>{label}</span><div><i style={{ width: `${value}%`, '--bar-delay': `${index * 90}ms` }} /></div><b>{value}</b></div>)}</div></section>
@@ -987,6 +1005,92 @@ function AboutPage({ onStartDrill }) {
       <section className="mobile-card drill-entry-card"><div className="drill-entry-icon"><ShieldCheck size={21} /></div><div><strong>数字消防演练</strong><p>模拟火情、计时撤离、自动评分并生成证据记录。</p></div><button type="button" onClick={onStartDrill}>进入演练</button></section>
       <section className="mobile-card advantage-card"><div><ShieldCheck size={19} /><strong>复杂场景适配</strong></div><p>适配老旧楼宇、仓库、配电房和人员密集楼道，无需大规模重新布线，硬件成本可控，适合民用普及。</p></section>
       <div className="disclaimer"><ShieldAlert size={17} /><p>本系统为科研演示原型，不替代专业消防检测设备与灭火系统。</p></div>
+    </div>
+  )
+}
+
+
+function CommandCenter({ frame, inference, onClose, onStartDrill }) {
+  const [minutes, setMinutes] = useState(0)
+  const [broadcast, setBroadcast] = useState(false)
+  const maxTemp = Number(frame?.maxTemp || 0)
+  const hotspots = frame?.hotspots?.length || 0
+  const route = useMemo(() => planEvacuation(frame), [frame])
+  const riskIndex = Math.round(Math.min(99, 42 + maxTemp / 2 + hotspots * 6 + (inference?.confidence || 0) * 12))
+  const buildingForecast = useMemo(() => {
+    const distances = [0, 0.08, 0.14, 0.2, 0.32, 0.45]
+    return [
+      ['N', '图书馆'], ['B', '教学楼 B'], ['O', '教学楼 O'], ['R', '综合大楼'], ['H', '科技大楼'], ['P', 'P座宿舍'],
+    ].map(([code, name], index) => ({
+      code,
+      name,
+      score: Math.min(99, Math.round((maxTemp - 35) * 0.72 + minutes * 4.3 + hotspots * 3 - distances[index] * 100)),
+    }))
+  }, [maxTemp, hotspots, minutes])
+  const exits = [
+    { name: '东侧安全出口', load: Math.min(96, 34 + hotspots * 8 + minutes * 3), safe: route?.path?.includes('stairs') },
+    { name: '北侧安全出口', load: Math.min(88, 28 + hotspots * 5 + minutes * 2), safe: route?.path?.includes('north') },
+    { name: '南门出口', load: Math.min(99, 46 + hotspots * 7 + minutes * 4), safe: false },
+  ].sort((a, b) => a.load - b.load)
+  const speak = () => {
+    setBroadcast(true)
+    try {
+      const utterance = new SpeechSynthesisUtterance(`检测到高风险热源，最高温度${maxTemp.toFixed(0)}摄氏度。请立即沿绿色路线撤离，前往${exits[0].name}。`)
+      utterance.lang = 'zh-CN'
+      utterance.rate = 0.95
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.speak(utterance)
+      navigator.vibrate?.([220, 100, 220, 100, 420])
+    } catch {}
+    window.setTimeout(() => setBroadcast(false), 4200)
+  }
+  const downloadReport = () => {
+    const report = {
+      system: 'AI热感火警风险检测系统',
+      generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      location: '澳门科技大学校园数字孪生',
+      riskIndex,
+      maxTemp,
+      hotspotCount: hotspots,
+      recommendedExit: exits[0].name,
+      evacuationDistance: route?.distance,
+      evacuationEta: route?.eta,
+      forecast: buildingForecast,
+      exits,
+    }
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `AI火警网警处置单-${Date.now()}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+  return (
+    <div className="command-overlay">
+      <section className="command-sheet">
+        <div className="sheet-handle" />
+        <div className="command-head"><div><span>AI火警网警</span><strong>应急指挥中心</strong></div><button type="button" onClick={onClose}><X size={19} /></button></div>
+        <div className={`command-level risk-${frame?.risk || 'low'}`}><Siren size={23} /><div><strong>{riskTitle(frame?.risk || 'low')} · 风险指数 {riskIndex}</strong><span>澳门科技大学校园数字孪生 · 最高温 {maxTemp.toFixed(1)}°C · {hotspots} 个热区</span></div></div>
+        <section className="command-card">
+          <div className="command-card-head"><div><Radar size={16} /><strong>火势蔓延预测</strong></div><span>未来 {minutes} 分钟</span></div>
+          <div className="spread-timeline">{['现在', '3分钟', '5分钟', '10分钟'].map((label, index) => <button type="button" className={minutes === [0, 3, 5, 10][index] ? 'active' : ''} key={label} onClick={() => setMinutes([0, 3, 5, 10][index])}>{label}</button>)}</div>
+          <div className="spread-building-list">{buildingForecast.map((building) => <div key={building.code} style={{ '--risk': `${building.score}%` }}><span>{building.code}</span><div><i /><strong>{building.name}</strong></div><b>{building.score}%</b></div>)}</div>
+        </section>
+        <section className="command-card">
+          <div className="command-card-head"><div><DoorOpen size={16} /><strong>疏散出口分流</strong></div><span>推荐 {exits[0].name}</span></div>
+          <div className="exit-flow-list">{exits.map((exit) => <div key={exit.name}><span>{exit.name}</span><div><i style={{ width: `${exit.load}%` }} /></div><b>{exit.load}%</b></div>)}</div>
+        </section>
+        <section className="command-card command-route-card">
+          <div className="command-card-head"><div><Waves size={16} /><strong>动态疏散路径</strong></div><span>{route?.distance} 米 · {route?.eta} 秒</span></div>
+          <div className="command-route-steps">{route?.steps?.map((step) => <span key={step}>{step}</span>)}</div>
+        </section>
+        <div className="command-actions">
+          <button type="button" className={broadcast ? 'active' : ''} onClick={speak}><Megaphone size={16} />{broadcast ? '正在广播' : '语音疏散广播'}</button>
+          <button type="button" onClick={onStartDrill}><ClipboardCheck size={16} />启动数字演练</button>
+          <button type="button" onClick={downloadReport}><Download size={16} />生成处置单</button>
+        </div>
+      </section>
     </div>
   )
 }
@@ -1015,6 +1119,7 @@ export default function MobileApp() {
   const [toast, setToast] = useState('')
   const [inference, setInference] = useState(() => computeInference(createFrame(), null, null))
   const [showDrill, setShowDrill] = useState(false)
+  const [showCommandCenter, setShowCommandCenter] = useState(false)
   const previousFrameRef = useRef(null)
   const timerRef = useRef(null)
   const socketRef = useRef(null)
@@ -1208,7 +1313,7 @@ export default function MobileApp() {
   const page = useMemo(() => {
     if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} inference={inference} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
     if (activeTab === 'alerts') return <AlertsPage alerts={alerts} onExportEvidence={exportEvidence} />
-    if (activeTab === 'dashboard') return <DashboardPage />
+    if (activeTab === 'dashboard') return <DashboardPage frame={frame} inference={inference} onOpenCommand={() => setShowCommandCenter(true)} />
     if (activeTab === 'about') return <AboutPage onStartDrill={() => setShowDrill(true)} />
     return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} inference={inference} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
   }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, frame, connection, inference, image, fileName, detecting, progress, detected, result, phase])
@@ -1217,7 +1322,7 @@ export default function MobileApp() {
     <div className="mobile-app-shell">
       <header className="mobile-topbar">
         <div className="mobile-brand"><span><Flame size={19} /></span><div><strong>热感哨兵</strong><small>AI火警网警</small></div></div>
-        <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
+        <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="AI指挥中心" onClick={() => setShowCommandCenter(true)}><Siren size={18} /></button><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
       </header>
       <main className="mobile-main">{page}</main>
       <nav className="mobile-tabs">
@@ -1226,6 +1331,7 @@ export default function MobileApp() {
       {showDevices && <DeviceSheet devices={devices} activeDevice={activeDevice} connection={connection} error={error} onClose={() => setShowDevices(false)} onConnect={connectDevice} onDisconnect={disconnect} onSave={saveDevice} onDelete={(id) => setDevices((current) => current.filter((device) => device.id !== id))} />}
       {cameraSheet && <CameraSheet editing={cameraSheet.camera} onClose={() => setCameraSheet(null)} onSave={saveCamera} />}
       {showDrill && <DrillMode frame={frame} onClose={() => setShowDrill(false)} onComplete={completeDrill} />}
+      {showCommandCenter && <CommandCenter frame={frame} inference={inference} onClose={() => setShowCommandCenter(false)} onStartDrill={() => { setShowCommandCenter(false); setShowDrill(true) }} />}
       {toast && <div className="toast-message">{toast}</div>}
     </div>
   )
