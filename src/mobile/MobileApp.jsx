@@ -612,6 +612,7 @@ function CompassPage({ frame }) {
   const [tracking, setTracking] = useState(false)
   const [permission, setPermission] = useState('prompt')
   const [voiceOn, setVoiceOn] = useState(false)
+  const [mode, setMode] = useState('compass')
   const route = useMemo(() => planEvacuation(frame, target), [frame, target])
   const targetRoutes = useMemo(() => targets.map((item) => ({ ...item, route: planEvacuation(frame, item.id) })), [frame])
 
@@ -668,7 +669,8 @@ function CompassPage({ frame }) {
   return (
     <div className="mobile-page compass-page">
       <header className="page-heading compass-heading"><span>疏散导航</span><h1>指南针逃生路线</h1><p>实时磁力计、动态风险路线与语音引导</p></header>
-      <section className="compass-hero-card">
+      <div className="compass-mode-switch"><button type="button" className={mode === 'compass' ? 'active' : ''} onClick={() => setMode('compass')}><Compass size={14} />指南针导航</button><button type="button" className={mode === 'ar' ? 'active' : ''} onClick={() => setMode('ar')}><Camera size={14} />AR实景导航</button></div>
+      {mode === 'compass' && <section className="compass-hero-card">
         <div className="compass-page-dial" style={{ '--heading': `${-heading}deg`, '--turn': `${turn}deg` }}>
           <span className="compass-n">N</span><span className="compass-e">E</span><span className="compass-s">S</span><span className="compass-w">W</span>
           <i className="compass-page-ring" />
@@ -683,10 +685,11 @@ function CompassPage({ frame }) {
           <p>前往 {targets.find((item) => item.id === target)?.label}</p>
           <div className="compass-main-stats"><span><Route size={13} />{route?.distance} 米</span><span><Clock3 size={13} />约 {route?.eta} 秒</span><span><Compass size={13} />{Math.round(route?.bearing ?? 42)}°</span></div>
         </div>
-      </section>
+      </section>}
 
-      {!tracking && <button type="button" className="compass-enable compass-enable-large" onClick={enableCompass}><Compass size={16} />开启手机指南针并开始引导</button>}
-      <div className="compass-status compass-status-page"><span><i className={tracking ? 'online' : ''} />{tracking ? `实时方向 ${Math.round(heading)}°` : permission === 'denied' ? '未授权，使用模拟方向演示' : '当前为模拟方向'}</span><b>最高温 {Number(frame?.maxTemp || 0).toFixed(1)}°C</b></div>
+      {mode === 'ar' && <ArEvacuationView route={route} risk={frame?.risk || 'low'} />}
+      {mode === 'compass' && !tracking && <button type="button" className="compass-enable compass-enable-large" onClick={enableCompass}><Compass size={16} />开启手机指南针并开始引导</button>}
+      {mode === 'compass' && <div className="compass-status compass-status-page"><span><i className={tracking ? 'online' : ''} />{tracking ? `实时方向 ${Math.round(heading)}°` : permission === 'denied' ? '未授权，使用模拟方向演示' : '当前为模拟方向'}</span><b>最高温 {Number(frame?.maxTemp || 0).toFixed(1)}°C</b></div>}
 
       <div className="section-title"><strong>选择最近安全出口</strong><span>根据风险动态排序</span></div>
       <div className="exit-choice-list">
@@ -713,6 +716,109 @@ function CompassPage({ frame }) {
   )
 }
 
+
+function ArEvacuationView({ route, risk }) {
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+  const [status, setStatus] = useState('idle')
+  const [heading, setHeading] = useState(24)
+  const targetId = route?.path?.[route.path.length - 1]
+  const targetLabel = buildingGraph.nodes[targetId]?.label || '最近安全出口'
+  const bearing = Math.round(route?.bearing ?? 42)
+  const turn = shortestTurn(bearing, heading)
+  const turnText = Math.abs(turn) < 15 ? '保持当前方向直行' : turn > 0 ? `向右转 ${Math.round(Math.abs(turn))}°` : `向左转 ${Math.round(Math.abs(turn))}°`
+
+  useEffect(() => {
+    if (status !== 'active') return undefined
+    const handler = (event) => {
+      const raw = Number.isFinite(event.webkitCompassHeading) ? event.webkitCompassHeading : Number(event.alpha)
+      if (Number.isFinite(raw)) setHeading((raw + 360) % 360)
+    }
+    window.addEventListener('deviceorientationabsolute', handler, true)
+    window.addEventListener('deviceorientation', handler, true)
+    return () => {
+      window.removeEventListener('deviceorientationabsolute', handler, true)
+      window.removeEventListener('deviceorientation', handler, true)
+    }
+  }, [status])
+
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+  }, [])
+
+  const start = async () => {
+    setStatus('requesting')
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        await DeviceOrientationEvent.requestPermission()
+      }
+    } catch {}
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) { setStatus('unsupported'); return }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play().catch(() => {})
+      }
+      setStatus('active')
+      navigator.vibrate?.(40)
+    } catch {
+      setStatus('denied')
+    }
+  }
+
+  const stop = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    setStatus('idle')
+  }
+
+  return (
+    <div className="ar-evac-view">
+      <div className="ar-evac-head"><div><strong>AR 实景逃生导航</strong><small>调用手机摄像头，在实景中标出逃生方向</small></div><Camera size={18} /></div>
+
+      {status !== 'active' && (
+        <div className="ar-evac-idle">
+          <p>开启后，摄像头画面会实时叠加指南针方位与逃生方向箭头，带你沿推荐路线撤离。</p>
+          <button type="button" className="ar-start-btn" onClick={start} disabled={status === 'requesting'}><Camera size={16} />{status === 'requesting' ? '正在请求权限…' : '打开摄像头实景导航'}</button>
+          {status === 'denied' && <div className="ar-state warn">摄像头或方向权限被拒绝，请在系统设置中允许后再试。</div>}
+          {status === 'unsupported' && <div className="ar-state warn">当前浏览器不支持摄像头调用，请使用 Safari 或 Chrome。</div>}
+        </div>
+      )}
+
+      {status === 'active' && (
+        <div className="ar-stage">
+          <video ref={videoRef} className="ar-video" autoPlay playsInline muted />
+          <div className="ar-overlay">
+            <div className="ar-top">
+              <span className={`route-risk route-${risk || 'low'}`}>{riskTitle(risk || 'low')} · 动态路线</span>
+              <span className="ar-target"><Navigation size={13} />{targetLabel}</span>
+            </div>
+            <div className="ar-arrow-wrap" style={{ transform: `rotate(${turn}deg)` }}>
+              <Navigation size={56} className="ar-arrow" />
+              <span className="ar-turn-angle">{Math.abs(turn) < 15 ? '0°' : `${Math.round(Math.abs(turn))}°`}</span>
+            </div>
+            <div className="ar-center-text"><strong>{turnText}</strong><p>{Math.round(heading)}° 当前朝向 · 出口方位 {bearing}°</p></div>
+            <div className="ar-bottom">
+              <div className="ar-mini-compass" style={{ '--heading': `${-heading}deg` }}>
+                <span className="ar-cn">N</span><span className="ar-ce">E</span><span className="ar-cs">S</span><span className="ar-cw">W</span>
+                <i className="ar-mini-ring" />
+              </div>
+              <div className="ar-metrics">
+                <span><Route size={13} />{route?.distance} 米</span>
+                <span><Clock3 size={13} />约 {route?.eta} 秒</span>
+                <span><Compass size={13} />{bearing}°</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" className="ar-stop-btn" onClick={stop}><X size={15} />关闭摄像头</button>
+        </div>
+      )}
+      <p className="ar-evac-note"><ShieldAlert size={12} />AR 引导为科研演示辅助功能，请结合现场标识与工作人员指挥撤离。</p>
+    </div>
+  )
+}
 
 function Thermal3DScene({ frame, camera }) {
   const fallbackHotspots = [
@@ -1026,6 +1132,7 @@ function DrillMode({ frame, onClose, onComplete, onViewEvidence }) {
                 </div>
                 <div className="drill-progress"><div><i style={{ width: `${progress}%` }} /></div><span>{stepCount}/{DRILL_STEPS.length} 安全动作</span></div>
                 <DigitalTwinView frame={frame} route={route} />
+                <ArEvacuationView route={route} risk={risk} />
                 <div className="drill-checklist">
                   <div className="drill-checklist-head"><strong>疏散动作清单</strong><small>完成后点击勾选</small></div>
                   {DRILL_STEPS.map((step, index) => {
