@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Building3DView from './Building3DView.jsx'
+import Campus3DView from './Campus3DView.jsx'
 import {
   Activity,
   AlertTriangle,
@@ -686,7 +687,7 @@ function LivePlayer({ camera, frame, viewMode }) {
   }, [])
 
   useEffect(() => {
-    if (!camera || viewMode === 'thermal3d' || viewMode === 'building' || camera.type === 'sensor' || camera.type === 'demo' || camera.type === 'mjpeg') return undefined
+    if (!camera || viewMode === 'thermal3d' || viewMode === 'building' || viewMode === 'campus' || camera.type === 'sensor' || camera.type === 'demo' || camera.type === 'mjpeg') return undefined
     const video = videoRef.current
     if (!video) return undefined
     let hls
@@ -725,14 +726,14 @@ function LivePlayer({ camera, frame, viewMode }) {
 
   return (
     <div className="live-player" ref={playerRef}>
-      {viewMode === 'building' ? <Building3DView frame={frame} /> : viewMode === 'thermal3d' || camera.type === 'sensor' ? <Thermal3DScene frame={frame} camera={camera} /> : null}
+      {viewMode === 'building' ? <Building3DView frame={frame} /> : viewMode === 'campus' ? <Campus3DView frame={frame} /> : viewMode === 'thermal3d' || camera.type === 'sensor' ? <Thermal3DScene frame={frame} camera={camera} /> : null}
       {viewMode !== 'thermal3d' && camera.type === 'demo' && <img src={camera.url} alt={`${camera.name}演示监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'mjpeg' && <img src={camera.url} alt={`${camera.name}实时监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'hls' && <video ref={videoRef} controls muted autoPlay playsInline />}
       <div className="live-grid" />
       {camera.type === 'demo' && <div className="live-scan" />}
-      <div className="live-status"><i />{viewMode === 'building' ? '3D大楼模拟' : viewMode === 'thermal3d' || camera.type === 'sensor' ? '热感板联动' : camera.type === 'demo' ? '公开演示流' : camera.public ? '公开监控' : '本机监控'}</div>
-      {viewMode !== 'thermal3d' && viewMode !== 'building' && camera.type !== 'sensor' && <div className="live-camera-name"><Video size={14} /><span>{camera.name}</span><small>{camera.location || '未设置位置'}</small></div>}
+      <div className="live-status"><i />{viewMode === 'campus' ? '科大数字孪生' : viewMode === 'building' ? '3D大楼模拟' : viewMode === 'thermal3d' || camera.type === 'sensor' ? '热感板联动' : camera.type === 'demo' ? '公开演示流' : camera.public ? '公开监控' : '本机监控'}</div>
+      {viewMode !== 'thermal3d' && viewMode !== 'building' && viewMode !== 'campus' && camera.type !== 'sensor' && <div className="live-camera-name"><Video size={14} /><span>{camera.name}</span><small>{camera.location || '未设置位置'}</small></div>}
       <button className="fullscreen-button" type="button" onClick={enterFullscreen}><Maximize2 size={16} /></button>
       <div className="live-time">{currentTime}</div>
     </div>
@@ -891,6 +892,7 @@ function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete
         {selectedCamera?.type !== 'sensor' && <button type="button" className={viewMode === 'camera' ? 'active' : ''} onClick={() => setViewMode('camera')}><Video size={14} />实景监控</button>}
         <button type="button" className={viewMode === 'thermal3d' ? 'active' : ''} onClick={() => setViewMode('thermal3d')}><Rotate3D size={14} />3D热感</button>
         <button type="button" className={viewMode === 'building' ? 'active' : ''} onClick={() => setViewMode('building')}><Box size={14} />3D大楼</button>
+        <button type="button" className={viewMode === 'campus' ? 'active' : ''} onClick={() => setViewMode('campus')}><Box size={14} />科大校园</button>
       </div>
       <LivePlayer camera={selectedCamera} frame={frame} viewMode={viewMode} />
       <div className="camera-actions">

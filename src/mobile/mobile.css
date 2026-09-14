@@ -316,7 +316,7 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .toast-message { position: fixed; z-index: 100; left: 50%; bottom: calc(82px + var(--m-safe-bottom)); transform: translateX(-50%); padding: 10px 14px; color: #e8f5ff; border: 1px solid rgba(96,165,250,.25); border-radius: 999px; background: rgba(8,20,37,.95); box-shadow: 0 12px 32px rgba(0,0,0,.36); font-size: 9px; white-space: nowrap; backdrop-filter: blur(10px); }
 .mobile-tabs { grid-template-columns: repeat(5, 1fr); }
 
-.view-switcher { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 0 0 9px; padding: 4px; border: 1px solid rgba(96,165,250,.14); border-radius: 12px; background: rgba(8,17,31,.75); }
+.view-switcher { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 0 0 9px; padding: 4px; border: 1px solid rgba(96,165,250,.14); border-radius: 12px; background: rgba(8,17,31,.75); }
 .view-switcher button { min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 4px; color: #7188a5; border-radius: 9px; background: transparent; font-size: 8px; transition: color .2s ease, background .2s ease; }
 .view-switcher button.active { color: #dcebff; background: linear-gradient(110deg, rgba(37,99,235,.75), rgba(56,189,248,.5)); box-shadow: 0 6px 18px rgba(37,99,235,.18); }
 .thermal-3d-view { position: relative; width: 100%; height: 100%; min-height: 215px; overflow: hidden; background: radial-gradient(circle at 50% 25%, rgba(14,116,144,.23), transparent 42%), linear-gradient(180deg, #061428, #020713 68%, #01040b); }
@@ -456,3 +456,10 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 .building-3d-view { position: relative; width: 100%; height: 100%; min-height: 215px; overflow: hidden; background: radial-gradient(circle at 50% 32%, rgba(14,116,144,.25), transparent 42%), linear-gradient(180deg, #061428, #020713 66%, #01040b); }
 .building-3d-view canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; }
+
+.campus-3d-view { position: relative; width: 100%; height: 100%; min-height: 215px; overflow: hidden; background: radial-gradient(circle at 50% 24%, rgba(14,116,144,.24), transparent 42%), linear-gradient(180deg,#061428,#020713 68%,#01040b); }
+.campus-3d-view canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; }
+.campus-legend { position: absolute; left: 10px; top: 38px; display: flex; flex-wrap: wrap; gap: 4px; max-width: calc(100% - 54px); pointer-events: none; }
+.campus-legend strong { width: 100%; color: #dff4ff; font-size: 9px; text-shadow: 0 1px 5px #000; }
+.campus-legend span { padding: 3px 5px; color: #9fd6f4; border: 1px solid rgba(56,189,248,.18); border-radius: 5px; background: rgba(3,10,22,.65); font-size: 7px; }
+.campus-caption { position: absolute; right: 8px; bottom: 8px; color: #6e8ba8; font-size: 7px; pointer-events: none; }
