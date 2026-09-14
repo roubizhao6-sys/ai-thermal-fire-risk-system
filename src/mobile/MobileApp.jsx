@@ -37,6 +37,7 @@ import {
   LocateFixed,
   MapPin,
   Navigation,
+  Pause,
   Play,
   Plus,
   Radar,
@@ -515,9 +516,18 @@ function AlertsPage({ alerts, onExportEvidence }) {
         <section className="alert-detail-card">
           <div className="alert-detail-head"><RiskBadge risk={selected.risk} /><span>{selected.time}</span></div>
           <img src={DEMO_THERMAL} alt="历史热成像记录" />
-          <h2>{selected.zone}</h2>
-          <div className="detail-grid alert-detail-grid"><div><Thermometer size={16} /><span>最高温度</span><strong>{selected.temp.toFixed(1)}°C</strong></div><div><MapPin size={16} /><span>高温区域</span><strong>{selected.hotspots} 处</strong></div></div>
-          <div className="advice-box"><ShieldAlert size={18} /><div><strong>{riskAdvice(selected.risk)}</strong><p>{selected.risk === 'high' ? '立即核查电源、设备与周边可燃物，确认疏散通道畅通。' : selected.risk === 'medium' ? '安排人员现场检查设备运行状态，持续观察温升趋势。' : '当前无明显异常，保持规律巡检。'}</p></div></div>
+          <h2>{selected.zone}{selected.eventType === 'drill' && <em className="drill-detail-tag">{selected.rating || '演练'} · {selected.score ?? '-'} 分</em>}</h2>
+          {selected.eventType === 'drill' ? (
+            <div className="drill-detail-metrics">
+              <div><Clock3 size={15} /><span>撤离用时</span><strong>{selected.seconds ?? 0} 秒</strong></div>
+              <div><DoorOpen size={15} /><span>使用出口</span><strong>{selected.exitLabel || '安全出口'}</strong></div>
+              <div><Route size={15} /><span>路线距离</span><strong>{selected.distance ?? 0} m</strong></div>
+              <div><ClipboardCheck size={15} /><span>完成动作</span><strong>{selected.stepCount ?? 0}/{selected.totalSteps ?? 4}</strong></div>
+            </div>
+          ) : (
+            <div className="detail-grid alert-detail-grid"><div><Thermometer size={16} /><span>最高温度</span><strong>{selected.temp.toFixed(1)}°C</strong></div><div><MapPin size={16} /><span>高温区域</span><strong>{selected.hotspots} 处</strong></div></div>
+          )}
+          <div className="advice-box"><ShieldAlert size={18} /><div><strong>{selected.eventType === 'drill' ? '演练评语' : riskAdvice(selected.risk)}</strong><p>{selected.eventType === 'drill' ? `${selected.rating ? `本次演练评级 ${selected.rating}。` : ''}响应用时 ${selected.seconds ?? 0} 秒，完成 ${selected.stepCount ?? 0}/${selected.totalSteps ?? 4} 项安全动作，经由${selected.exitLabel || '安全出口'}撤离。` : (selected.risk === 'high' ? '立即核查电源、设备与周边可燃物，确认疏散通道畅通。' : selected.risk === 'medium' ? '安排人员现场检查设备运行状态，持续观察温升趋势。' : '当前无明显异常，保持规律巡检。')}</p></div></div>
           <section className="evidence-card">
             <div className="card-head"><div><strong>事后证据链</strong><small>自动留存的完整处置时间线</small></div><Database size={18} /></div>
             <div className="evidence-list">{evidenceForAlert(selected, selected.inference).map((item, index) => <div className="evidence-row" key={`${item.time}-${index}`}><i>{String(index + 1).padStart(2, '0')}</i><div><strong>{item.title}</strong><p>{item.detail}</p></div><span>{item.time}</span></div>)}</div>
@@ -535,8 +545,8 @@ function AlertsPage({ alerts, onExportEvidence }) {
       <div className="filter-row secondary">{['全部时间', '今天', '最近7天'].map((item) => <button type="button" className={timeFilter === item ? 'active' : ''} key={item} onClick={() => setTimeFilter(item)}>{item}</button>)}</div>
       {filtered.map((item) => (
         <button className={`alert-list-card alert-${item.risk}`} type="button" key={item.id} onClick={() => setSelected(item)}>
-          <span className="alert-icon"><AlertTriangle size={18} /></span>
-          <div><strong>{item.zone}</strong><small>{item.time}</small><em>{item.hotspots} 个高温区域 · 最高 {item.temp.toFixed(1)}°C</em></div>
+          <span className={`alert-icon ${item.eventType === 'drill' ? 'drill' : ''}`}>{item.eventType === 'drill' ? <ShieldCheck size={18} /> : <AlertTriangle size={18} />}</span>
+          <div><strong>{item.zone}</strong><small>{item.time}</small><em>{item.eventType === 'drill' ? `演练得分 ${item.score ?? '-'} · 用时 ${item.seconds ?? 0} 秒 · ${item.rating || ''}` : `${item.hotspots} 个高温区域 · 最高 ${item.temp.toFixed(1)}°C`}</em></div>
           <RiskBadge risk={item.risk} compact /><ChevronRight size={16} />
         </button>
       ))}
@@ -882,33 +892,84 @@ function DigitalTwinView({ frame, route }) {
 }
 
 
-function DrillMode({ frame, onClose, onComplete }) {
+const DRILL_STEPS = [
+  { id: 'leave', label: '离开高温区域', hint: '背向热源，沿推荐路线移动' },
+  { id: 'corridor', label: '进入疏散通道', hint: '保持低姿，贴近墙侧前行' },
+  { id: 'avoid', label: '避开封控区域', hint: '绕开系统标注的封控节点' },
+  { id: 'exit', label: '到达安全出口', hint: '抵达安全出口并确认清点' },
+]
+
+function drillRating(score) {
+  if (score >= 90) return { label: '优秀', tone: 'excellent', advice: '反应迅速、路线选择正确，可作为示范演练。' }
+  if (score >= 80) return { label: '良好', tone: 'good', advice: '整体表现良好，仍可进一步压缩反应时间。' }
+  if (score >= 70) return { label: '合格', tone: 'pass', advice: '基本完成撤离，注意提升反应速度与路线判断。' }
+  return { label: '需改进', tone: 'improve', advice: '建议重新演练，重点熟悉疏散路线与安全动作。' }
+}
+
+function DrillMode({ frame, onClose, onComplete, onViewEvidence }) {
   const [phase, setPhase] = useState('ready')
   const [countdown, setCountdown] = useState(3)
   const [elapsed, setElapsed] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const [completedSteps, setCompletedSteps] = useState([])
   const [result, setResult] = useState(null)
   const route = useMemo(() => planEvacuation(frame), [frame])
+  const exitLabel = buildingGraph.nodes[route.path[route.path.length - 1]]?.label || '最近安全出口'
+  const risk = frame?.risk || 'low'
+  const maxTemp = Number(frame?.maxTemp || 0)
+  const hotspots = frame?.hotspots?.length || 0
 
   useEffect(() => {
-    if (phase === 'running' && countdown > 0) {
+    if (phase !== 'running') return undefined
+    if (countdown > 0) {
       const timer = setTimeout(() => setCountdown((value) => value - 1), 1000)
       return () => clearTimeout(timer)
     }
-    if (phase === 'running' && countdown === 0) {
-      const timer = setInterval(() => setElapsed((value) => value + 1), 1000)
-      return () => clearInterval(timer)
-    }
-    return undefined
-  }, [phase, countdown])
+    if (paused) return undefined
+    const timer = setInterval(() => setElapsed((value) => value + 1), 1000)
+    return () => clearInterval(timer)
+  }, [phase, countdown, paused])
+
+  const toggleStep = (id) => setCompletedSteps((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+
+  const startDrill = () => {
+    setPhase('running')
+    setCountdown(3)
+    setElapsed(0)
+    setPaused(false)
+    setCompletedSteps([])
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(40)
+  }
+
+  const resetDrill = () => {
+    setPhase('ready')
+    setCountdown(3)
+    setElapsed(0)
+    setPaused(false)
+    setCompletedSteps([])
+    setResult(null)
+  }
 
   const finishDrill = () => {
-    const score = Math.max(60, Math.min(100, 100 - elapsed + (frame?.risk === 'high' ? 4 : 0)))
+    const timeScore = Math.max(0, 100 - elapsed * 1.8)
+    const riskBonus = risk === 'high' ? 10 : risk === 'medium' ? 5 : 0
+    const checklistBonus = completedSteps.length * 5
+    const score = Math.max(0, Math.round(Math.min(100, timeScore * 0.65 + riskBonus + checklistBonus)))
+    const ratingInfo = drillRating(score)
     const next = {
       score,
+      rating: ratingInfo.label,
       seconds: elapsed,
       route,
-      risk: frame?.risk || 'low',
-      maxTemp: Number(frame?.maxTemp || 0),
+      path: route.path,
+      exit: route.path[route.path.length - 1],
+      exitLabel,
+      distance: route.distance,
+      eta: route.eta,
+      steps: completedSteps,
+      totalSteps: DRILL_STEPS.length,
+      risk,
+      maxTemp,
       time: new Date().toLocaleString('zh-CN', { hour12: false }),
     }
     setResult(next)
@@ -916,34 +977,107 @@ function DrillMode({ frame, onClose, onComplete }) {
     onComplete(next)
   }
 
+  const ratingInfo = result ? drillRating(result.score) : null
+  const stepCount = completedSteps.length
+  const progress = Math.round((stepCount / DRILL_STEPS.length) * 100)
+
   return (
     <div className="drill-overlay">
       <section className="drill-sheet">
         <div className="sheet-handle" />
-        <div className="drill-head"><div><span>数字消防演练</span><strong>{phase === 'ready' ? '演练准备' : phase === 'complete' ? '演练完成' : '正在演练'}</strong></div><button type="button" onClick={onClose}><X size={18} /></button></div>
-        {phase === 'ready' && <div className="drill-body">
-          <div className="drill-scenario"><ShieldAlert size={20} /><p>模拟场景：<strong>{riskTitle(frame?.risk || 'low')}</strong>，最高温度 {Number(frame?.maxTemp || 0).toFixed(1)}°C。请按推荐路线完成撤离，并记录你的反应时间。</p></div>
-          <button type="button" className="sheet-save" onClick={() => { setPhase('running'); setCountdown(3); setElapsed(0) }}><Play size={16} />开始演练</button>
-        </div>}
-        {phase === 'running' && <div className="drill-body">
-          {countdown > 0 ? <div className="drill-countdown">{countdown}</div> : <div className="drill-running">
-            <div className="drill-timer"><Clock3 size={15} />已用时 <strong>{elapsed}</strong> 秒</div>
-            <AIGatewayPanel url={aiGatewayUrl} onChange={onAIUrlChange} status={aiConnection} detections={aiDetections} onConnect={onConnectAI} onDisconnect={onDisconnectAI} />
-      {viewMode === 'campus' && <CampusBuildingPanel />}
-      <DigitalTwinView frame={frame} route={route} />
-            <button type="button" className="sheet-save" onClick={finishDrill}><CheckCircle2 size={16} />已完成撤离</button>
-          </div>}
-        </div>}
-        {phase === 'complete' && <div className="drill-body drill-result">
-          <div className="drill-score"><strong>{result?.score ?? 92}</strong><span>演练得分</span></div>
-          <p>本次撤离用时 {result?.seconds ?? 0} 秒，系统已生成一条证据记录，可到“预警记录”中查看。</p>
-          <button type="button" className="sheet-save" onClick={onClose}>关闭演练</button>
-        </div>}
+        <div className="drill-head">
+          <div><span>数字消防演练</span><strong>{phase === 'ready' ? '演练准备' : phase === 'complete' ? '演练完成' : '正在演练'}</strong></div>
+          <button type="button" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        {phase === 'ready' && (
+          <div className="drill-body">
+            <div className={`drill-scenario drill-risk-${risk}`}><ShieldAlert size={20} /><p>模拟火情：<strong>{riskTitle(risk)}</strong>，最高温度 {maxTemp.toFixed(1)}°C，识别到 {hotspots} 个高温区域。请按推荐路线完成撤离，系统将记录你的反应时间与安全动作。</p></div>
+            <div className="drill-info-grid">
+              <div><ShieldAlert size={14} /><span>风险等级</span><strong>{riskTitle(risk)}</strong></div>
+              <div><Thermometer size={14} /><span>最高温度</span><strong>{maxTemp.toFixed(1)}°C</strong></div>
+              <div><DoorOpen size={14} /><span>推荐出口</span><strong>{exitLabel}</strong></div>
+              <div><Clock3 size={14} /><span>预计用时</span><strong>{route.eta} 秒</strong></div>
+            </div>
+            <div className="drill-brief">
+              <div className="drill-brief-head"><ClipboardCheck size={15} />演练要点</div>
+              <ul>
+                <li>听到开始后立即反应，沿绿色推荐路线撤离</li>
+                <li>绕开系统标注的高温封控区域</li>
+                <li>依次完成四项安全动作，用时越短、动作越全得分越高</li>
+              </ul>
+            </div>
+            <button type="button" className="sheet-save" onClick={startDrill}><Play size={16} />开始演练</button>
+          </div>
+        )}
+
+        {phase === 'running' && (
+          <div className="drill-body">
+            {countdown > 0 ? (
+              <div className="drill-countdown-wrap">
+                <div className="drill-countdown">{countdown}</div>
+                <p>准备撤离 · 沿推荐路线行动</p>
+              </div>
+            ) : (
+              <div className="drill-running">
+                <div className="drill-hud">
+                  <div className="drill-timer"><Clock3 size={15} />已用时 <strong>{elapsed}</strong> 秒</div>
+                  <div className={`drill-risk-chip drill-risk-${risk}`}>{riskTitle(risk)} · {maxTemp.toFixed(0)}°C</div>
+                </div>
+                <div className="drill-progress"><div><i style={{ width: `${progress}%` }} /></div><span>{stepCount}/{DRILL_STEPS.length} 安全动作</span></div>
+                <DigitalTwinView frame={frame} route={route} />
+                <div className="drill-checklist">
+                  <div className="drill-checklist-head"><strong>疏散动作清单</strong><small>完成后点击勾选</small></div>
+                  {DRILL_STEPS.map((step, index) => {
+                    const done = completedSteps.includes(step.id)
+                    return (
+                      <button type="button" className={`drill-step ${done ? 'done' : ''}`} key={step.id} onClick={() => toggleStep(step.id)}>
+                        <span className="drill-step-check">{done ? <CheckCircle2 size={16} /> : <span>{index + 1}</span>}</span>
+                        <span className="drill-step-text"><strong>{step.label}</strong><small>{step.hint}</small></span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="drill-controls">
+                  <button type="button" className="drill-ghost" onClick={() => setPaused((value) => !value)}>{paused ? <Play size={15} /> : <Pause size={15} />}{paused ? '继续' : '暂停'}</button>
+                  <button type="button" className="drill-ghost danger" onClick={onClose}><X size={15} />取消演练</button>
+                </div>
+                {paused && <p className="drill-paused-note">演练已暂停，计时停止。点击“继续”恢复。</p>}
+                <button type="button" className="sheet-save" onClick={finishDrill} disabled={paused}><CheckCircle2 size={16} />已完成撤离</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {phase === 'complete' && (
+          <div className="drill-body drill-result">
+            <div className={`drill-score rating-${ratingInfo?.tone || 'good'}`}><strong>{result?.score ?? 0}</strong><span>演练得分</span></div>
+            <div className={`drill-rating rating-${ratingInfo?.tone || 'good'}`}>{ratingInfo?.label}</div>
+            <div className="drill-result-metrics">
+              <div><Clock3 size={14} /><span>撤离用时</span><strong>{result?.seconds ?? 0} 秒</strong></div>
+              <div><DoorOpen size={14} /><span>使用出口</span><strong>{result?.exitLabel || exitLabel}</strong></div>
+              <div><Route size={14} /><span>路线距离</span><strong>{result?.distance ?? route.distance} m</strong></div>
+              <div><ClipboardCheck size={14} /><span>完成动作</span><strong>{stepCount}/{DRILL_STEPS.length}</strong></div>
+            </div>
+            <div className="drill-summary">
+              <div className="drill-summary-head"><Sparkles size={15} />AI 演练点评</div>
+              <div className="drill-summary-row"><span>响应速度</span><p>{!result ? '—' : result.seconds <= 20 ? '反应迅速，第一时间进入撤离状态。' : result.seconds <= 40 ? '反应速度尚可，仍有压缩空间。' : '反应偏慢，建议加强初始反应训练。'}</p></div>
+              <div className="drill-summary-row"><span>路线选择</span><p>沿推荐路线经 {result?.path?.map((id) => buildingGraph.nodes[id]?.label).filter(Boolean).join(' → ')} 抵达安全出口。</p></div>
+              <div className="drill-summary-row"><span>安全动作</span><p>{stepCount >= DRILL_STEPS.length ? '四项安全动作全部完成，操作规范。' : `完成 ${stepCount} 项安全动作，注意遗漏项。`}</p></div>
+              <div className="drill-summary-row advise"><span>改进建议</span><p>{ratingInfo?.advice}</p></div>
+            </div>
+            <div className="drill-result-actions">
+              <button type="button" className="sheet-save" onClick={resetDrill}><RotateCcw size={16} />再练一次</button>
+              <button type="button" className="drill-ghost" onClick={() => { if (onViewEvidence) onViewEvidence(); else onClose() }}><Database size={15} />查看证据链</button>
+              <button type="button" className="drill-ghost" onClick={onClose}><X size={15} />关闭</button>
+            </div>
+            <p className="drill-disclaimer">演练为科研演示原型，评分仅用于教学参考，不替代专业消防训练。</p>
+          </div>
+        )}
       </section>
     </div>
   )
 }
-
 function CameraSheet({ editing, onClose, onSave }) {
   const [name, setName] = useState(editing?.name || '')
   const [location, setLocation] = useState(editing?.location || '')
@@ -1422,11 +1556,21 @@ export default function MobileApp() {
       risk: result.risk,
       zone: '数字消防演练',
       temp: result.maxTemp,
-      hotspots: 1,
-      inference: { confidence: result.score / 100, stages: [], reasons: [`演练得分 ${result.score}`, `撤离用时 ${result.seconds} 秒`] },
+      hotspots: result.steps?.length || 0,
+      eventType: 'drill',
+      score: result.score,
+      rating: result.rating,
+      seconds: result.seconds,
+      exitLabel: result.exitLabel,
+      distance: result.distance,
+      eta: result.eta,
+      stepCount: result.steps?.length || 0,
+      totalSteps: result.totalSteps || DRILL_STEPS.length,
+      path: result.path,
+      inference: { confidence: result.score / 100, stages: [], reasons: [`演练得分 ${result.score}`, `评级 ${result.rating}`, `撤离用时 ${result.seconds} 秒`] },
     }
     setAlerts((current) => [evidence, ...current].slice(0, 30))
-    setToast(`演练完成，得分 ${result.score}`)
+    setToast(`演练完成，得分 ${result.score}（${result.rating}）`)
   }
 
   const shareCamera = async (camera) => {
@@ -1468,7 +1612,7 @@ export default function MobileApp() {
       </nav>
       {showDevices && <DeviceSheet devices={devices} activeDevice={activeDevice} connection={connection} error={error} onClose={() => setShowDevices(false)} onConnect={connectDevice} onDisconnect={disconnect} onSave={saveDevice} onDelete={(id) => setDevices((current) => current.filter((device) => device.id !== id))} />}
       {cameraSheet && <CameraSheet editing={cameraSheet.camera} onClose={() => setCameraSheet(null)} onSave={saveCamera} />}
-      {showDrill && <DrillMode frame={frame} onClose={() => setShowDrill(false)} onComplete={completeDrill} />}
+      {showDrill && <DrillMode frame={frame} onClose={() => setShowDrill(false)} onComplete={completeDrill} onViewEvidence={() => { setShowDrill(false); setActiveTab('alerts') }} />}
       {showCommandCenter && <CommandCenter frame={frame} inference={inference} onClose={() => setShowCommandCenter(false)} onStartDrill={() => { setShowCommandCenter(false); setShowDrill(true) }} />}
       {toast && <div className="toast-message">{toast}</div>}
     </div>
