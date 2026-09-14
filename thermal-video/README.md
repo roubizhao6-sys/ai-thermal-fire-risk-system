@@ -20,3 +20,11 @@ pnpm run render
 ```
 
 视频输出到 `out/thermal-tutorial.mp4`，分辨率 1920×1080，约 115 秒。
+
+## 硬件安装与手机联动版
+
+```bash
+pnpm run render:hardware
+```
+
+输出文件：`out/hardware-linkage-tutorial.mp4`。视频使用 Espressif、Adafruit 与 Wikimedia Commons 的公开设备照片，仅用于教学演示。

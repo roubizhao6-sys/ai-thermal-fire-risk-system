@@ -33,7 +33,8 @@
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc",
     "voice": "bash scripts/generate-voice.sh",
-    "render": "node node_modules/@remotion/cli/remotion-cli.js render src/index.ts ThermalAssemblyTutorial out/thermal-tutorial.mp4 --gl=angle --codec=h264 --crf=18 --pixel-format=yuv420p --audio-codec=aac --concurrency=2"
+    "render": "node node_modules/@remotion/cli/remotion-cli.js render src/index.ts ThermalAssemblyTutorial out/thermal-tutorial.mp4 --gl=angle --codec=h264 --crf=18 --pixel-format=yuv420p --audio-codec=aac --concurrency=2",
+    "render:hardware": "node node_modules/@remotion/cli/remotion-cli.js render src/index.ts HardwareLinkageTutorial out/hardware-linkage-tutorial.mp4 --gl=angle --codec=h264 --crf=18 --pixel-format=yuv420p --audio-codec=aac --concurrency=2"
   },
   "sideEffects": [
     "*.css"
