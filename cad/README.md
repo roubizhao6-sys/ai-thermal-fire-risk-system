@@ -23,3 +23,7 @@ uv run --python 3.12 --with build123d python cad/build_must_campus.py
 ```
 
 简化坐标单位为毫米，校园总平面约 270 m × 190 m。
+
+## 素材说明
+
+校园实景背景采用 Wikimedia Commons「An aerial view of MUST」作者 Winslowchen，许可 CC BY-SA 3.0；校园参考图采用「Macau University of Science and Technology」作者 Bill9999360，许可 CC BY-SA 4.0。三维几何为原创低多边形重建。

@@ -202,13 +202,13 @@ export default function Campus3DView({ frame }) {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.setClearColor(0x000000, 0)
     renderer.shadowMap.enabled = true
     renderer.setSize(container.clientWidth || 1, container.clientHeight || 1)
     container.prepend(renderer.domElement)
 
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x050d19)
-    scene.fog = new THREE.Fog(0x050d19, 22, 54)
+    scene.fog = new THREE.Fog(0x071321, 28, 60)
     const camera = new THREE.PerspectiveCamera(40, (container.clientWidth || 1) / (container.clientHeight || 1), 0.1, 120)
     camera.position.set(17, 13, 19)
 
@@ -315,13 +315,17 @@ export default function Campus3DView({ frame }) {
     })
   }, [frame])
 
+  const photo = `${import.meta.env.BASE_URL}must-campus-aerial.jpg`
   return (
-    <div className="campus-3d-view" ref={containerRef}>
+    <div className="campus-3d-view" ref={containerRef} style={{ backgroundImage: `linear-gradient(rgba(1,7,16,.30), rgba(1,7,16,.48)), url(${photo})` }}>
+      <div className="campus-photo-layer" />
+      <div className="campus-real-badge">实景背景 + 3D数字孪生</div>
+      <div className="campus-reference-photo"><img src={`${import.meta.env.BASE_URL}must-campus-reference.jpg`} alt="澳门科技大学校园实景参考" /><span>实景参考</span></div>
       <div className="campus-legend">
         <strong>澳门科技大学数字孪生演示</strong>
         <span>正门</span><span>图书馆</span><span>教学楼</span><span>宿舍区</span><span>科大医院</span>
       </div>
-      <div className="campus-caption">低多边形数字孪生 · 依据公开校园地图与建筑外观素材原创重建</div>
+      <div className="campus-caption">实景背景：Winslowchen / CC BY-SA 3.0 · 参考图：Bill9999360 / CC BY-SA 4.0</div>
       <div className="campus-downloads">
         <a href={`${import.meta.env.BASE_URL}models/must-campus.step`} download>下载 STEP CAD</a>
         <a href={`${import.meta.env.BASE_URL}models/must-campus.stl`} download>下载 STL 模型</a>
