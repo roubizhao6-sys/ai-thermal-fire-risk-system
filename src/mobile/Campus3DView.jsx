@@ -321,7 +321,11 @@ export default function Campus3DView({ frame }) {
         <strong>澳门科技大学数字孪生演示</strong>
         <span>正门</span><span>图书馆</span><span>教学楼</span><span>宿舍区</span><span>科大医院</span>
       </div>
-      <div className="campus-caption">低多边形演示模型 · 依据公开校园地图与建筑外观素材原创重建</div>
+      <div className="campus-caption">低多边形数字孪生 · 依据公开校园地图与建筑外观素材原创重建</div>
+      <div className="campus-downloads">
+        <a href={`${import.meta.env.BASE_URL}models/must-campus.step`} download>下载 STEP CAD</a>
+        <a href={`${import.meta.env.BASE_URL}models/must-campus.stl`} download>下载 STL 模型</a>
+      </div>
     </div>
   )
 }
