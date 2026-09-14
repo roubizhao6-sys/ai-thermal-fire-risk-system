@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { CAMPUS_BUILDINGS, CAMPUS_FLOOR_HEIGHT, CAMPUS_LANDMARKS, CAMPUS_ROADS, campusLocationForNode } from './campus.js'
 
 const STYLE = {
@@ -158,6 +159,10 @@ export default function Campus3D({ fires = [], onPick }) {
 
     const disposables = []
     const track = (object) => { disposables.push(object); return object }
+    // 程序化环境（地面/道路/地标）单独成组：Blender 模型加载成功后整体隐藏，避免重叠
+    const environment = new THREE.Group()
+    scene.add(environment)
+    const landmarkLabels = []
 
     const ground = track(new THREE.Mesh(
       track(new THREE.PlaneGeometry(2800, 2800)),
@@ -165,7 +170,7 @@ export default function Campus3D({ fires = [], onPick }) {
     ))
     ground.rotation.x = -Math.PI / 2
     ground.receiveShadow = true
-    scene.add(ground)
+    environment.add(ground)
 
     const lawn = track(new THREE.Mesh(
       track(new THREE.CircleGeometry(540, 72)),
@@ -174,7 +179,7 @@ export default function Campus3D({ fires = [], onPick }) {
     lawn.rotation.x = -Math.PI / 2
     lawn.position.y = 0.05
     lawn.receiveShadow = true
-    scene.add(lawn)
+    environment.add(lawn)
 
     const roadMaterial = track(new THREE.MeshStandardMaterial({ color: '#1d2937', roughness: 0.85 }))
     CAMPUS_ROADS.forEach((road) => {
@@ -182,7 +187,7 @@ export default function Campus3D({ fires = [], onPick }) {
       mesh.position.set(road.x, 0.6, road.z)
       mesh.rotation.y = -road.angle
       mesh.receiveShadow = true
-      scene.add(mesh)
+      environment.add(mesh)
     })
 
     const materials = {}
@@ -205,13 +210,14 @@ export default function Campus3D({ fires = [], onPick }) {
       const mesh = track(new THREE.Mesh(track(new THREE.BoxGeometry(landmark.w, height, landmark.d)), landmarkMaterial))
       mesh.position.set(landmark.x, height / 2, landmark.z)
       mesh.castShadow = true
-      scene.add(mesh)
+      environment.add(mesh)
       const el = document.createElement('div')
       el.className = 'campus-label is-landmark'
       el.textContent = landmark.name
       const label = new CSS2DObject(el)
       label.position.set(landmark.x, height + 10, landmark.z)
       scene.add(label)
+      landmarkLabels.push(label)
     })
 
     const buildings = {}
@@ -261,14 +267,17 @@ export default function Campus3D({ fires = [], onPick }) {
           glassMaterial,
         ))
         glass.position.y = baseY - CAMPUS_FLOOR_HEIGHT * 0.12
+        spandrel.userData.originY = spandrel.position.y
+        glass.userData.originY = glass.position.y
         group.add(spandrel, glass)
         floorParts.push({
           floor: level,
           meshes: [spandrel, glass],
           materials: [spandrelMaterial, glassMaterial],
-          baseY,
-          spandrelOffset: CAMPUS_FLOOR_HEIGHT * 0.22,
-          glassOffset: -CAMPUS_FLOOR_HEIGHT * 0.12,
+          baseStates: [
+            { material: spandrelMaterial, color: palette.spandrel.color.clone(), opacity: 1, transparent: false, emissive: new THREE.Color('#000000'), emissiveIntensity: 0 },
+            { material: glassMaterial, color: palette.glass.color.clone(), opacity: palette.glass.opacity, transparent: true, emissive: new THREE.Color('#000000'), emissiveIntensity: 0 },
+          ],
         })
       }
 
@@ -335,7 +344,7 @@ export default function Campus3D({ fires = [], onPick }) {
       label.position.set(0, totalHeight + 20, 0)
       group.add(label)
 
-      buildings[building.id] = { building, group, floorParts, labelEl, height: totalHeight, podiumFloors }
+      buildings[building.id] = { building, group, floorParts, labelEl, labelObject: label, height: totalHeight, podiumFloors }
     })
 
     const markerGeo = track(new THREE.CylinderGeometry(3.6, 5.6, 1, 20, 1, true))
@@ -370,45 +379,44 @@ export default function Campus3D({ fires = [], onPick }) {
         entry.floorParts.forEach((part) => {
           const isFire = fireLocations.some((location) => location.buildingId === entry.building.id && location.floor === part.floor)
           const isFocused = isFocusedBuilding && focusState.floor === part.floor
-          const [spandrelMaterial, glassMaterial] = part.materials
-          spandrelMaterial.color.copy(palette.spandrel.color)
-          spandrelMaterial.emissive.set('#000000')
-          spandrelMaterial.emissiveIntensity = 0
-          spandrelMaterial.opacity = 1
-          spandrelMaterial.transparent = false
-          glassMaterial.color.copy(palette.glass.color)
-          glassMaterial.emissive.set('#000000')
-          glassMaterial.emissiveIntensity = 0
-          glassMaterial.opacity = palette.glass.opacity
-          glassMaterial.transparent = true
-
-          if (isFire) {
-            spandrelMaterial.color.set('#ff5a3c')
-            spandrelMaterial.emissive.set('#ff3b30')
-            spandrelMaterial.emissiveIntensity = 1.5
-            glassMaterial.color.set('#ff8a70')
-            glassMaterial.emissive.set('#ff3b30')
-            glassMaterial.emissiveIntensity = 1.2
-          } else if (isFocused) {
-            spandrelMaterial.color.set('#38bdf8')
-            spandrelMaterial.emissive.set('#0ea5e9')
-            spandrelMaterial.emissiveIntensity = 1
-            glassMaterial.color.set('#bfe9ff')
-          } else if (focusState && !isFocusedBuilding) {
-            spandrelMaterial.transparent = true
-            spandrelMaterial.opacity = 0.22
-            glassMaterial.opacity = 0.12
-          } else if (isFocusedBuilding) {
-            spandrelMaterial.transparent = true
-            spandrelMaterial.opacity = 0.42
-            glassMaterial.opacity = 0.3
-          }
-          spandrelMaterial.needsUpdate = true
-          glassMaterial.needsUpdate = true
+          // 统一用"基准状态"复位：程序化模型与 Blender(GL)B 模型走同一套逻辑
+          part.baseStates.forEach((state) => {
+            const material = state.material
+            if (!material) return
+            material.color.copy(state.color)
+            material.opacity = state.opacity
+            material.transparent = state.transparent
+            if (state.emissive && material.emissive) {
+              material.emissive.copy(state.emissive)
+              material.emissiveIntensity = state.emissiveIntensity
+            }
+            if (isFire) {
+              material.color.set('#ff5a3c')
+              if (material.emissive) {
+                material.emissive.set('#ff3b30')
+                material.emissiveIntensity = 1.5
+              }
+            } else if (isFocused) {
+              material.color.set('#38bdf8')
+              if (material.emissive) {
+                material.emissive.set('#0ea5e9')
+                material.emissiveIntensity = 1
+              }
+            } else if (focusState && !isFocusedBuilding) {
+              material.transparent = true
+              material.opacity = Math.min(material.opacity, 0.2)
+            } else if (isFocusedBuilding) {
+              material.transparent = true
+              material.opacity = Math.min(material.opacity, 0.38)
+            }
+            material.needsUpdate = true
+          })
 
           const offset = focusState && explodeState ? (part.floor - 1) * 4.2 : 0
-          part.meshes[0].position.y = part.baseY + part.spandrelOffset + offset
-          part.meshes[1].position.y = part.baseY + part.glassOffset + offset
+          part.meshes.forEach((mesh) => {
+            const originY = mesh.userData.originY ?? mesh.position.y
+            mesh.position.y = originY + offset
+          })
         })
         entry.labelEl.classList.toggle('is-fire', fireLocations.some((location) => location.buildingId === entry.building.id))
         entry.labelEl.classList.toggle('is-focused', focusState?.buildingId === entry.building.id)
@@ -476,6 +484,54 @@ export default function Campus3D({ fires = [], onPick }) {
         refresh()
       },
     }
+
+    // 加载 Blender 导出的校园模型（GLB）。加载成功后用它替换程序化楼体与环境；
+    // 楼层对象名形如 `{楼栋}_F{层号}` 与 `{id}_F{n}_spandrel`，据此建立单层高亮映射。
+    let glbRoot = null
+    const gltfLoader = new GLTFLoader()
+    gltfLoader.load('./models/must-campus.glb', (gltf) => {
+      glbRoot = gltf.scene
+      glbRoot.traverse((object) => {
+        if (!object.isMesh) return
+        object.castShadow = true
+        object.receiveShadow = true
+      })
+      scene.add(glbRoot)
+      environment.visible = false
+      landmarkLabels.forEach((label) => scene.attach(label))
+      Object.values(buildings).forEach((entry) => {
+        if (entry.labelObject) scene.attach(entry.labelObject)
+        entry.group.visible = false
+        entry.floorParts = []
+      })
+      glbRoot.traverse((object) => {
+        const match = /^(.+)_F(\d+)(_spandrel)?$/.exec(object.name)
+        if (!match) return
+        const entry = buildings[match[1]]
+        if (!entry) return
+        const floor = Number(match[2])
+        let part = entry.floorParts.find((item) => item.floor === floor)
+        if (!part) {
+          part = { floor, meshes: [], materials: [], baseStates: [] }
+          entry.floorParts.push(part)
+        }
+        object.userData.originY = object.position.y
+        part.meshes.push(object)
+        part.materials.push(object.material)
+        part.baseStates.push({
+          material: object.material,
+          color: object.material.color.clone(),
+          opacity: object.material.opacity,
+          transparent: object.material.transparent,
+          emissive: object.material.emissive ? object.material.emissive.clone() : null,
+          emissiveIntensity: object.material.emissiveIntensity ?? 0,
+        })
+      })
+      wrap.dataset.campusSource = 'glb'
+      refresh()
+    }, undefined, () => {
+      wrap.dataset.campusSource = 'procedural'
+    })
 
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
@@ -551,6 +607,14 @@ export default function Campus3D({ fires = [], onPick }) {
       controls.removeEventListener('start', onUserStart)
       controls.dispose()
       apiRef.current = null
+      if (glbRoot) {
+        glbRoot.traverse((object) => {
+          if (!object.isMesh) return
+          object.geometry?.dispose()
+          const list = Array.isArray(object.material) ? object.material : [object.material]
+          list.forEach((material) => material?.dispose())
+        })
+      }
       disposables.forEach((item) => item.dispose?.())
       envTarget.dispose()
       sky.dispose()
