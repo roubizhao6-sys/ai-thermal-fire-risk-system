@@ -760,6 +760,7 @@ export default function MobileApp() {
   const [mapView, setMapView] = useState('campus')
   const [campusPick, setCampusPick] = useState(null)
   const [crowd, setCrowd] = useState(() => createCrowdState())
+  const [crowdHistory, setCrowdHistory] = useState([])
   const [demoStep, setDemoStep] = useState(0)
   const [alarm, setAlarm] = useState(null)
   const [overlayOpen, setOverlayOpen] = useState(false)
@@ -982,23 +983,36 @@ export default function MobileApp() {
   const fireLocationDetail = fire
     ? `${campusLocationForNode(fire.nodeId)?.label ?? `${fireFloorForCrowd} 楼`}${fire.floor ? `（${fire.floor} 楼·${fire.nodeId}）` : `（${fire.nodeId}）`}`
     : null
+  // ?demo=1 一键演示模式（人流节奏放快、并高亮人流监看面板）
+  const demoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1'
   useEffect(() => {
     if (!fire) {
       setCrowd((current) => (current.alarm ? createCrowdState() : current))
+      setCrowdHistory((current) => (current.length ? [] : current))
       return undefined
     }
+    // 演示模式下人流推进更快，便于在现场看到逐层清空的过程
+    const tickMs = demoMode ? 600 : 1000
     const timer = window.setInterval(() => {
-      setCrowd((current) => advanceCrowd(current, 1, {
-        alarm: true,
-        fireFloor: floorOfNode(fire.nodeId, fire.floor ?? position.floor),
-        blockedStairs: blockedStairIds,
-      }))
-    }, 1000)
+      setCrowd((current) => {
+        const next = advanceCrowd(current, demoMode ? 0.6 : 1, {
+          alarm: true,
+          fireFloor: floorOfNode(fire.nodeId, fire.floor ?? position.floor),
+          blockedStairs: blockedStairIds,
+        })
+        setCrowdHistory((history) => [...history, {
+          at: Date.now(),
+          evacuated: next.totals.evacuated,
+          remaining: next.totals.remaining,
+          floors: next.floors.map((floor) => floor.remaining),
+        }].slice(-72))
+        return next
+      })
+    }, tickMs)
     return () => window.clearInterval(timer)
-  }, [fire, blockedStairIds, position.floor])
+  }, [fire, blockedStairIds, position.floor, demoMode])
 
   // ?demo=1 一键演示：按脚本自动推进「检测 → 报警 → 蔓延 → 人流 → 用户端」
-  const demoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1'
   useEffect(() => {
     if (!demoMode) return undefined
     const timers = []
@@ -1054,7 +1068,7 @@ export default function MobileApp() {
         },
       },
       {
-        at: 30000,
+        at: 38000,
         step: 5,
         label: '同一浏览器打开用户端：极简表盘 + 距离/方向指引',
         run: () => setNotice({ id: Date.now(), text: '演示结束：可切到「用户端」标签查看极简逃生指引（距离+方向）', tone: 'info' }),
@@ -1376,6 +1390,8 @@ export default function MobileApp() {
           blocked={blockedNodes}
           nowMs={nowMs}
           crowd={crowd}
+          crowdHistory={crowdHistory}
+          crowdDemo={demoMode && demoStep === 4}
           onPositionChange={setPosition}
           onToggleBlock={toggleBlockedNode}
           onStartDrillAt={(nodeId, floor) => startDrill(floor, nodeId[0])}
