@@ -45,6 +45,8 @@ struct ContentView: View {
             DashboardView()
         case .monitor:
             LiveMonitorView()
+        case .evacuation:
+            EvacuationGuidanceView()
         case .hardware:
             HardwareView()
         case .equipment:
