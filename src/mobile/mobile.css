@@ -1652,11 +1652,29 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .campus-3d-holder { position: relative; width: 100%; height: 380px; margin-top: 10px; border-radius: 18px; overflow: hidden; border: 1px solid rgba(56,189,248,.2); background: #05080f; box-shadow: 0 18px 48px rgba(0,0,0,.35); }
 .campus-3d, .campus-3d-stage { position: absolute; inset: 0; }
 .campus-3d-stage canvas { display: block; width: 100% !important; height: 100% !important; }
-.campus-3d-legend { position: absolute; left: 12px; bottom: 12px; padding: 6px 10px; color: #8fb4d6; border: 1px solid rgba(56,189,248,.2); border-radius: 999px; background: rgba(3,8,17,.72); font-size: 9px; backdrop-filter: blur(8px); }
+.campus-3d-legend { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 7px 10px; color: #8fb4d6; border: 1px solid rgba(56,189,248,.2); border-radius: 14px; background: rgba(3,8,17,.74); font-size: 9px; backdrop-filter: blur(8px); }
+.campus-jump-fire { min-height: 26px; margin-left: auto; padding: 0 10px; color: #fff; border: 1px solid rgba(255,255,255,.45); border-radius: 999px; background: rgba(255,59,48,.88); font-size: 9px; font-weight: 700; }
 .campus-3d-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #7f9cbb; font-size: 11px; letter-spacing: .04em; }
 .campus-label { padding: 2px 6px; color: #bfe3ff; border: 1px solid rgba(56,189,248,.22); border-radius: 6px; background: rgba(4,12,22,.62); font-size: 9px; white-space: nowrap; }
 .campus-label.is-fire { color: #fff; border-color: rgba(255,255,255,.5); background: rgba(255,59,48,.82); }
 .campus-fire-label { padding: 3px 8px; color: #fff; border: 1px solid rgba(255,255,255,.45); border-radius: 999px; background: rgba(255,59,48,.9); font-size: 9px; font-weight: 700; white-space: nowrap; box-shadow: 0 6px 18px rgba(255,59,48,.35); }
+.campus-label.is-landmark { color: #9fd2f5; border-color: rgba(56,189,248,.3); }
+.campus-label.is-focused { color: #04121f; border-color: rgba(255,255,255,.6); background: rgba(56,189,248,.92); font-weight: 700; }
+
+/* 楼层视角面板 */
+.campus-floor-panel { position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 10px; border: 1px solid rgba(56,189,248,.26); border-radius: 14px; background: rgba(4,11,20,.86); backdrop-filter: blur(10px); box-shadow: 0 14px 40px rgba(0,0,0,.45); }
+.campus-floor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.campus-floor-head strong { display: block; color: #e6f4ff; font-size: 12px; }
+.campus-floor-head small { display: block; margin-top: 2px; color: #7fa0bf; font-size: 9px; }
+.campus-floor-head button { min-height: 26px; padding: 0 10px; color: #cfe6ff; border: 1px solid rgba(96,165,250,.3); border-radius: 8px; background: rgba(37,99,235,.16); font-size: 9px; }
+.campus-floor-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 9px; max-height: 108px; overflow-y: auto; }
+.campus-floor-grid button { min-height: 26px; color: #9db8d4; border: 1px solid rgba(96,165,250,.16); border-radius: 7px; background: rgba(12,24,40,.9); font-size: 9px; }
+.campus-floor-grid button.active { color: #04121f; border-color: rgba(255,255,255,.5); background: #38bdf8; font-weight: 700; }
+.campus-floor-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 9px; }
+.campus-floor-actions button { min-height: 30px; color: #cfe6ff; border: 1px solid rgba(96,165,250,.2); border-radius: 9px; background: rgba(23,42,66,.8); font-size: 9px; }
+.campus-floor-actions button.active { color: #04121f; background: #7dd3fc; font-weight: 700; }
+.campus-floor-actions button:disabled { opacity: .35; }
+.campus-floor-note { margin-top: 7px; color: #7fa0bf; font-size: 8px; line-height: 1.5; }
 .view-switcher button { min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 5px; color: #7188a5; border-radius: 9px; background: transparent; font-size: 9px; transition: color .2s ease, background .2s ease; }
 .view-switcher button.active { color: #dcebff; background: linear-gradient(110deg, rgba(37,99,235,.75), rgba(56,189,248,.5)); box-shadow: 0 6px 18px rgba(37,99,235,.18); }
 .thermal-3d-view { position: relative; width: 100%; height: 100%; min-height: 215px; overflow: hidden; background: radial-gradient(circle at 50% 25%, rgba(14,116,144,.23), transparent 42%), linear-gradient(180deg, #061428, #020713 68%, #01040b); }
