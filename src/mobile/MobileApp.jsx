@@ -17,6 +17,7 @@ import {
   Cpu,
   Crosshair,
   Database,
+  Download,
   Edit3,
   Eye,
   Copy,
@@ -33,6 +34,7 @@ import {
   LocateFixed,
   MapPin,
   Navigation,
+  Play,
   Plus,
   RadioTower,
   Radio,
@@ -196,6 +198,131 @@ function normalizePacket(packet) {
   }
 }
 
+
+const buildingGraph = {
+  nodes: {
+    start: { label: '当前位置', x: 16, y: 72, type: 'zone' },
+    west: { label: '西侧通道', x: 36, y: 62, type: 'zone' },
+    mid: { label: '走廊中部', x: 52, y: 62, type: 'zone' },
+    east: { label: '东侧通道', x: 70, y: 60, type: 'zone' },
+    stairs: { label: '东侧安全楼梯', x: 82, y: 44, type: 'exit' },
+    north: { label: '北侧安全出口', x: 54, y: 24, type: 'exit' },
+  },
+  edges: {
+    'start-west': { from: 'start', to: 'west', weight: 9 },
+    'start-mid': { from: 'start', to: 'mid', weight: 14 },
+    'west-mid': { from: 'west', to: 'mid', weight: 8 },
+    'mid-east': { from: 'mid', to: 'east', weight: 9 },
+    'east-stairs': { from: 'east', to: 'stairs', weight: 12 },
+    'mid-north': { from: 'mid', to: 'north', weight: 15 },
+    'east-north': { from: 'east', to: 'north', weight: 14 },
+  },
+}
+
+function shortestPath(graph, startId, targetIds, blockedIds) {
+  const dist = {}
+  const prev = {}
+  const visited = new Set()
+  Object.keys(graph.nodes).forEach((id) => { dist[id] = Infinity })
+  dist[startId] = 0
+  for (let i = 0; i < Object.keys(graph.nodes).length; i += 1) {
+    const candidates = Object.keys(graph.nodes).filter((id) => !visited.has(id) && !blockedIds.has(id))
+    if (!candidates.length) break
+    candidates.sort((a, b) => dist[a] - dist[b])
+    const current = candidates[0]
+    if (dist[current] === Infinity) break
+    visited.add(current)
+    Object.values(graph.edges).forEach((edge) => {
+      if (edge.from !== current || blockedIds.has(edge.to)) return
+      const next = dist[current] + edge.weight
+      if (next < dist[edge.to]) {
+        dist[edge.to] = next
+        prev[edge.to] = current
+      }
+    })
+  }
+  const target = targetIds.slice().sort((a, b) => dist[a] - dist[b])[0]
+  const path = []
+  let cursor = target
+  while (cursor && cursor !== startId) {
+    path.unshift(cursor)
+    cursor = prev[cursor]
+  }
+  path.unshift(startId)
+  return { path, distance: Number.isFinite(dist[target]) ? dist[target] : 42, target }
+}
+
+function planEvacuation(frame) {
+  const hotspots = frame?.hotspots || []
+  const maxTemp = Number(frame?.maxTemp || 0)
+  const first = hotspots[0] || { x: 32, y: 34 }
+  const blocked = new Set()
+  if (maxTemp >= 65) {
+    blocked.add(first.x > 55 ? 'east' : 'west')
+    blocked.add(first.x > 55 ? 'stairs' : 'mid')
+  } else if (maxTemp >= 45) {
+    blocked.add(first.x > 55 ? 'east' : 'west')
+  }
+  const result = shortestPath(buildingGraph, 'start', ['stairs', 'north'], blocked)
+  const from = buildingGraph.nodes[result.path[0]]
+  const next = buildingGraph.nodes[result.path[1] || result.path[0]]
+  const dx = next.x - from.x
+  const dy = next.y - from.y
+  const bearing = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360
+  return {
+    ...result,
+    bearing: Math.round(bearing),
+    distance: Math.round(result.distance * 4),
+    eta: Math.round(result.distance * 3.1),
+    blocked: [...blocked],
+    path: result.path,
+    steps: result.path.map((id, index) => `${String(index + 1).padStart(2, '0')} ${buildingGraph.nodes[id].label}`),
+  }
+}
+
+function computeInference(frame, previousFrame, previousInference) {
+  const maxTemp = Number(frame?.maxTemp || 0)
+  const prevMax = Number(previousFrame?.maxTemp ?? maxTemp)
+  const trend = maxTemp - prevMax
+  const persistence = Math.max(0, (previousInference?.persistence || 0) + (trend > 0.7 ? 1 : 0))
+  const temperatures = frame?.temperatures || []
+  const highCells = temperatures.filter((value) => Number(value) >= 65).length
+  const coverage = temperatures.length ? highCells / temperatures.length : 0
+  const hotspots = frame?.hotspots || []
+  const previousHotspot = previousFrame?.hotspots?.[0]
+  const currentHotspot = hotspots[0]
+  const movement = previousHotspot && currentHotspot
+    ? Math.hypot((currentHotspot.x || 0) - (previousHotspot.x || 0), (currentHotspot.y || 0) - (previousHotspot.y || 0))
+    : 0
+  const confidence = Math.min(0.99, 0.58 + coverage * 32 + Math.min(Math.abs(trend), 8) * 3 + Math.min(persistence, 10) * 2 + (movement > 6 ? 0.02 : 0))
+  const stages = [
+    { name: '温度轮廓分割', detail: `识别 ${hotspots.length} 个高温区域`, score: Math.round(Math.min(100, 58 + hotspots.length * 12)) },
+    { name: '扩散梯度分析', detail: `${trend >= 0 ? '+' : ''}${trend.toFixed(1)}°C / 帧`, score: Math.round(Math.min(100, 52 + Math.abs(trend) * 8)) },
+    { name: '持续特征判定', detail: `连续 ${persistence} 帧保持升温`, score: Math.round(Math.min(100, 48 + persistence * 6)) },
+    { name: '空间关联分析', detail: movement > 6 ? '热源存在位移' : '热源位置稳定', score: Math.round(Math.min(100, 55 + movement * 3)) },
+  ]
+  const reasons = [
+    `最高温度 ${maxTemp.toFixed(1)}°C，${frame?.risk === 'high' ? '超过高风险阈值 65°C' : frame?.risk === 'medium' ? '处于中风险区间 45–65°C' : '低于预警阈值 45°C'}`,
+    `温度变化 ${trend >= 0 ? '+' : ''}${trend.toFixed(1)}°C，${trend > 1.5 ? '上升速度较快' : '变化相对平缓'}`,
+    `高温像素占比 ${(coverage * 100).toFixed(1)}%，${hotspots.length} 处空间聚集热区`,
+  ]
+  return { maxTemp, trend, persistence, coverage, confidence, stages, reasons }
+}
+
+function evidenceForAlert(alert, inference) {
+  const risk = alert?.risk || 'low'
+  const temp = Number(alert?.temp || 0)
+  const hotspots = alert?.hotspots || 0
+  const confidence = inference ? Math.round(inference.confidence * 100) : risk === 'high' ? 94 : risk === 'medium' ? 81 : 62
+  return [
+    { time: '00:00', title: '热成像检测触发', detail: `检测到最高温度 ${temp.toFixed(1)}°C` },
+    { time: '00:01', title: '高温区域定位', detail: `识别 ${hotspots} 个疑似高温区域，完成空间坐标映射` },
+    { time: '00:02', title: 'AI 多维推理', detail: `综合温度轮廓、扩散梯度与持续特征，置信度 ${confidence}%` },
+    { time: '00:03', title: '风险等级判定', detail: `${riskTitle(risk)} · ${riskAdvice(risk)}` },
+    { time: '00:04', title: '证据归档', detail: '温度快照、区域坐标与处置建议已写入本地日志' },
+  ]
+}
+
 function ConnectionBadge({ state }) {
   const text = state === 'connected' ? '设备在线' : state === 'connecting' ? '连接中' : state === 'failed' ? '连接失败' : '模拟运行'
   return <span className={`connection-badge state-${state}`}><i />{text}</span>
@@ -298,7 +425,7 @@ function RiskLevelCard({ risk, active }) {
   )
 }
 
-function HomePage({ inputCameraRef, inputGalleryRef, image, fileName, detecting, progress, detected, result, onImage, onSample, onReset, onDetect }) {
+function HomePage({ inputCameraRef, inputGalleryRef, image, fileName, detecting, progress, detected, result, inference, onImage, onSample, onReset, onDetect }) {
   return (
     <div className="mobile-page home-page">
       <header className="home-header">
@@ -337,6 +464,11 @@ function HomePage({ inputCameraRef, inputGalleryRef, image, fileName, detecting,
             <div><Crosshair size={17} /><span>区域坐标</span><strong>X 31%/Y 24%</strong></div>
           </div>
           <div className="ai-explain"><span><Cpu size={17} /></span><div><strong>AI判断说明</strong><p>基于温度轮廓、扩散梯度、持续特征多维度综合分析，区分正常热源与火灾隐患，有效降低误报率。</p></div></div>
+          {inference && <div className="ai-inference-card">
+            <div className="ai-inference-head"><div><strong>AI推理引擎</strong><small>轻量化边缘推理 · 时序确认</small></div><span>{(inference.confidence * 100).toFixed(0)}%</span></div>
+            <div className="confidence-track"><i style={{ width: `${inference.confidence * 100}%` }} /></div>
+            <div className="ai-stage-grid">{inference.stages.map((stage) => <div key={stage.name}><span>{stage.name}</span><strong>{stage.detail}</strong><em>{stage.score}%</em></div>)}</div>
+          </div>}
           <div className="early-warning"><Zap size={15} />可在明火、烟雾出现前识别温度异常，实现灾前预警。</div>
         </section>
       )}
@@ -344,7 +476,7 @@ function HomePage({ inputCameraRef, inputGalleryRef, image, fileName, detecting,
   )
 }
 
-function AlertsPage({ alerts }) {
+function AlertsPage({ alerts, onExportEvidence }) {
   const [riskFilter, setRiskFilter] = useState('全部')
   const [timeFilter, setTimeFilter] = useState('全部时间')
   const [selected, setSelected] = useState(null)
@@ -360,6 +492,11 @@ function AlertsPage({ alerts }) {
           <h2>{selected.zone}</h2>
           <div className="detail-grid alert-detail-grid"><div><Thermometer size={16} /><span>最高温度</span><strong>{selected.temp.toFixed(1)}°C</strong></div><div><MapPin size={16} /><span>高温区域</span><strong>{selected.hotspots} 处</strong></div></div>
           <div className="advice-box"><ShieldAlert size={18} /><div><strong>{riskAdvice(selected.risk)}</strong><p>{selected.risk === 'high' ? '立即核查电源、设备与周边可燃物，确认疏散通道畅通。' : selected.risk === 'medium' ? '安排人员现场检查设备运行状态，持续观察温升趋势。' : '当前无明显异常，保持规律巡检。'}</p></div></div>
+          <section className="evidence-card">
+            <div className="card-head"><div><strong>事后证据链</strong><small>自动留存的完整处置时间线</small></div><Database size={18} /></div>
+            <div className="evidence-list">{evidenceForAlert(selected, selected.inference).map((item, index) => <div className="evidence-row" key={`${item.time}-${index}`}><i>{String(index + 1).padStart(2, '0')}</i><div><strong>{item.title}</strong><p>{item.detail}</p></div><span>{item.time}</span></div>)}</div>
+            <button type="button" className="evidence-export" onClick={() => onExportEvidence(selected)}><Download size={15} />导出证据链报告</button>
+          </section>
         </section>
       </div>
     )
@@ -407,8 +544,8 @@ function shortestTurn(target, heading) {
   return ((target - heading + 540) % 360) - 180
 }
 
-function EscapeCompass({ risk, maxTemp }) {
-  const exitBearing = risk === 'high' ? 18 : 42
+function EscapeCompass({ risk, maxTemp, route }) {
+  const exitBearing = route?.bearing ?? (risk === 'high' ? 18 : 42)
   const [heading, setHeading] = useState(24)
   const [tracking, setTracking] = useState(false)
   const [permission, setPermission] = useState('prompt')
@@ -469,14 +606,11 @@ function EscapeCompass({ risk, maxTemp }) {
           <span className={`route-risk route-${risk}`}>{riskTitle(risk)} · {risk === 'high' ? '建议立即撤离' : '建议预防性撤离'}</span>
           <strong>{directionLabel(exitBearing)}向安全出口</strong>
           <p>{turnText}</p>
-          <div className="route-stats"><span><Route size={12} />86 米</span><span><LocateFixed size={12} />约 42 秒</span></div>
+          <div className="route-stats"><span><Route size={12} />{route?.distance ?? 86} 米</span><span><LocateFixed size={12} />约 {route?.eta ?? 42} 秒</span></div>
         </div>
       </div>
       <div className="escape-steps">
-        <span><i>01</i>离开当前高温区域</span>
-        <span><i>02</i>前往东侧安全楼梯</span>
-        <span><i>03</i>低姿通过烟区</span>
-        <span><i>04</i>到达一楼集合点</span>
+        {(route?.steps || ['离开当前高温区域', '前往东侧安全楼梯', '低姿通过烟区', '到达一楼集合点']).slice(0, 4).map((step) => <span key={step}>{step}</span>)}
       </div>
       <div className="compass-status">
         <span><i className={tracking ? 'online' : ''} />{tracking ? `实时方向 ${Math.round(heading)}°` : permission === 'denied' ? '未授权，正在使用模拟方向' : '待开启手机指南针'}</span>
@@ -604,6 +738,116 @@ function LivePlayer({ camera, frame, viewMode }) {
   )
 }
 
+
+function DigitalTwinView({ frame, route }) {
+  const nodes = buildingGraph.nodes
+  const edges = Object.values(buildingGraph.edges)
+  const pathIds = route?.path || ['start', 'mid', 'stairs']
+  const blocked = new Set(route?.blocked || [])
+  const hotspots = frame?.hotspots || []
+  const pathPoints = pathIds.map((id) => `${nodes[id].x},${nodes[id].y}`).join(' ')
+  return (
+    <section className="mobile-card digital-twin-card">
+      <div className="card-head"><div><strong>3D 数字孪生 · 动态疏散图</strong><small>热区、传感器节点与推荐路线实时联动</small></div><Box size={18} /></div>
+      <div className="twin-map">
+        <svg viewBox="0 0 100 84" role="img" aria-label="楼层数字孪生地图">
+          <defs>
+            <linearGradient id="twin-room" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#0b2440" /><stop offset="1" stopColor="#071224" />
+            </linearGradient>
+            <filter id="twin-glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          </defs>
+          <rect x="7" y="10" width="86" height="66" rx="6" fill="url(#twin-room)" stroke="#2f6ba3" strokeOpacity=".45" />
+          <path d="M7 18 L93 18 M7 30 L34 30 M64 30 L93 30 M7 52 L34 52 M64 52 L93 52 M34 18 L34 68 M64 18 L64 68" fill="none" stroke="#3b82f6" strokeOpacity=".16" />
+          {edges.map((edge) => {
+            const a = nodes[edge.from]
+            const b = nodes[edge.to]
+            const isBlocked = blocked.has(edge.from) || blocked.has(edge.to)
+            return <line key={edge.from + edge.to} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={isBlocked ? '#ef4444' : '#3b82f6'} strokeOpacity={isBlocked ? '.55' : '.28'} strokeWidth={isBlocked ? '.9' : '.6'} strokeDasharray={isBlocked ? '2 1' : ''} />
+          })}
+          {hotspots.slice(0, 4).map((spot, index) => {
+            const x = 14 + (Number(spot.x || 0) / 100) * 74
+            const y = 18 + (Number(spot.y || 0) / 100) * 50
+            return <g key={index}><circle cx={x} cy={y} r={3.4 + index * .4} fill={Number(spot.temp || 0) >= 65 ? '#ef4444' : '#f59e0b'} opacity=".22" /><circle cx={x} cy={y} r="2" fill={Number(spot.temp || 0) >= 65 ? '#ff5a4e' : '#ffae45'} filter="url(#twin-glow)" /><text x={x + 3} y={y - 2} fontSize="4.2" fill="#ffd7c2">{Number(spot.temp || 0).toFixed(0)}°</text></g>
+          })}
+          <polyline points={pathPoints} fill="none" stroke="#22c55e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" filter="url(#twin-glow)" />
+          {pathIds.map((id, index) => {
+            const node = nodes[id]
+            return <g key={id}><circle cx={node.x} cy={node.y} r={index === 0 ? '2.6' : '1.8'} fill={node.type === 'exit' ? '#22c55e' : '#38bdf8'} /><text x={node.x} y={node.y + 6.5} textAnchor="middle" fontSize="4" fill="#cfe4f7">{node.label}</text></g>
+          })}
+          <g transform="translate(13 9)"><circle cx="0" cy="0" r="1.8" fill="#38bdf8" /><text x="3.5" y="1.4" fontSize="4" fill="#8db8dd">热感节点</text></g>
+          <g transform="translate(36 9)"><circle cx="0" cy="0" r="1.8" fill="#22c55e" /><text x="3.5" y="1.4" fontSize="4" fill="#8dd5a9">安全出口</text></g>
+          {blocked.size > 0 && <g transform="translate(61 9)"><line x1="-2" y1="0" x2="2" y2="0" stroke="#ef4444" strokeWidth="1.4" /><text x="4" y="1.4" fontSize="4" fill="#f2a2a2">封控区域</text></g>}
+        </svg>
+      </div>
+      <div className="twin-route">
+        {route?.steps?.length ? route.steps.map((step) => <span key={step}>{step}</span>) : <span>正在根据热区风险计算推荐路线</span>}
+      </div>
+      <div className="twin-metrics"><span><Route size={13} />{route?.distance || 86} 米</span><span><Clock3 size={13} />约 {route?.eta || 42} 秒</span><span><Navigation size={13} />出口方向 {route?.bearing ?? 42}°</span></div>
+    </section>
+  )
+}
+
+function DrillMode({ frame, onClose, onComplete }) {
+  const [phase, setPhase] = useState('ready')
+  const [countdown, setCountdown] = useState(3)
+  const [elapsed, setElapsed] = useState(0)
+  const [result, setResult] = useState(null)
+  const route = useMemo(() => planEvacuation(frame), [frame])
+
+  useEffect(() => {
+    if (phase === 'running' && countdown > 0) {
+      const timer = setTimeout(() => setCountdown((value) => value - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+    if (phase === 'running' && countdown === 0) {
+      const timer = setInterval(() => setElapsed((value) => value + 1), 1000)
+      return () => clearInterval(timer)
+    }
+    return undefined
+  }, [phase, countdown])
+
+  const finishDrill = () => {
+    const score = Math.max(60, Math.min(100, 100 - elapsed + (frame?.risk === 'high' ? 4 : 0)))
+    const next = {
+      score,
+      seconds: elapsed,
+      route,
+      risk: frame?.risk || 'low',
+      maxTemp: Number(frame?.maxTemp || 0),
+      time: new Date().toLocaleString('zh-CN', { hour12: false }),
+    }
+    setResult(next)
+    setPhase('complete')
+    onComplete(next)
+  }
+
+  return (
+    <div className="drill-overlay">
+      <section className="drill-sheet">
+        <div className="sheet-handle" />
+        <div className="drill-head"><div><span>数字消防演练</span><strong>{phase === 'ready' ? '演练准备' : phase === 'complete' ? '演练完成' : '正在演练'}</strong></div><button type="button" onClick={onClose}><X size={18} /></button></div>
+        {phase === 'ready' && <div className="drill-body">
+          <div className="drill-scenario"><ShieldAlert size={20} /><p>模拟场景：<strong>{riskTitle(frame?.risk || 'low')}</strong>，最高温度 {Number(frame?.maxTemp || 0).toFixed(1)}°C。请按推荐路线完成撤离，并记录你的反应时间。</p></div>
+          <button type="button" className="sheet-save" onClick={() => { setPhase('running'); setCountdown(3); setElapsed(0) }}><Play size={16} />开始演练</button>
+        </div>}
+        {phase === 'running' && <div className="drill-body">
+          {countdown > 0 ? <div className="drill-countdown">{countdown}</div> : <div className="drill-running">
+            <div className="drill-timer"><Clock3 size={15} />已用时 <strong>{elapsed}</strong> 秒</div>
+            <DigitalTwinView frame={frame} route={route} />
+            <button type="button" className="sheet-save" onClick={finishDrill}><CheckCircle2 size={16} />已完成撤离</button>
+          </div>}
+        </div>}
+        {phase === 'complete' && <div className="drill-body drill-result">
+          <div className="drill-score"><strong>{result?.score ?? 92}</strong><span>演练得分</span></div>
+          <p>本次撤离用时 {result?.seconds ?? 0} 秒，系统已生成一条证据记录，可到“预警记录”中查看。</p>
+          <button type="button" className="sheet-save" onClick={onClose}>关闭演练</button>
+        </div>}
+      </section>
+    </div>
+  )
+}
+
 function CameraSheet({ editing, onClose, onSave }) {
   const [name, setName] = useState(editing?.name || '')
   const [location, setLocation] = useState(editing?.location || '')
@@ -629,8 +873,9 @@ function CameraSheet({ editing, onClose, onSave }) {
   )
 }
 
-function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete, canShare, onShare, frame, connection }) {
+function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete, canShare, onShare, frame, connection, inference }) {
   const [viewMode, setViewMode] = useState(selectedCamera?.type === 'sensor' ? 'thermal3d' : 'camera')
+  const route = useMemo(() => planEvacuation(frame), [frame])
 
   useEffect(() => {
     setViewMode(selectedCamera?.type === 'sensor' ? 'thermal3d' : 'camera')
@@ -663,9 +908,11 @@ function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete
           <div><span>热区</span><strong>{frame?.hotspots?.length || 0} 处</strong></div>
         </div>
         <p className="thermal-link-note"><Box size={13} />手机端可接入 HLS、MJPEG，或直接接收 width、height、max_temp、temperatures、hotspots 格式的热感板数据。</p>
+        {inference && <div className="thermal-inference-line"><span><Cpu size={13} />AI推理</span><b>{(inference.confidence * 100).toFixed(0)}% · {inference.stages[0]?.detail}</b></div>}
       </section>
 
-      <EscapeCompass risk={frame?.risk || 'low'} maxTemp={frame?.maxTemp} />
+      <DigitalTwinView frame={frame} route={route} />
+      <EscapeCompass risk={frame?.risk || 'low'} maxTemp={frame?.maxTemp} route={route} />
 
       <div className="section-title"><strong>监控列表</strong><span>{cameras.length} 路</span></div>
       <div className="camera-grid">
@@ -705,12 +952,13 @@ function DashboardPage() {
   )
 }
 
-function AboutPage() {
+function AboutPage({ onStartDrill }) {
   return (
     <div className="mobile-page">
       <header className="page-heading"><span>关于项目</span><h1>让AI成为火警监测网警</h1><p>热成像 + 计算机视觉，让隐患在灾害发生前被看见</p></header>
       <section className="mobile-card principle-card"><div className="card-head"><div><strong>技术原理</strong><small>多模态融合识别</small></div><Cpu size={19} /></div><div className="principle-flow"><div><ScanLine size={20} /><strong>YOLO检测</strong><span>火焰与烟雾目标</span></div><ArrowRight size={16} /><div><Thermometer size={20} /><strong>温度融合</strong><span>热区轮廓与梯度</span></div><ArrowRight size={16} /><div><ShieldAlert size={20} /><strong>风险判断</strong><span>灾前分级预警</span></div></div></section>
-      <section className="mobile-card innovation-card"><div className="card-head"><div><strong>六大核心创新</strong><small>AI火警网警的优势</small></div><Sparkles size={18} /></div>{[['灾前预警', '在明火和烟雾出现前识别温度异常'], ['精准定位', '红橙热区标注高温隐患位置'], ['多级研判', '温度轮廓、扩散梯度、持续特征综合分析'], ['低误报率', '区分人员、设备和正常热源'], ['3D热感重建', '将热成像板数据映射到空间热源场景'], ['智能疏散导航', '指南针结合安全出口动态引导撤离']].map(([title, text], index) => <div className="innovation-row" key={title}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{title}</strong><p>{text}</p></div></div>)}</section>
+      <section className="mobile-card innovation-card"><div className="card-head"><div><strong>十大核心创新</strong><small>AI火警网警的完整创新链</small></div><Sparkles size={18} /></div>{[['灾前预警', '在明火和烟雾出现前识别温度异常'], ['精准定位', '红橙热区标注高温隐患位置'], ['AI时序推理', '温度轮廓、扩散梯度与持续特征融合'], ['低误报率', '多维度证据区分正常热源与真实隐患'], ['数字孪生', '楼层热区与监控设备三维联动'], ['动态疏散', '根据热区与封控实时重规划路线'], ['3D热感重建', '将热成像板数据映射到空间热源场景'], ['数字演练', '模拟火情、计时撤离与自动评分'], ['证据链', '自动留存检测与处置全过程'], ['边缘部署', '老旧楼宇无需大规模重新布线']].map(([title, text], index) => <div className="innovation-row" key={title}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{title}</strong><p>{text}</p></div></div>)}</section>
+      <section className="mobile-card drill-entry-card"><div className="drill-entry-icon"><ShieldCheck size={21} /></div><div><strong>数字消防演练</strong><p>模拟火情、计时撤离、自动评分并生成证据记录。</p></div><button type="button" onClick={onStartDrill}>进入演练</button></section>
       <section className="mobile-card advantage-card"><div><ShieldCheck size={19} /><strong>复杂场景适配</strong></div><p>适配老旧楼宇、仓库、配电房和人员密集楼道，无需大规模重新布线，硬件成本可控，适合民用普及。</p></section>
       <div className="disclaimer"><ShieldAlert size={17} /><p>本系统为科研演示原型，不替代专业消防检测设备与灭火系统。</p></div>
     </div>
@@ -739,6 +987,9 @@ export default function MobileApp() {
   const [selectedCameraId, setSelectedCameraId] = useState(() => initialCameraState()[0].id)
   const [cameraSheet, setCameraSheet] = useState(null)
   const [toast, setToast] = useState('')
+  const [inference, setInference] = useState(() => computeInference(createFrame(), null, null))
+  const [showDrill, setShowDrill] = useState(false)
+  const previousFrameRef = useRef(null)
   const timerRef = useRef(null)
   const socketRef = useRef(null)
   const inputCameraRef = useRef(null)
@@ -757,6 +1008,11 @@ export default function MobileApp() {
     const timer = window.setTimeout(() => setToast(''), 2400)
     return () => clearTimeout(timer)
   }, [toast])
+
+  useEffect(() => {
+    setInference((current) => computeInference(frame, previousFrameRef.current, current))
+    previousFrameRef.current = frame
+  }, [frame])
 
   useEffect(() => {
     if (connection === 'connected') return undefined
@@ -808,11 +1064,12 @@ export default function MobileApp() {
         clearInterval(timerRef.current)
         window.setTimeout(() => {
           const nextResult = createFrame(phase)
+          const nextInference = computeInference(nextResult, frame, inference)
           setResult(nextResult)
           setFrame(nextResult)
           setDetected(true)
           setDetecting(false)
-          setAlerts((current) => [{ id: `local-${Date.now()}`, time: new Date().toLocaleString('zh-CN', { hour12: false }), risk: nextResult.risk, zone: '手机端实时检测', temp: nextResult.maxTemp, hotspots: nextResult.hotspots.length }, ...current].slice(0, 30))
+          setAlerts((current) => [{ id: `local-${Date.now()}`, time: new Date().toLocaleString('zh-CN', { hour12: false }), risk: nextResult.risk, zone: '手机端实时检测', temp: nextResult.maxTemp, hotspots: nextResult.hotspots.length, inference: nextInference }, ...current].slice(0, 30))
         }, 260)
       }
       setProgress(Math.min(value, 99))
@@ -867,6 +1124,43 @@ export default function MobileApp() {
     setCameraSheet(null)
   }
 
+  const exportEvidence = (alert) => {
+    const report = {
+      system: 'AI热感火警风险检测系统',
+      exportTime: new Date().toLocaleString('zh-CN', { hour12: false }),
+      incident: {
+        time: alert.time,
+        zone: alert.zone,
+        risk: riskTitle(alert.risk),
+        maxTemp: alert.temp,
+        hotspots: alert.hotspots,
+      },
+      chain: evidenceForAlert(alert, alert.inference),
+    }
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `热感哨兵-证据链-${alert.id || Date.now()}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    setToast('证据链报告已导出')
+  }
+
+  const completeDrill = (result) => {
+    const evidence = {
+      id: `drill-${Date.now()}`,
+      time: result.time,
+      risk: result.risk,
+      zone: '数字消防演练',
+      temp: result.maxTemp,
+      hotspots: 1,
+      inference: { confidence: result.score / 100, stages: [], reasons: [`演练得分 ${result.score}`, `撤离用时 ${result.seconds} 秒`] },
+    }
+    setAlerts((current) => [evidence, ...current].slice(0, 30))
+    setToast(`演练完成，得分 ${result.score}`)
+  }
+
   const shareCamera = async (camera) => {
     if (!camera?.public) {
       setToast('授权监控不可公开分享')
@@ -886,12 +1180,12 @@ export default function MobileApp() {
   }
 
   const page = useMemo(() => {
-    if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
-    if (activeTab === 'alerts') return <AlertsPage alerts={alerts} />
+    if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} inference={inference} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
+    if (activeTab === 'alerts') return <AlertsPage alerts={alerts} onExportEvidence={exportEvidence} />
     if (activeTab === 'dashboard') return <DashboardPage />
-    if (activeTab === 'about') return <AboutPage />
-    return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
-  }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, frame, connection, image, fileName, detecting, progress, detected, result, phase])
+    if (activeTab === 'about') return <AboutPage onStartDrill={() => setShowDrill(true)} />
+    return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} inference={inference} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
+  }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, frame, connection, inference, image, fileName, detecting, progress, detected, result, phase])
 
   return (
     <div className="mobile-app-shell">
@@ -905,6 +1199,7 @@ export default function MobileApp() {
       </nav>
       {showDevices && <DeviceSheet devices={devices} activeDevice={activeDevice} connection={connection} error={error} onClose={() => setShowDevices(false)} onConnect={connectDevice} onDisconnect={disconnect} onSave={saveDevice} onDelete={(id) => setDevices((current) => current.filter((device) => device.id !== id))} />}
       {cameraSheet && <CameraSheet editing={cameraSheet.camera} onClose={() => setCameraSheet(null)} onSave={saveCamera} />}
+      {showDrill && <DrillMode frame={frame} onClose={() => setShowDrill(false)} onComplete={completeDrill} />}
       {toast && <div className="toast-message">{toast}</div>}
     </div>
   )
