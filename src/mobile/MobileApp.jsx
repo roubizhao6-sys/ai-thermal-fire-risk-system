@@ -5,11 +5,13 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
+  Box,
   BellRing,
   Cable,
   Camera,
   CheckCircle2,
   ChevronRight,
+  Compass,
   CircleDot,
   Clock3,
   Cpu,
@@ -28,10 +30,15 @@ import {
   Layers3,
   Link2,
   LoaderCircle,
+  LocateFixed,
   MapPin,
+  Navigation,
   Plus,
+  RadioTower,
   Radio,
   RotateCcw,
+  Rotate3D,
+  Route,
   Save,
   ScanLine,
   ShieldAlert,
@@ -59,6 +66,7 @@ const tabs = [
 ]
 
 const defaultCameras = [
+  { id: 'thermal-board-sim', name: '模拟热成像板', location: '实验室 P11', type: 'sensor', url: 'sensor://esp32-sim', public: true },
   { id: 'demo-live', name: '热感监控演示', location: '三楼东侧走廊', type: 'demo', url: DEMO_LIVE, public: true },
 ]
 
@@ -389,7 +397,149 @@ function LineChart() {
 }
 
 
-function LivePlayer({ camera }) {
+function directionLabel(degree) {
+  const labels = ['北', '东北', '东', '东南', '南', '西南', '西', '西北']
+  return labels[Math.round(((degree % 360) + 360) % 360 / 45) % 8]
+}
+
+function shortestTurn(target, heading) {
+  return ((target - heading + 540) % 360) - 180
+}
+
+function EscapeCompass({ risk, maxTemp }) {
+  const exitBearing = risk === 'high' ? 18 : 42
+  const [heading, setHeading] = useState(24)
+  const [tracking, setTracking] = useState(false)
+  const [permission, setPermission] = useState('prompt')
+
+  useEffect(() => {
+    if (!tracking) return undefined
+    const handler = (event) => {
+      const raw = Number.isFinite(event.webkitCompassHeading) ? event.webkitCompassHeading : Number(event.alpha)
+      if (Number.isFinite(raw)) setHeading((raw + 360) % 360)
+    }
+    window.addEventListener('deviceorientationabsolute', handler, true)
+    window.addEventListener('deviceorientation', handler, true)
+    return () => {
+      window.removeEventListener('deviceorientationabsolute', handler, true)
+      window.removeEventListener('deviceorientation', handler, true)
+    }
+  }, [tracking])
+
+  const enableCompass = async () => {
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const result = await DeviceOrientationEvent.requestPermission()
+        setPermission(result)
+        if (result !== 'granted') return
+      } else {
+        setPermission('granted')
+      }
+      setTracking(true)
+    } catch {
+      setPermission('denied')
+    }
+  }
+
+  const turn = shortestTurn(exitBearing, heading)
+  const turnText = Math.abs(turn) < 15
+    ? '保持当前方向直行'
+    : turn > 0
+      ? `向右转 ${Math.round(Math.abs(turn))}° 后前进`
+      : `向左转 ${Math.round(Math.abs(turn))}° 后前进`
+
+  return (
+    <section className="mobile-card escape-card">
+      <div className="card-head">
+        <div><strong>指南针疏散导航</strong><small>结合风险等级与安全出口方向动态引导</small></div>
+        <Compass size={19} />
+      </div>
+      <div className="compass-layout">
+        <div className="compass-dial" style={{ '--heading': `${-heading}deg`, '--turn': `${turn}deg` }}>
+          <span className="compass-n">N</span>
+          <span className="compass-e">E</span>
+          <span className="compass-s">S</span>
+          <span className="compass-w">W</span>
+          <i className="compass-ring" />
+          <b className="compass-arrow"><Navigation size={20} /></b>
+          <em />
+        </div>
+        <div className="route-summary">
+          <span className={`route-risk route-${risk}`}>{riskTitle(risk)} · {risk === 'high' ? '建议立即撤离' : '建议预防性撤离'}</span>
+          <strong>{directionLabel(exitBearing)}向安全出口</strong>
+          <p>{turnText}</p>
+          <div className="route-stats"><span><Route size={12} />86 米</span><span><LocateFixed size={12} />约 42 秒</span></div>
+        </div>
+      </div>
+      <div className="escape-steps">
+        <span><i>01</i>离开当前高温区域</span>
+        <span><i>02</i>前往东侧安全楼梯</span>
+        <span><i>03</i>低姿通过烟区</span>
+        <span><i>04</i>到达一楼集合点</span>
+      </div>
+      <div className="compass-status">
+        <span><i className={tracking ? 'online' : ''} />{tracking ? `实时方向 ${Math.round(heading)}°` : permission === 'denied' ? '未授权，正在使用模拟方向' : '待开启手机指南针'}</span>
+        <b>最高温 {Number(maxTemp || 0).toFixed(1)}°C</b>
+      </div>
+      {!tracking && <button type="button" className="compass-enable" onClick={enableCompass}><Compass size={15} />开启指南针并开始引导</button>}
+    </section>
+  )
+}
+
+function Thermal3DScene({ frame }) {
+  const fallbackHotspots = [
+    { x: 28, y: 24, temp: frame?.maxTemp || 72 },
+    { x: 64, y: 30, temp: (frame?.maxTemp || 72) - 13 },
+  ]
+  const hotspots = frame?.hotspots?.length ? frame.hotspots : fallbackHotspots
+  const maxTemp = Number(frame?.maxTemp || 0)
+
+  return (
+    <div className="thermal-3d-view">
+      <div className="scene-vignette" />
+      <div className="scene-room">
+        <div className="scene-back-wall">
+          <span /><span /><span /><span /><span /><span />
+        </div>
+        <div className="scene-left-wall" />
+        <div className="scene-right-wall" />
+        <div className="scene-floor">
+          <i className="scene-route-line" />
+        </div>
+        <div className="scene-sensor">
+          <RadioTower size={15} />
+          <span>32×24</span>
+        </div>
+        {hotspots.slice(0, 3).map((spot, index) => (
+          <div
+            className={`scene-hotspot scene-hotspot-${index + 1}`}
+            key={`${spot.x}-${spot.y}-${index}`}
+            style={{
+              left: `${17 + (Number(spot.x || 0) / 100) * 56}%`,
+              top: `${30 + (Number(spot.y || 0) / 100) * 27}%`,
+              '--spot-color': Number(spot.temp || maxTemp) >= 65 ? '#ff3b30' : '#ff9d2e',
+            }}
+          >
+            <i />
+            <span>{Number(spot.temp || maxTemp).toFixed(1)}°</span>
+          </div>
+        ))}
+        <div className="scene-scan-plane" />
+      </div>
+      <div className="scene-hud scene-hud-top">
+        <span><Rotate3D size={13} />3D 热感重建</span>
+        <b>{frame?.width || 32}×{frame?.height || 24} · 3.1 帧/秒</b>
+      </div>
+      <div className="scene-hud scene-hud-bottom">
+        <span><i />热成像板已联动</span>
+        <b>最高 {maxTemp.toFixed(1)}°C</b>
+      </div>
+      <div className="scene-axis"><span>X</span><span>Y</span><span>Z</span></div>
+    </div>
+  )
+}
+
+function LivePlayer({ camera, frame, viewMode }) {
   const videoRef = useRef(null)
   const playerRef = useRef(null)
   const [currentTime, setCurrentTime] = useState(() => new Date().toLocaleString('zh-CN', { hour12: false }))
@@ -400,7 +550,7 @@ function LivePlayer({ camera }) {
   }, [])
 
   useEffect(() => {
-    if (!camera || camera.type === 'demo' || camera.type === 'mjpeg') return undefined
+    if (!camera || viewMode === 'thermal3d' || camera.type === 'sensor' || camera.type === 'demo' || camera.type === 'mjpeg') return undefined
     const video = videoRef.current
     if (!video) return undefined
     let hls
@@ -428,7 +578,7 @@ function LivePlayer({ camera }) {
         video.load()
       }
     }
-  }, [camera])
+  }, [camera, viewMode])
 
   const enterFullscreen = () => {
     const element = playerRef.current
@@ -439,12 +589,13 @@ function LivePlayer({ camera }) {
 
   return (
     <div className="live-player" ref={playerRef}>
-      {camera.type === 'demo' && <img src={camera.url} alt={`${camera.name}演示监控`} />}
-      {camera.type === 'mjpeg' && <img src={camera.url} alt={`${camera.name}实时监控`} />}
-      {camera.type === 'hls' && <video ref={videoRef} controls muted autoPlay playsInline />}
+      {viewMode === 'thermal3d' || camera.type === 'sensor' ? <Thermal3DScene frame={frame} /> : null}
+      {viewMode !== 'thermal3d' && camera.type === 'demo' && <img src={camera.url} alt={`${camera.name}演示监控`} />}
+      {viewMode !== 'thermal3d' && camera.type === 'mjpeg' && <img src={camera.url} alt={`${camera.name}实时监控`} />}
+      {viewMode !== 'thermal3d' && camera.type === 'hls' && <video ref={videoRef} controls muted autoPlay playsInline />}
       <div className="live-grid" />
       {camera.type === 'demo' && <div className="live-scan" />}
-      <div className="live-status"><i />{camera.type === 'demo' ? '公开演示流' : camera.public ? '公开监控' : '本机监控'}</div>
+      <div className="live-status"><i />{viewMode === 'thermal3d' || camera.type === 'sensor' ? '热感板联动' : camera.type === 'demo' ? '公开演示流' : camera.public ? '公开监控' : '本机监控'}</div>
       <div className="live-camera-name"><Video size={14} /><span>{camera.name}</span><small>{camera.location || '未设置位置'}</small></div>
       <button className="fullscreen-button" type="button" onClick={enterFullscreen}><Maximize2 size={16} /></button>
       <div className="live-time">{currentTime}</div>
@@ -458,7 +609,7 @@ function CameraSheet({ editing, onClose, onSave }) {
   const [type, setType] = useState(editing?.type || 'hls')
   const [url, setUrl] = useState(editing?.url || '')
   const [isPublic, setIsPublic] = useState(Boolean(editing?.public))
-  const valid = name.trim() && (type === 'demo' || /^https?:\/\//i.test(url.trim()))
+  const valid = name.trim() && (type === 'demo' || type === 'sensor' || /^https?:\/\//i.test(url.trim()))
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -467,35 +618,68 @@ function CameraSheet({ editing, onClose, onSave }) {
         <div className="sheet-head"><div><span>监控联动</span><strong>{editing ? '编辑监控' : '添加监控'}</strong></div><button type="button" onClick={onClose}><X size={18} /></button></div>
         <label>监控名称<input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：三楼东侧走廊" /></label>
         <label>安装位置<input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="例如：消防通道入口" /></label>
-        <label>监控类型<select value={type} onChange={(e) => { setType(e.target.value); if (e.target.value === 'demo') setUrl(DEMO_LIVE) }}><option value="hls">HLS 实时流</option><option value="mjpeg">MJPEG 实时流</option><option value="demo">内置公开演示流</option></select></label>
-        <label>监控地址<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/live.m3u8" inputMode="url" autoCapitalize="none" disabled={type === 'demo'} /></label>
+        <label>监控类型<select value={type} onChange={(e) => { setType(e.target.value); if (e.target.value === 'demo') setUrl(DEMO_LIVE); if (e.target.value === 'sensor') setUrl('sensor://esp32-sim') }}><option value="hls">HLS 实时流</option><option value="mjpeg">MJPEG 实时流</option><option value="sensor">3D 热感模拟板</option><option value="demo">内置公开演示流</option></select></label>
+        <label>监控地址<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/live.m3u8" inputMode="url" autoCapitalize="none" disabled={type === 'demo' || type === 'sensor'} /></label>
         <label className="public-toggle"><input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} /><span><strong>允许通过分享链接公开查看</strong><small>请勿公开包含人员、住宅、门禁或消防设施细节的画面</small></span></label>
         <div className="sheet-tip"><Info size={14} />RTSP 地址不能被手机浏览器直接播放，需要海康、大华 NVR 或媒体网关转换为 HLS/WebRTC。</div>
-        <button className="sheet-save" type="button" disabled={!valid} onClick={() => onSave({ name: name.trim(), location: location.trim(), type, url: type === 'demo' ? DEMO_LIVE : url.trim(), public: isPublic })}><Save size={16} />保存监控</button>
+        <button className="sheet-save" type="button" disabled={!valid} onClick={() => onSave({ name: name.trim(), location: location.trim(), type, url: type === 'demo' ? DEMO_LIVE : type === 'sensor' ? 'sensor://esp32-sim' : url.trim(), public: isPublic })}><Save size={16} />保存监控</button>
       </section>
     </div>
   )
 }
 
-function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete, canShare, onShare }) {
+function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete, canShare, onShare, frame, connection }) {
+  const [viewMode, setViewMode] = useState(selectedCamera?.type === 'sensor' ? 'thermal3d' : 'camera')
+
+  useEffect(() => {
+    setViewMode(selectedCamera?.type === 'sensor' ? 'thermal3d' : 'camera')
+  }, [selectedCamera?.id, selectedCamera?.type])
+
+  const canSwitchView = selectedCamera?.type !== 'sensor'
+
   return (
-    <div className="mobile-page">
-      <header className="page-heading camera-heading"><span>现场监控</span><h1>热成像与监控联动</h1><p>实时查看现场画面，高温预警可直接对应到监控区域</p></header>
-      <LivePlayer camera={selectedCamera} />
+    <div className="mobile-page camera-page">
+      <header className="page-heading camera-heading"><span>现场监控</span><h1>热成像与监控联动</h1><p>实景监控、3D 热感重建与疏散导航在同一画面联动</p></header>
+      {canSwitchView && <div className="view-switcher">
+        <button type="button" className={viewMode === 'camera' ? 'active' : ''} onClick={() => setViewMode('camera')}><Video size={14} />实景监控</button>
+        <button type="button" className={viewMode === 'thermal3d' ? 'active' : ''} onClick={() => setViewMode('thermal3d')}><Rotate3D size={14} />3D 热感视图</button>
+      </div>}
+      <LivePlayer camera={selectedCamera} frame={frame} viewMode={viewMode} />
       <div className="camera-actions">
         <button type="button" className={canShare ? '' : 'disabled'} onClick={() => canShare && onShare(selectedCamera)}><Copy size={15} />分享当前监控</button>
         <button type="button" onClick={onAdd}><Plus size={15} />添加监控</button>
       </div>
+
+      <section className="mobile-card thermal-link-card">
+        <div className="card-head"><div><strong>模拟热成像板联动</strong><small>ESP32 / MLX90640 数据格式演示</small></div><RadioTower size={18} /></div>
+        <div className="thermal-link-status">
+          <span><i className={connection === 'connected' ? 'online' : ''} />{connection === 'connected' ? '真实硬件在线' : '模拟器数据流运行中'}</span>
+          <b>{frame?.source || '内置模拟热像仪'}</b>
+        </div>
+        <div className="thermal-link-metrics">
+          <div><span>矩阵</span><strong>{frame?.width || 32}×{frame?.height || 24}</strong></div>
+          <div><span>最高温</span><strong>{Number(frame?.maxTemp || 0).toFixed(1)}°C</strong></div>
+          <div><span>热区</span><strong>{frame?.hotspots?.length || 0} 处</strong></div>
+        </div>
+        <p className="thermal-link-note"><Box size={13} />手机端可接入 HLS、MJPEG，或直接接收 width、height、max_temp、temperatures、hotspots 格式的热感板数据。</p>
+      </section>
+
+      <EscapeCompass risk={frame?.risk || 'low'} maxTemp={frame?.maxTemp} />
+
       <div className="section-title"><strong>监控列表</strong><span>{cameras.length} 路</span></div>
       <div className="camera-grid">
-        {cameras.map((camera) => (
-          <article className={`camera-card ${selectedCamera?.id === camera.id ? 'active' : ''}`} key={camera.id} onClick={() => onSelect(camera)}>
-            <div className="camera-thumb">{camera.type === 'demo' || camera.type === 'mjpeg' ? <img src={camera.url} alt="" /> : <Video size={25} />}<span>{camera.public ? '公开' : '授权'}</span></div>
-            <div className="camera-info"><strong>{camera.name}</strong><small>{camera.location || '未设置位置'}</small><em>{camera.type === 'demo' ? '演示流' : camera.type === 'mjpeg' ? 'MJPEG' : 'HLS直播'}</em></div>
+        {cameras.map((camera) => {
+          const active = selectedCamera?.id === camera.id
+          return (
+          <article className={`camera-card ${active ? 'active' : ''}`} key={camera.id} onClick={() => onSelect(camera)}>
+            <div className={`camera-thumb ${camera.type === 'sensor' ? 'thermal-thumb' : ''}`}>
+              {camera.type === 'sensor' ? <><Rotate3D size={27} /><span>{camera.public ? '公开' : '授权'}</span></> : camera.type === 'demo' || camera.type === 'mjpeg' ? <><img src={camera.url} alt="" /><span>{camera.public ? '公开' : '授权'}</span></> : <><Video size={25} /><span>{camera.public ? '公开' : '授权'}</span></>}
+            </div>
+            <div className="camera-info"><strong>{camera.name}</strong><small>{camera.location || '未设置位置'}</small><em>{camera.type === 'sensor' ? '3D热感板' : camera.type === 'demo' ? '演示流' : camera.type.toUpperCase()}</em></div>
             <button type="button" onClick={(event) => { event.stopPropagation(); onEdit(camera) }}><Edit3 size={14} /></button>
             <button type="button" onClick={(event) => { event.stopPropagation(); onDelete(camera.id) }}><Trash2 size={14} /></button>
           </article>
-        ))}
+        )})}
       </div>
       <div className="monitor-note"><Globe2 size={16} /><p>公开流适合无隐私的演示区域。真实监控建议通过账号授权、临时签名地址或受控网关接入，不建议直接暴露 NVR 地址或长期公开。</p></div>
     </div>
@@ -525,7 +709,7 @@ function AboutPage() {
     <div className="mobile-page">
       <header className="page-heading"><span>关于项目</span><h1>让AI成为火警监测网警</h1><p>热成像 + 计算机视觉，让隐患在灾害发生前被看见</p></header>
       <section className="mobile-card principle-card"><div className="card-head"><div><strong>技术原理</strong><small>多模态融合识别</small></div><Cpu size={19} /></div><div className="principle-flow"><div><ScanLine size={20} /><strong>YOLO检测</strong><span>火焰与烟雾目标</span></div><ArrowRight size={16} /><div><Thermometer size={20} /><strong>温度融合</strong><span>热区轮廓与梯度</span></div><ArrowRight size={16} /><div><ShieldAlert size={20} /><strong>风险判断</strong><span>灾前分级预警</span></div></div></section>
-      <section className="mobile-card innovation-card"><div className="card-head"><div><strong>五大核心创新</strong><small>AI火警网警的优势</small></div><Sparkles size={18} /></div>{[['灾前预警', '在明火和烟雾出现前识别温度异常'], ['精准定位', '红橙热区标注高温隐患位置'], ['多级研判', '温度轮廓、扩散梯度、持续特征综合分析'], ['低误报率', '区分人员、设备和正常热源'], ['轻量部署', '边缘设备可运行，老旧楼宇改造成本低']].map(([title, text], index) => <div className="innovation-row" key={title}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{title}</strong><p>{text}</p></div></div>)}</section>
+      <section className="mobile-card innovation-card"><div className="card-head"><div><strong>六大核心创新</strong><small>AI火警网警的优势</small></div><Sparkles size={18} /></div>{[['灾前预警', '在明火和烟雾出现前识别温度异常'], ['精准定位', '红橙热区标注高温隐患位置'], ['多级研判', '温度轮廓、扩散梯度、持续特征综合分析'], ['低误报率', '区分人员、设备和正常热源'], ['3D热感重建', '将热成像板数据映射到空间热源场景'], ['智能疏散导航', '指南针结合安全出口动态引导撤离']].map(([title, text], index) => <div className="innovation-row" key={title}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{title}</strong><p>{text}</p></div></div>)}</section>
       <section className="mobile-card advantage-card"><div><ShieldCheck size={19} /><strong>复杂场景适配</strong></div><p>适配老旧楼宇、仓库、配电房和人员密集楼道，无需大规模重新布线，硬件成本可控，适合民用普及。</p></section>
       <div className="disclaimer"><ShieldAlert size={17} /><p>本系统为科研演示原型，不替代专业消防检测设备与灭火系统。</p></div>
     </div>
@@ -701,12 +885,12 @@ export default function MobileApp() {
   }
 
   const page = useMemo(() => {
-    if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
+    if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
     if (activeTab === 'alerts') return <AlertsPage alerts={alerts} />
     if (activeTab === 'dashboard') return <DashboardPage />
     if (activeTab === 'about') return <AboutPage />
     return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
-  }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, result, phase])
+  }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, frame, connection, image, fileName, detecting, progress, detected, result, phase])
 
   return (
     <div className="mobile-app-shell">
