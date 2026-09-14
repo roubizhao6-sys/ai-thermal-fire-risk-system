@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Building3DView from './Building3DView.jsx'
 import Campus3DView from './Campus3DView.jsx'
+import CampusBuildingPanel from './CampusBuildingPanel.jsx'
 import {
   Activity,
   AlertTriangle,
@@ -845,7 +846,8 @@ function DrillMode({ frame, onClose, onComplete }) {
         {phase === 'running' && <div className="drill-body">
           {countdown > 0 ? <div className="drill-countdown">{countdown}</div> : <div className="drill-running">
             <div className="drill-timer"><Clock3 size={15} />已用时 <strong>{elapsed}</strong> 秒</div>
-            <DigitalTwinView frame={frame} route={route} />
+            {viewMode === 'campus' && <CampusBuildingPanel />}
+      <DigitalTwinView frame={frame} route={route} />
             <button type="button" className="sheet-save" onClick={finishDrill}><CheckCircle2 size={16} />已完成撤离</button>
           </div>}
         </div>}
@@ -924,6 +926,7 @@ function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete
         {inference && <div className="thermal-inference-line"><span><Cpu size={13} />AI推理</span><b>{(inference.confidence * 100).toFixed(0)}% · {inference.stages[0]?.detail}</b></div>}
       </section>
 
+      {viewMode === 'campus' && <CampusBuildingPanel />}
       <DigitalTwinView frame={frame} route={route} />
       <EscapeCompass risk={frame?.risk || 'low'} maxTemp={frame?.maxTemp} route={route} />
 

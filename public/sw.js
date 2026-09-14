@@ -1,4 +1,4 @@
-const CACHE = 'thermal-guard-v8'
+const CACHE = 'thermal-guard-v9'
 const CORE = ['./', './index.html', './mobile-app.html', './mobile-install.html', './thermal-guard.mobileconfig', './demo-live.gif', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png']
 
 self.addEventListener('install', event => {

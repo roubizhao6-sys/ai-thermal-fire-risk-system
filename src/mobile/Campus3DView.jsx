@@ -327,6 +327,7 @@ export default function Campus3DView({ frame }) {
       </div>
       <div className="campus-caption">实景背景：Winslowchen / CC BY-SA 3.0 · 参考图：Bill9999360 / CC BY-SA 4.0</div>
       <div className="campus-downloads">
+        <a href="https://www.must.edu.mo/page/id-13635.html?locale=zh_MO" target="_blank" rel="noreferrer">官网地图</a>
         <a href={`${import.meta.env.BASE_URL}models/must-campus.step`} download>下载 STEP CAD</a>
         <a href={`${import.meta.env.BASE_URL}models/must-campus.stl`} download>下载 STL 模型</a>
       </div>
