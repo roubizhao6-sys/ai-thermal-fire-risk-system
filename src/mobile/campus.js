@@ -1,80 +1,52 @@
-// 澳门科技大学校园数据（按校方校园图重建）
+// 澳门科技大学校园数据（**按真实地理坐标重建**）
 //
-// 来源：用户提供的《澳科大地图.JPG》(1279×1472) + 校方 720° 全景。
-// 楼名与**相对位置**来自对该图的 OCR（macOS Vision，带像素坐标），布局与真实校园一致：
-//   左列  行政大樓 / 教學大樓
-//   中列  活動中心 / 宿舍 / 科技大樓
-//   右列  田徑運動場 / 室內體育館 / 澳門國際學校 / 宿舍 / 圖書館
-//   最右  教學大樓 / Dormitory / 綜合教學大樓（图中标注 R）
-//   顶部  輕軌科大站、北門；中部 南門
+// 来源：OpenStreetMap 校园建筑多边形（含 building:levels / height），
+// 以澳科大中心 (22.1526454, 113.5680410) 为原点做等距投影，x 向东、z 向南，单位为米。
+// 楼名与座号（A/B/C/D/E/F/G/H/L/M/O/P/R + 圖書館 + J 體育館）来自 OSM 名称与校方 720° 场景清单。
 //
-// 换算：mapPx → 模型单位（0.55 倍，地图中心移到原点）。x 向东、z 向南、y 为高度。
-// 楼层数由公开资料与图中标注（如"圖書館六樓"）估计，可按实测绘改。
+// 为什么不是照校园图的像素换算：校园图不是正北朝上（北門在图的左上、南門在右中），
+// 直接按像素当"东/南"会整体错位，所以改用真实经纬度 + 真实轮廓。
+// 楼层高度：优先用 OSM 的 building:levels（每层 3.4 米），缺失时按 height 反推。
 
-export const CAMPUS_FLOOR_HEIGHT = 6.4
+export const CAMPUS_FLOOR_HEIGHT = 3.4
 
-const MAP_W = 1279
-const MAP_H = 1472
-const SCALE = 0.55
-const toModel = (px, py) => ({
-  x: Number(((px - MAP_W / 2) * SCALE).toFixed(1)),
-  z: Number(((py - MAP_H / 2) * SCALE).toFixed(1)),
-})
-
-// 楼名与座号对照：校园图 OCR + 校方 720° 全景的场景清单（A座行政樓、C座教學樓、D座禮堂、
-// O座教學樓、E座點聚餐廳、N座圖書館、J座室內體育館、G座宿舍、科大醫院、澳門國際學校…）
-const BUILDINGS = [
-  { id: 'admin', letter: 'A', name: 'A 座 行政樓', short: 'A 座行政樓', px: 350, py: 967, w: 58, d: 46, floors: 5, style: 'office', note: '校方全景：A座行政樓前 / 大堂' },
-  { id: 'academic-left', letter: 'C', name: 'C 座 教學樓', short: 'C 座教學樓', px: 350, py: 1042, w: 62, d: 52, floors: 6, style: 'glass', note: '含停車場、學生便利店、廚藝學教學實驗室' },
-  { id: 'recreation', letter: 'D', name: 'D 座 禮堂', short: 'D 座禮堂', px: 600, py: 990, w: 66, d: 50, floors: 3, style: 'warm', note: '活動中心 / 禮堂' },
-  { id: 'science', letter: 'H', name: '科技大樓', short: '科技大樓', px: 600, py: 1225, w: 60, d: 52, floors: 6, style: 'lab', note: '科研與實驗室' },
-  { id: 'dorm-mid', letter: 'E', name: 'E 座 宿舍', short: 'E 座宿舍', px: 600, py: 1150, w: 52, d: 40, floors: 10, style: 'dorm', note: '校方全景：E座點聚餐廳' },
-  { id: 'stadium', letter: '', name: '足球 / 田徑運動場', short: '田徑場', px: 900, py: 985, w: 150, d: 96, floors: 1, style: 'sport', note: '校方全景：足球/田徑運動場、籃球場' },
-  { id: 'gym', letter: 'J', name: 'J 座 室內體育館', short: 'J 座體育館', px: 900, py: 1062, w: 86, d: 60, floors: 3, style: 'sport', note: '校方全景：J座室內體育館' },
-  { id: 'tis', letter: '', name: '澳門國際學校', short: '國際學校', px: 900, py: 1128, w: 70, d: 52, floors: 4, style: 'clean', note: '校方全景：澳門國際學校入口' },
-  { id: 'dorm-right', letter: 'G', name: 'G 座 宿舍', short: 'G 座宿舍', px: 900, py: 1210, w: 52, d: 40, floors: 10, style: 'dorm', note: '校方全景：G座宿舍入口 / 大堂 / 五人間' },
-  { id: 'library', letter: 'N', name: 'N 座 圖書館', short: 'N 座圖書館', px: 900, py: 1258, w: 74, d: 54, floors: 6, style: 'warm', note: '校方全景：圖書館一至四樓、N座大堂' },
-  { id: 'academic-right', letter: 'O', name: 'O 座 教學樓', short: 'O 座教學樓', px: 1075, py: 986, w: 58, d: 48, floors: 7, style: 'glass', note: '校方全景：O201/O202/O203/O205/O702 教室' },
-  { id: 'dorm-far', letter: '', name: '宿舍（東）', short: '宿舍', px: 1075, py: 1080, w: 52, d: 40, floors: 10, style: 'dorm', note: '宿舍區' },
-  { id: 'complex', letter: 'R', name: '綜合教學大樓', short: '綜合教學樓', px: 1075, py: 1259, w: 96, d: 62, floors: 9, style: 'glass', note: '含演藝廳 / 電影院 / 體育設施' },
+export const CAMPUS_BUILDINGS = [
+  { id: "academic-b", letter: "B", name: "B座教學大樓", short: "B座教學大樓", x: -226.7, z: 108.3, w: 78.8, d: 48.9, floors: 6, heightMeters: 29.6, style: 'stone', footprint: [[-236.2, 96.6], [-198.9, 117.7], [-197.1, 114.5], [-187.3, 120], [-194.4, 132.6], [-200.2, 129.4], [-202.1, 132.7], [-249.4, 106.1], [-255.9, 102.4], [-266.1, 96.6], [-258.9, 83.8], [-240.1, 94.4], [-236.2, 96.6]] },
+  { id: "academic-c", letter: "C", name: "C座教學大樓", short: "C座教學大樓", x: -273.8, z: 133.6, w: 49.2, d: 62.3, floors: 7, heightMeters: 23.1, style: 'stone', footprint: [[-249.4, 106.1], [-251.9, 110.5], [-255.6, 117], [-249.2, 120.6], [-256.2, 132.9], [-261.5, 142.4], [-273.2, 163.1], [-280.7, 158.9], [-284, 164.7], [-298.4, 156.6], [-278.2, 120.6], [-269, 125.7], [-258.5, 106.8], [-255.9, 102.4], [-249.4, 106.1]] },
+  { id: "academic-o", letter: "O", name: "O座教學大樓", short: "O座教學大樓", x: -164.8, z: 155, w: 90.7, d: 83.4, floors: 9, heightMeters: 46.3, style: 'stone', footprint: [[-164.2, 117.9], [-149.4, 114], [-119.4, 187.6], [-126.3, 196.7], [-210.1, 150.2], [-205, 140.7], [-194, 145], [-176, 113.3], [-164.2, 117.9]] },
+  { id: "admin", letter: "A", name: "A座行政大樓", short: "A座行政大樓", x: -216.8, z: 72.2, w: 65.7, d: 48.9, floors: 7, heightMeters: 23.2, style: 'stone', footprint: [[-228.5, 52.7], [-232.8, 52.4], [-236.4, 54.7], [-237.9, 58.8], [-236.5, 62.9], [-232.9, 65.3], [-235.4, 69.6], [-244.4, 64.5], [-249.7, 74], [-240.8, 79], [-244.3, 85.2], [-237.2, 89.3], [-240.1, 94.4], [-236.2, 96.6], [-233.3, 91.5], [-227.4, 94.8], [-217, 76.5], [-190.5, 91.4], [-184, 79.8], [-206.7, 67], [-203.1, 60.5], [-225.7, 47.7], [-228.5, 52.7]] },
+  { id: "civil-lab", letter: "", name: "土木工程實驗室", short: "土木工程實驗室", x: -305.8, z: -23.4, w: 56.8, d: 67.8, floors: 7, heightMeters: 24.5, style: 'stone', footprint: [[-290.4, -57.3], [-298.7, -51.9], [-311.6, -36.7], [-317.4, -26.8], [-325.6, -12], [-334.2, 7.9], [-318.8, 10.5], [-277.4, -43], [-288.4, -49.9], [-295.5, -40.2], [-313.1, -16.4], [-321.9, -4.6], [-324.3, -8.6], [-317.2, -19.6], [-315.4, -22.4], [-308.4, -33], [-302, -40.7], [-299.9, -43.4], [-295.3, -49.2], [-288.5, -53.6], [-290.4, -57.3]] },
+  { id: "complex", letter: "R", name: "R座綜合教學大樓", short: "R座綜合教學大樓", x: 133, z: -75.3, w: 94.4, d: 88.4, floors: 11, heightMeters: 35.7, style: 'stone', footprint: [[85.8, -81.4], [150.6, -119.5], [180.2, -69.2], [115.3, -31.1], [85.8, -81.4]] },
+  { id: "conference", letter: "D", name: "D座會議廳", short: "D座會議廳", x: -245.1, z: 146.7, w: 36.9, d: 41.7, floors: 4, heightMeters: 13.4, style: 'stone', footprint: [[-256.2, 132.9], [-251.6, 135.4], [-246.2, 125.8], [-226.6, 136.8], [-243.9, 167.5], [-263.5, 156.5], [-257.1, 145], [-261.5, 142.4], [-256.2, 132.9]] },
+  { id: "dorm-f", letter: "F", name: "F座宿舍", short: "F座宿舍", x: -202.9, z: -2.6, w: 49.9, d: 58.8, floors: 6, heightMeters: 27.6, style: 'stone', footprint: [[-198.6, 2.3], [-211.7, 26.8], [-227.9, 18.1], [-211.4, -12.7], [-205.6, -9.6], [-193.5, -32], [-178, -23.7], [-193.4, 5.1], [-198.6, 2.3]] },
+  { id: "dorm-g", letter: "G", name: "G座宿舍", short: "G座宿舍", x: -71, z: -111, w: 82.9, d: 73.6, floors: 7, heightMeters: 24.5, style: 'stone', footprint: [[-46.6, -109.4], [-29.6, -86.6], [-46.3, -74.2], [-67.3, -102.4], [-57.3, -109.8], [-62.8, -117.1], [-100.5, -89], [-112.5, -105.1], [-73.3, -134.2], [-69.7, -129.3], [-44.7, -147.8], [-32.1, -130.8], [-51.3, -116.6], [-46.2, -109.7], [-46.6, -109.4]] },
+  { id: "dorm-m", letter: "M", name: "M座宿舍", short: "M座宿舍", x: -70.6, z: 160.4, w: 84.8, d: 55.5, floors: 7, heightMeters: 23.3, style: 'stone', footprint: [[-75.2, 154.8], [-77.1, 149.6], [-39.6, 136], [-40.2, 134.3], [-35.9, 132.7], [-28.2, 153.9], [-32.4, 155.4], [-32.9, 154.2], [-69.7, 167.6], [-67.9, 172.3], [-101.7, 184.5], [-100.9, 186.7], [-105.1, 188.2], [-113, 166.6], [-109.1, 165.2], [-108.5, 167], [-75.2, 154.8]] },
+  { id: "dorm-p", letter: "P", name: "P座宿舍", short: "P座宿舍", x: 215.9, z: 59.1, w: 84.4, d: 68, floors: 16, heightMeters: 55.7, style: 'stone', footprint: [[177.3, 66.1], [244.4, 25.1], [252.1, 37.7], [249.6, 39.2], [253, 44.7], [258.1, 53.1], [192.8, 93.1], [189.7, 88], [187.3, 84], [183.7, 78.2], [180.2, 80.3], [173.7, 69.8], [177.9, 67.2], [177.3, 66.1]] },
+  { id: "guesthouse", letter: "L", name: "L座公寓式酒店", short: "L座公寓式酒店", x: -43.4, z: 202.8, w: 82.3, d: 52.7, floors: 7, heightMeters: 23.4, style: 'stone', footprint: [[-45.8, 196.4], [-47.8, 191], [-9.4, 176.5], [-2.3, 195.6], [-39.6, 209.7], [-38, 214.2], [-77.8, 229.2], [-84.6, 211], [-45.8, 196.4]] },
+  { id: "gym", letter: "J", name: "J座體育館", short: "J座體育館", x: 186.4, z: -4.8, w: 90.3, d: 94.6, floors: 9, heightMeters: 29.8, style: 'stone', footprint: [[193.4, -52.1], [231.6, 10.9], [179.5, 42.5], [141.3, -20.4], [193.4, -52.1]] },
+  { id: "library", letter: "N", name: "圖書館", short: "圖書館", x: -107, z: 85.3, w: 108.3, d: 117.4, floors: 9, heightMeters: 30.1, style: 'stone', footprint: [[-119.9, 51.5], [-110.5, 48.7], [-100.2, 83.4], [-80.4, 77.2], [-70.7, 95.8], [-60.3, 92.8], [-52.9, 104.6], [-55, 105.9], [-53.4, 108.5], [-109.4, 144], [-161.2, 62.3], [-147.3, 53.5], [-145.1, 57], [-129.1, 26.6], [-111.6, 35.8], [-119.9, 51.5]] },
+  { id: "north-wing", letter: "", name: "國際學校北翼", short: "國際學校北翼", x: 64.4, z: 149.4, w: 94.4, d: 72.5, floors: 5, heightMeters: 24.6, style: 'stone', footprint: [[20.9, 160], [99.2, 113.2], [100.2, 115.2], [111.6, 136.5], [80.2, 155], [81.6, 157.5], [78.5, 159], [77, 156.5], [26.7, 185.7], [17.2, 167.8], [23.2, 164.3], [20.9, 160]] },
+  { id: "recreation", letter: "E", name: "E座活動中心", short: "E座活動中心", x: -161.4, z: 8.2, w: 45.7, d: 61.8, floors: 3, heightMeters: 17.7, style: 'stone', footprint: [[-176.2, 15.8], [-174.7, 16.5], [-170.5, 8.4], [-173.1, 7.1], [-169.8, 0.9], [-167.1, 2.3], [-163.3, -5.1], [-169.7, -8.4], [-162.4, -22.7], [-147.7, -15.1], [-146.7, -17.1], [-138.6, -12.9], [-157.6, 23.9], [-160.7, 22.3], [-169.4, 39.1], [-183.2, 32], [-181.5, 28.8], [-184.3, 27.3], [-181.6, 22], [-179.9, 22.9], [-176.2, 15.8]] },
+  { id: "science", letter: "H", name: "H座科技大樓", short: "H座科技大樓", x: 33.5, z: -207.6, w: 101.9, d: 84.5, floors: 3, heightMeters: 11.3, style: 'stone', footprint: [[-17.5, -189.6], [1.1, -203.5], [-1.3, -206.8], [57.2, -249.8], [63.8, -240.7], [84.4, -212.7], [25.9, -169.8], [25.1, -170.9], [19.1, -179.1], [0.6, -165.3], [-17.5, -189.6]] },
+  { id: "south-wing", letter: "", name: "國際學校南翼", short: "國際學校南翼", x: 115.3, z: 201.9, w: 73.7, d: 106.5, floors: 6, heightMeters: 20, style: 'stone', footprint: [[104.3, 208.3], [131, 255.2], [152.2, 243.1], [123.8, 193.3], [115.5, 198], [114.7, 196.7], [125.4, 190.7], [117.2, 176.4], [113.5, 178.5], [96.6, 148.7], [81.6, 157.5], [78.5, 159], [83.3, 167.4], [84.3, 169.2], [95.4, 188.7], [96.8, 191.2], [103.1, 202.1], [104.3, 201.4], [107.3, 206.6], [104.3, 208.3]] },
 ]
 
-export const CAMPUS_BUILDINGS = BUILDINGS.map((building) => {
-  const { x, z } = toModel(building.px, building.py)
-  return { ...building, x, z }
-})
-
-const LANDMARKS = [
-  { id: 'north-gate', name: '北門', px: 213, py: 318, w: 46, d: 12, kind: 'gate' },
-  { id: 'south-gate', name: '南門', px: 743, py: 655, w: 46, d: 12, kind: 'gate' },
-  { id: 'lrt', name: '輕軌科大站', px: 747, py: 248, w: 84, d: 26, kind: 'station' },
+export const CAMPUS_LANDMARKS = [
+  { id: "lrt", name: "輕軌科大站", x: 269.1, z: -48.4, w: 49.5, d: 64, kind: 'station' },
+  { id: 'north-gate', name: '北門', x: -230, z: -215, w: 46, d: 12, kind: 'gate' },
+  { id: 'south-gate', name: '南門', x: 60, z: -40, w: 46, d: 12, kind: 'gate' },
 ]
 
-export const CAMPUS_LANDMARKS = LANDMARKS.map((item) => {
-  const { x, z } = toModel(item.px, item.py)
-  return { ...item, x, z }
-})
-
-// 道路：按地图上的主动线（北门→南门、轻轨站→生活区、教学区横线）
+// 主动线（按校园图走向的近似，仅用于环境观感）
 export const CAMPUS_ROADS = [
-  { from: [213, 318], to: [743, 655], w: 20 },
-  { from: [747, 248], to: [600, 1150], w: 22 },
-  { from: [350, 1042], to: [1075, 1259], w: 20 },
-].map((road) => {
-  const a = toModel(road.from[0], road.from[1])
-  const b = toModel(road.to[0], road.to[1])
-  return {
-    x: (a.x + b.x) / 2,
-    z: (a.z + b.z) / 2,
-    w: road.w,
-    d: Math.hypot(b.x - a.x, b.z - a.z),
-    angle: Math.atan2(b.z - a.z, b.x - a.x),
-  }
-})
+  { x: -85, z: -120, w: 20, d: 420, angle: 0.62 },
+  { x: 0, z: 40, w: 22, d: 520, angle: 0.05 },
+  { x: -40, z: 120, w: 20, d: 420, angle: 1.35 },
+]
 
 export const CAMPUS_BY_ID = Object.fromEntries(CAMPUS_BUILDINGS.map((item) => [item.id, item]))
 
-// 楼盘节点（如 'C4'）→ 校园建筑 + 楼层
+// 楼盘节点（如 'C4'）→ 校园建筑 + 楼层：C 走廊→R座綜合教學大樓、A 梯→圖書館、B 梯→H座科技大樓
 const SPOT_TO_BUILDING = { A: 'library', B: 'science', C: 'complex' }
 
 export function campusLocationForNode(nodeId) {
@@ -94,4 +66,4 @@ export function campusLocationForNode(nodeId) {
   }
 }
 
-export const SPOT_MAPPING_NOTE = '节点映射：C 走廊 → 綜合教學大樓｜A 梯 → 圖書館｜B 梯 → 科技大樓'
+export const SPOT_MAPPING_NOTE = '节点映射：C 走廊 → R座綜合教學大樓｜A 梯 → 圖書館｜B 梯 → H座科技大樓'
