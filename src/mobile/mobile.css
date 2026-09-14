@@ -624,3 +624,35 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .compass-action-bar button, .compass-action-bar a { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 5px; color: #d9ecfb; border: 1px solid rgba(96,165,250,.17); border-radius: 10px; background: rgba(59,130,246,.08); font-size: 8px; text-decoration: none; }
 .compass-action-bar button:first-child { color: white; background: linear-gradient(110deg, #b91c1c, #f97316); }
 .compass-action-bar button.active { animation: pulse 1s infinite; }
+
+.ai-gateway-card { margin-top: 10px; padding: 14px; border-radius: 16px; border-color: rgba(56,189,248,.18); }
+.ai-gateway-card .card-head > svg { color: #6fd3ff; }
+.ai-gateway-status { display: flex; align-items: center; gap: 6px; margin-top: 11px; padding: 9px 10px; color: #8ca5bd; border-radius: 9px; background: rgba(5,15,29,.58); font-size: 9px; }
+.ai-gateway-status i { width: 7px; height: 7px; border-radius: 50%; background: #64748b; }
+.ai-gateway-status.state-connected { color: #90e2af; background: rgba(34,197,94,.07); }
+.ai-gateway-status.state-connected i { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+.ai-gateway-status.state-connecting i { background: #38bdf8; animation: pulse 1s infinite; }
+.ai-gateway-status.state-failed { color: #f0a3a3; background: rgba(239,68,68,.07); }
+.ai-gateway-status.state-failed i { background: #ef4444; }
+.ai-gateway-status b { margin-left: auto; color: #6f89a4; font-size: 8px; }
+.ai-gateway-input { display: flex; flex-direction: column; gap: 5px; margin-top: 9px; color: #7d95b0; font-size: 8px; }
+.ai-gateway-input input { width: 100%; height: 39px; padding: 0 10px; color: #e9f4ff; border: 1px solid rgba(96,165,250,.17); border-radius: 9px; background: rgba(4,13,27,.68); font-family: ui-monospace, monospace; font-size: 9px; outline: none; }
+.ai-gateway-input input:focus { border-color: rgba(56,189,248,.5); box-shadow: 0 0 0 3px rgba(59,130,246,.08); }
+.ai-gateway-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 9px; }
+.ai-gateway-actions button { min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 5px; color: #dcecff; border: 1px solid rgba(96,165,250,.16); border-radius: 9px; background: rgba(59,130,246,.08); font-size: 9px; }
+.ai-gateway-actions button:first-child { color: white; background: linear-gradient(110deg, #2563eb, #38bdf8); }
+.ai-gateway-actions button:disabled { opacity: .42; }
+.ai-detection-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.ai-detection-chips span { padding: 4px 6px; color: #f3d28c; border: 1px solid rgba(245,158,11,.2); border-radius: 999px; background: rgba(245,158,11,.08); font-size: 8px; }
+.ai-detection-chips .detection-flame, .ai-detection-chips .detection-fire { color: #ffaca1; border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.09); }
+.ai-detection-chips .detection-person { color: #a9d8ff; border-color: rgba(59,130,246,.22); background: rgba(59,130,246,.08); }
+.ai-gateway-note { display: flex; align-items: flex-start; gap: 6px; margin-top: 9px; color: #7089a4; font-size: 8px; line-height: 1.55; }
+.ai-gateway-note svg { flex: 0 0 auto; margin-top: 1px; color: #60a5fa; }
+.detection-layer { position: absolute; z-index: 6; inset: 0; pointer-events: none; }
+.detection-box { position: absolute; min-width: 30px; min-height: 24px; border: 2px solid #f59e0b; border-radius: 5px; background: rgba(245,158,11,.07); box-shadow: 0 0 14px rgba(245,158,11,.35); animation: boxIn .25s ease both; }
+.detection-box.detection-smoke { border-color: #f59e0b; }
+.detection-box.detection-flame, .detection-box.detection-fire { border-color: #ef4444; background: rgba(239,68,68,.09); box-shadow: 0 0 16px rgba(239,68,68,.45); }
+.detection-box.detection-person { border-color: #3b82f6; background: rgba(59,130,246,.08); box-shadow: 0 0 12px rgba(59,130,246,.35); }
+.detection-box span, .detection-box b { position: absolute; top: -18px; padding: 2px 4px; color: white; border-radius: 3px; background: rgba(15,23,42,.9); font-size: 7px; white-space: nowrap; }
+.detection-box span { left: -2px; }
+.detection-box b { right: -2px; color: #ffe3a8; }

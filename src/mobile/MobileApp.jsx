@@ -757,7 +757,7 @@ function Thermal3DScene({ frame, camera }) {
   )
 }
 
-function LivePlayer({ camera, frame, viewMode }) {
+function LivePlayer({ camera, frame, viewMode, detections = [] }) {
   const videoRef = useRef(null)
   const playerRef = useRef(null)
   const [currentTime, setCurrentTime] = useState(() => new Date().toLocaleString('zh-CN', { hour12: false }))
@@ -812,6 +812,7 @@ function LivePlayer({ camera, frame, viewMode }) {
       {viewMode !== 'thermal3d' && camera.type === 'mjpeg' && <img src={camera.url} alt={`${camera.name}实时监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'hls' && <video ref={videoRef} controls muted autoPlay playsInline />}
       <div className="live-grid" />
+      {viewMode === 'camera' && <div className="detection-layer">{detections.map((item, index) => { const box = item.bbox || [0, 0, 0.1, 0.1]; const label = item.class === 'smoke' ? '烟雾' : item.class === 'flame' || item.class === 'fire' ? '明火' : item.class === 'person' ? '人员' : '热点'; return <div className={`detection-box detection-${item.class}`} key={`${item.class}-${index}`} style={{ left: `${Number(box[0]) * 100}%`, top: `${Number(box[1]) * 100}%`, width: `${Number(box[2]) * 100}%`, height: `${Number(box[3]) * 100}%` }}><span>{label}</span><b>{Math.round(Number(item.confidence || 0) * 100)}%</b></div> })}</div>}
       {camera.type === 'demo' && <div className="live-scan" />}
       <div className="live-status"><i />{viewMode === 'campus' ? '科大数字孪生' : viewMode === 'building' ? '3D大楼模拟' : viewMode === 'thermal3d' || camera.type === 'sensor' ? '热感板联动' : camera.type === 'demo' ? '公开演示流' : camera.public ? '公开监控' : '本机监控'}</div>
       {viewMode !== 'thermal3d' && viewMode !== 'building' && viewMode !== 'campus' && camera.type !== 'sensor' && <div className="live-camera-name"><Video size={14} /><span>{camera.name}</span><small>{camera.location || '未设置位置'}</small></div>}
@@ -927,7 +928,8 @@ function DrillMode({ frame, onClose, onComplete }) {
         {phase === 'running' && <div className="drill-body">
           {countdown > 0 ? <div className="drill-countdown">{countdown}</div> : <div className="drill-running">
             <div className="drill-timer"><Clock3 size={15} />已用时 <strong>{elapsed}</strong> 秒</div>
-            {viewMode === 'campus' && <CampusBuildingPanel />}
+            <AIGatewayPanel url={aiGatewayUrl} onChange={onAIUrlChange} status={aiConnection} detections={aiDetections} onConnect={onConnectAI} onDisconnect={onDisconnectAI} />
+      {viewMode === 'campus' && <CampusBuildingPanel />}
       <DigitalTwinView frame={frame} route={route} />
             <button type="button" className="sheet-save" onClick={finishDrill}><CheckCircle2 size={16} />已完成撤离</button>
           </div>}
@@ -967,7 +969,27 @@ function CameraSheet({ editing, onClose, onSave }) {
   )
 }
 
-function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete, canShare, onShare, frame, connection, inference }) {
+function AIGatewayPanel({ url, onChange, status, detections, onConnect, onDisconnect }) {
+  const [draft, setDraft] = useState(url)
+  useEffect(() => setDraft(url), [url])
+  const connected = status === 'connected'
+  const labels = { smoke: '烟雾', flame: '明火', fire: '火焰', person: '人员', flame_or_hot_object: '高温物体' }
+  return (
+    <section className="mobile-card ai-gateway-card">
+      <div className="card-head"><div><strong>笔记本AI检测网关</strong><small>接收YOLO、烟雾、火焰和热区检测结果</small></div><BrainCircuit size={18} /></div>
+      <div className={`ai-gateway-status state-${status}`}><i />{connected ? 'AI网关在线' : status === 'connecting' ? '正在连接AI网关' : status === 'failed' ? '连接失败' : 'AI网关未连接'}<b>{detections.length} 个目标</b></div>
+      <label className="ai-gateway-input"><span>WebSocket 地址</span><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="ws://笔记本IP:8787/ws/detections" inputMode="url" autoCapitalize="none" /></label>
+      <div className="ai-gateway-actions">
+        <button type="button" onClick={() => { onChange(draft.trim()); onConnect(draft.trim()) }} disabled={!draft.trim()}>{connected ? <><Wifi size={14} />重新连接</> : <><Link2 size={14} />连接网关</>}</button>
+        <button type="button" onClick={onDisconnect} disabled={!connected}><WifiOff size={14} />断开</button>
+      </div>
+      {detections.length > 0 && <div className="ai-detection-chips">{detections.map((item, index) => <span key={`${item.class}-${index}`} className={`detection-${item.class}`}>{labels[item.class] || item.class} {Math.round(Number(item.confidence || 0) * 100)}%</span>)}</div>}
+      <p className="ai-gateway-note"><Info size={13} />正式 App 使用 HTTPS 时需要 wss://；本地演示可打开网关提供的 http://笔记本IP:8787/mobile-app.html。</p>
+    </section>
+  )
+}
+
+function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete, canShare, onShare, frame, connection, inference, aiGatewayUrl, onAIUrlChange, aiConnection, aiDetections, onConnectAI, onDisconnectAI }) {
   const [viewMode, setViewMode] = useState(() => initialCameraView() || (selectedCamera?.type === 'sensor' ? 'thermal3d' : 'camera'))
   const route = useMemo(() => planEvacuation(frame), [frame])
 
@@ -986,7 +1008,7 @@ function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete
         <button type="button" className={viewMode === 'building' ? 'active' : ''} onClick={() => setViewMode('building')}><Box size={14} />3D大楼</button>
         <button type="button" className={viewMode === 'campus' ? 'active' : ''} onClick={() => setViewMode('campus')}><Box size={14} />科大校园</button>
       </div>
-      <LivePlayer camera={selectedCamera} frame={frame} viewMode={viewMode} />
+      <LivePlayer camera={selectedCamera} frame={frame} viewMode={viewMode} detections={aiDetections} />
       <div className="camera-actions">
         <button type="button" className={canShare ? '' : 'disabled'} onClick={() => canShare && onShare(selectedCamera)}><Copy size={15} />分享当前监控</button>
         <button type="button" onClick={onAdd}><Plus size={15} />添加监控</button>
@@ -1007,6 +1029,7 @@ function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete
         {inference && <div className="thermal-inference-line"><span><Cpu size={13} />AI推理</span><b>{(inference.confidence * 100).toFixed(0)}% · {inference.stages[0]?.detail}</b></div>}
       </section>
 
+      <AIGatewayPanel url={aiGatewayUrl} onChange={onAIUrlChange} status={aiConnection} detections={aiDetections} onConnect={onConnectAI} onDisconnect={onDisconnectAI} />
       {viewMode === 'campus' && <CampusBuildingPanel />}
       <DigitalTwinView frame={frame} route={route} />
 
@@ -1183,9 +1206,14 @@ export default function MobileApp() {
   const [inference, setInference] = useState(() => computeInference(createFrame(), null, null))
   const [showDrill, setShowDrill] = useState(false)
   const [showCommandCenter, setShowCommandCenter] = useState(() => { try { return new URLSearchParams(window.location.search).get('cmd') === '1' } catch { return false } })
+  const [aiGatewayUrl, setAiGatewayUrl] = useState(() => { try { return localStorage.getItem('thermalGuardAIGateway') || 'ws://127.0.0.1:8787/ws/detections' } catch { return 'ws://127.0.0.1:8787/ws/detections' } })
+  const [aiConnection, setAiConnection] = useState('disconnected')
+  const [aiDetections, setAiDetections] = useState([])
   const previousFrameRef = useRef(null)
   const timerRef = useRef(null)
   const socketRef = useRef(null)
+  const aiSocketRef = useRef(null)
+  const aiAlertRef = useRef(0)
   const inputCameraRef = useRef(null)
   const inputGalleryRef = useRef(null)
 
@@ -1221,6 +1249,7 @@ export default function MobileApp() {
   useEffect(() => () => {
     clearInterval(timerRef.current)
     socketRef.current?.close()
+    aiSocketRef.current?.close()
   }, [])
 
   const handleImage = (file) => {
@@ -1305,6 +1334,51 @@ export default function MobileApp() {
     else setDevices((current) => [...current, { id: globalThis.crypto?.randomUUID?.() || `${Date.now()}`, ...values }])
   }
 
+  const disconnectAIGateway = () => {
+    aiSocketRef.current?.close()
+    aiSocketRef.current = null
+    setAiConnection('disconnected')
+    setAiDetections([])
+  }
+
+  const connectAIGateway = (url) => {
+    disconnectAIGateway()
+    let parsed
+    try { parsed = new URL(url) } catch { setAiConnection('failed'); setToast('AI网关地址格式不正确'); return }
+    if (location.protocol === 'https:' && parsed.protocol === 'ws:') {
+      setAiConnection('failed')
+      setToast('HTTPS页面需要 wss:// AI网关地址')
+      return
+    }
+    setAiConnection('connecting')
+    const socket = new WebSocket(url)
+    aiSocketRef.current = socket
+    socket.onopen = () => { setAiConnection('connected'); setToast('AI检测网关已连接') }
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        const detections = Array.isArray(payload.detections) ? payload.detections : []
+        setAiDetections(detections)
+        if (payload.hotspots?.length || payload.max_temp || payload.risk) {
+          setFrame((current) => ({
+            ...current,
+            maxTemp: Number(payload.max_temp ?? current.maxTemp),
+            risk: payload.risk || current.risk,
+            hotspots: payload.hotspots?.length ? payload.hotspots.map((spot) => ({ x: Number(spot.x || 0) * 100, y: Number(spot.y || 0) * 100, w: Number(spot.width || 0.15) * 100, h: Number(spot.height || 0.18) * 100, temp: Number(spot.temp ?? payload.max_temp ?? current.maxTemp) })) : current.hotspots,
+            source: payload.source || '笔记本AI网关',
+          }))
+        }
+        if (payload.risk === 'high' && Date.now() - aiAlertRef.current > 15000) {
+          aiAlertRef.current = Date.now()
+          setToast('AI网关识别到高风险火情')
+          setAlerts((current) => [{ id: `ai-${Date.now()}`, time: new Date().toLocaleString('zh-CN', { hour12: false }), risk: 'high', zone: payload.camera_id || 'AI监控区域', temp: Number(payload.max_temp || 0), hotspots: payload.hotspots?.length || 1 }, ...current].slice(0, 30))
+        }
+      } catch {}
+    }
+    socket.onerror = () => { setAiConnection('failed'); setToast('无法连接AI检测网关') }
+    socket.onclose = () => { if (aiSocketRef.current === socket) setAiConnection('disconnected') }
+  }
+
   const selectedCamera = cameras.find((camera) => camera.id === selectedCameraId) || cameras[0]
 
   const saveCamera = (values) => {
@@ -1374,13 +1448,13 @@ export default function MobileApp() {
   }
 
   const page = useMemo(() => {
-    if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} inference={inference} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
+    if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} inference={inference} aiGatewayUrl={aiGatewayUrl} onAIUrlChange={setAiGatewayUrl} aiConnection={aiConnection} aiDetections={aiDetections} onConnectAI={connectAIGateway} onDisconnectAI={disconnectAIGateway} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
     if (activeTab === 'alerts') return <AlertsPage alerts={alerts} onExportEvidence={exportEvidence} />
     if (activeTab === 'dashboard') return <DashboardPage frame={frame} inference={inference} onOpenCommand={() => setShowCommandCenter(true)} />
     if (activeTab === 'guide') return <CompassPage frame={frame} />
     if (activeTab === 'about') return <AboutPage onStartDrill={() => setShowDrill(true)} />
     return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} inference={inference} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
-  }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, frame, connection, inference, image, fileName, detecting, progress, detected, result, phase])
+  }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, frame, connection, inference, aiGatewayUrl, aiConnection, aiDetections, image, fileName, detecting, progress, detected, result, phase])
 
   return (
     <div className="mobile-app-shell">
