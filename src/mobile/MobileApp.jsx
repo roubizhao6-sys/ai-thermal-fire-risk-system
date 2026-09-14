@@ -105,6 +105,7 @@ function initialActiveTab() {
   try {
     const params = new URLSearchParams(window.location.search)
     if (params.get('cmd') === '1') return 'dashboard'
+    if (params.get('view') === 'guide' || params.get('guide') === '1') return 'guide'
     if (params.get('camera') || params.get('view') === 'camera') return 'camera'
   } catch {}
   return 'home'
