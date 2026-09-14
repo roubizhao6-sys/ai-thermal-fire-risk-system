@@ -100,6 +100,15 @@ function initialActiveTab() {
   return 'home'
 }
 
+function initialCameraView() {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('scene') === 'campus') return 'campus'
+    if (params.get('scene') === 'building') return 'building'
+  } catch {}
+  return null
+}
+
 function initialCameraState() {
   let base = defaultCameras
   try {
@@ -876,11 +885,11 @@ function CameraSheet({ editing, onClose, onSave }) {
 }
 
 function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete, canShare, onShare, frame, connection, inference }) {
-  const [viewMode, setViewMode] = useState(selectedCamera?.type === 'sensor' ? 'thermal3d' : 'camera')
+  const [viewMode, setViewMode] = useState(() => initialCameraView() || (selectedCamera?.type === 'sensor' ? 'thermal3d' : 'camera'))
   const route = useMemo(() => planEvacuation(frame), [frame])
 
   useEffect(() => {
-    setViewMode(selectedCamera?.type === 'sensor' ? 'thermal3d' : 'camera')
+    setViewMode(initialCameraView() || (selectedCamera?.type === 'sensor' ? 'thermal3d' : 'camera'))
   }, [selectedCamera?.id, selectedCamera?.type])
 
   const canSwitchView = selectedCamera?.type !== 'sensor'
