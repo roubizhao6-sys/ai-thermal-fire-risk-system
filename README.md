@@ -21,8 +21,8 @@ https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/
 
 安装包下载：[最新 GitHub Release](https://github.com/roubizhao6-sys/ai-thermal-fire-risk-system/releases/latest)
 
-- `AIThermalFireGuard-macOS-1.0.4.dmg`：推荐分享给其他 Mac 用户
-- `AIThermalFireGuard-macOS-1.0.4.zip`：ZIP 版本
+- `AIThermalFireGuard-macOS-1.0.5.dmg`：推荐分享给其他 Mac 用户
+- `AIThermalFireGuard-macOS-1.0.5.zip`：ZIP 版本
 - 支持 Intel 与 Apple Silicon
 - DMG 内包含 ESP32 示例固件和安装说明
 
@@ -35,7 +35,6 @@ https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/
 - 32×24 热成像矩阵与风险分级
 - SceneKit 3D 热源重建与实时监控
 - 指南针方向提示与推荐疏散路线
-- 本机账号密码登录与退出
 - 实验设备采购、接线与固件示例
 
 运行：

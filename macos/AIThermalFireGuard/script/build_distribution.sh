@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_NAME="AIThermalFireGuard"
-VERSION="1.0.4"
+VERSION="1.0.5"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/build/distribution"
 DERIVED_DIR="$BUILD_DIR/DerivedData"

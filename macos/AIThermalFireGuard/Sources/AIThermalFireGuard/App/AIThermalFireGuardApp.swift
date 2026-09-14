@@ -5,20 +5,11 @@ import SwiftUI
 struct AIThermalFireGuardApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = ThermalMonitorStore()
-    @StateObject private var authStore = AuthStore()
 
     var body: some Scene {
         WindowGroup("AI热感火警风险检测系统") {
-            Group {
-                if authStore.isAuthenticated {
-                    ContentView()
-                        .environmentObject(store)
-                        .environmentObject(authStore)
-                } else {
-                    LoginView()
-                        .environmentObject(authStore)
-                }
-            }
+            ContentView()
+                .environmentObject(store)
                 .frame(minWidth: 1180, minHeight: 760)
                 .preferredColorScheme(.dark)
         }

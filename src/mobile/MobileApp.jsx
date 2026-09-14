@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Building3DView from './Building3DView.jsx'
 import Campus3DView from './Campus3DView.jsx'
 import CampusBuildingPanel from './CampusBuildingPanel.jsx'
-import { useAuth } from './AuthGate.jsx'
 import {
   Activity,
   AlertTriangle,
@@ -61,7 +60,6 @@ import {
   Trash2,
   TrendingUp,
   Upload,
-  UserRound,
   Wifi,
   WifiOff,
   X,
@@ -458,7 +456,7 @@ function HomePage({ inputCameraRef, inputGalleryRef, image, fileName, detecting,
     <div className="mobile-page home-page">
       <header className="home-header">
         <div className="guard-pill"><Sparkles size={13} />AI 火警网警</div>
-        <h1>AI热感火警风险检测</h1>
+        <h1>燧瞳智感</h1>
         <p>超早期温度预警 · 多维度智能判断</p>
       </header>
 
@@ -1134,7 +1132,7 @@ function CommandCenter({ frame, inference, onClose, onStartDrill }) {
   }
   const downloadReport = () => {
     const report = {
-      system: 'AI热感火警风险检测系统',
+      system: '燧瞳智感 AI火警网警系统',
       generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       location: '澳门科技大学校园数字孪生',
       riskIndex,
@@ -1184,7 +1182,6 @@ function CommandCenter({ frame, inference, onClose, onStartDrill }) {
 }
 
 export default function MobileApp() {
-  const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [showDevices, setShowDevices] = useState(false)
   const [phase, setPhase] = useState(0)
@@ -1397,7 +1394,7 @@ export default function MobileApp() {
 
   const exportEvidence = (alert) => {
     const report = {
-      system: 'AI热感火警风险检测系统',
+      system: '燧瞳智感 AI火警网警系统',
       exportTime: new Date().toLocaleString('zh-CN', { hour12: false }),
       incident: {
         time: alert.time,
@@ -1412,7 +1409,7 @@ export default function MobileApp() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `热感哨兵-证据链-${alert.id || Date.now()}.json`
+    anchor.download = `燧瞳智感-证据链-${alert.id || Date.now()}.json`
     anchor.click()
     URL.revokeObjectURL(url)
     setToast('证据链报告已导出')
@@ -1462,8 +1459,8 @@ export default function MobileApp() {
   return (
     <div className="mobile-app-shell">
       <header className="mobile-topbar">
-        <div className="mobile-brand"><span><Flame size={19} /></span><div><strong>热感哨兵</strong><small>AI火警网警</small></div></div>
-        <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="退出登录" onClick={logout}><UserRound size={17} /></button><button type="button" aria-label="AI指挥中心" onClick={() => setShowCommandCenter(true)}><Siren size={18} /></button><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
+        <div className="mobile-brand"><span><Flame size={19} /></span><div><strong>燧瞳智感</strong><small>AI火警网警</small></div></div>
+        <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="AI指挥中心" onClick={() => setShowCommandCenter(true)}><Siren size={18} /></button><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
       </header>
       <main className="mobile-main">{page}</main>
       <nav className="mobile-tabs">
