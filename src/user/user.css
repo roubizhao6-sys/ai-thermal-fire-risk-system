@@ -63,7 +63,7 @@ p { margin: 0; }
 /* 表盘占屏幕的主要面积，居中 */
 .dial-wrap {
   position: relative;
-  width: min(84vw, 420px);
+  width: min(92vw, 468px);
   aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
@@ -87,33 +87,55 @@ p { margin: 0; }
 .needle-line.needle-alert { stroke: var(--alert); }
 .dial-pin { fill: var(--text-3); }
 
-/* 表盘正中的读数：一个数字当主角 */
+/* 表盘正中的读数：距离当主角，方向退到上面一行小字 */
 .dial-center {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
   text-align: center;
   pointer-events: none;
 }
-.heading {
+.dial-caption {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  font-variant-numeric: tabular-nums;
+}
+.dial-distance {
   display: flex;
   align-items: baseline;
-  gap: 4px;
-  font-variant-numeric: tabular-nums;
+  gap: 6px;
+  margin-top: 2px;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
-.heading .cardinal { font-size: 26px; font-weight: 600; color: var(--text-2); }
-.heading .degrees { font-size: 76px; font-weight: 300; letter-spacing: -.04em; }
-.heading .unit { font-size: 28px; font-weight: 300; color: var(--text-2); }
-.heading.is-alert .degrees, .heading.is-alert .unit { color: var(--alert); }
-.direction-word { margin-top: 2px; color: var(--text-2); font-size: 13px; letter-spacing: .06em; }
+.dial-distance .distance-value {
+  font-size: clamp(60px, 20vw, 88px);
+  font-weight: 300;
+  letter-spacing: -.045em;
+}
+.dial-distance .distance-unit { font-size: clamp(20px, 6vw, 26px); font-weight: 300; color: var(--text-2); }
+.dial-distance.is-alert .distance-value,
+.dial-distance.is-alert .distance-unit { color: var(--alert); }
+.dial-distance.is-blocked .distance-value { font-size: clamp(38px, 12vw, 54px); color: var(--alert); }
+.dial-time { margin-top: 6px; color: var(--text-3); font-size: 13px; font-variant-numeric: tabular-nums; }
 
-.meta { margin-top: 22px; display: flex; flex-direction: column; gap: 8px; width: 210px; text-align: left; }
-.meta > div { display: flex; justify-content: space-between; gap: 12px; }
-.meta span { color: var(--text-3); font-size: 12px; white-space: nowrap; }
-.meta strong { font-size: 12px; font-weight: 500; text-align: right; }
+/* 表盘下方两块读数，只用一条发丝线分隔 */
+.stage-readouts {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 18px;
+  width: 100%;
+  max-width: 360px;
+}
+.readout { display: flex; flex: 1; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.readout span { color: var(--text-3); font-size: 12px; }
+.readout strong { font-size: 15px; font-weight: 500; text-align: center; }
+.readout-wide strong { color: var(--text-2); font-size: 12px; font-weight: 400; line-height: 1.5; }
+.readout-sep { width: 1px; background: var(--separator); }
 
 .stage-note { color: var(--text-3); font-size: 12px; text-align: center; }
 

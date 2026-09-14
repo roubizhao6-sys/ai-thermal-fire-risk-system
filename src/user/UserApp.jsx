@@ -129,6 +129,16 @@ export default function UserApp() {
       : 0
     : 0
 
+  // 剩余楼层：以当前所在层与出口所在层的差值为准（下行取负）
+  const startFloor = BUILDING.nodes[route?.startId]?.floor ?? position.floor
+  const exitFloor = route?.ok ? (BUILDING.nodes[route.exitId]?.floor ?? startFloor) : startFloor
+  const floorDelta = exitFloor - startFloor
+  const remainingFloors = route?.ok
+    ? floorDelta === 0
+      ? '已在本层'
+      : `${Math.abs(floorDelta)} 层 · ${floorDelta < 0 ? '下行' : '上行'}`
+    : '—'
+
   const requestCompass = async () => {
     if (dialMode === 'device') {
       setDialMode('north')
@@ -175,25 +185,45 @@ export default function UserApp() {
           <CompassDial rotation={dialRotation} needle={needleRotation} alert={Boolean(fire)} />
 
           <div className="dial-center">
-            <div className={`heading ${fire ? 'is-alert' : ''}`}>
-              <span className="cardinal">{cardinal.short}</span>
-              <span className="degrees">{Math.round(bearing)}</span>
-              <span className="unit">°</span>
+            <div className="dial-caption">
+              {route?.ok ? `${cardinal.label} · ${Math.round(bearing)}°` : '通道受阻'}
             </div>
-            <div className="direction-word">{cardinal.label}方向</div>
 
-            <div className="meta">
-              <div><span>{fire ? '撤离至' : '最近出口'}</span><strong>{route?.ok ? route.exitLabel : '通道受阻'}</strong></div>
-              {route?.ok ? (
-                <>
-                  <div><span>距离</span><strong>{Math.round(route.meters)} 米 · 约 {formatDuration(route.seconds)}</strong></div>
-                  {nextStep && <div><span>下一步</span><strong>{nextStep.title}</strong></div>}
-                </>
-              ) : (
-                <div><span>提示</span><strong>{route?.reason}</strong></div>
-              )}
-            </div>
+            {route?.ok ? (
+              <>
+                <div className={`dial-distance ${fire ? 'is-alert' : ''}`}>
+                  <span className="distance-value">{Math.round(route.meters)}</span>
+                  <span className="distance-unit">米</span>
+                </div>
+                <div className="dial-time">约 {formatDuration(route.seconds)}</div>
+              </>
+            ) : (
+              <div className="dial-distance is-blocked">
+                <span className="distance-value">受阻</span>
+              </div>
+            )}
           </div>
+        </div>
+
+        <div className="stage-readouts">
+          {route?.ok ? (
+            <>
+              <div className="readout">
+                <span>{fire ? '撤离至' : '最近出口'}</span>
+                <strong>{route.exitLabel}</strong>
+              </div>
+              <div className="readout-sep" aria-hidden="true" />
+              <div className="readout">
+                <span>剩余楼层</span>
+                <strong>{remainingFloors}</strong>
+              </div>
+            </>
+          ) : (
+            <div className="readout readout-wide">
+              <span>提示</span>
+              <strong>{route?.reason || '等待定位'}</strong>
+            </div>
+          )}
         </div>
 
         <div className="stage-note">
