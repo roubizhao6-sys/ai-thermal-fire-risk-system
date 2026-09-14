@@ -260,6 +260,10 @@ export default function UserApp() {
   const cardinal = cardinalOf(bearing)
   const dialRotation = dialMode === 'device' && deviceHeading != null ? -deviceHeading : 0
   const needleRotation = bearing - dialRotation
+  // 接近度（0 远 → 1 就在跟前），用于放大箭头与提示状态；参考 Apple「查找附近」的距离+方向表达
+  const proximity = route?.ok ? Math.max(0, Math.min(1, 1 - route.meters / 120)) : 0
+  const atExit = Boolean(route?.ok && route.meters <= 6)
+  const proximityText = !route?.ok ? '' : atExit ? '就在这里' : proximity > 0.62 ? '就在附近' : proximity > 0.3 ? '接近中' : '按箭头前进'
 
   const nextStep = route?.ok ? route.steps.find((step) => step.icon !== 'pin') : null
   const distanceToNext = route?.ok && nextNode
@@ -358,7 +362,14 @@ export default function UserApp() {
 
       <main className="compass-stage">
         <div className="dial-wrap">
-          <CompassDial rotation={dialRotation} needle={needleRotation} alert={Boolean(fire)} label={dialLabel} />
+          <CompassDial
+            rotation={dialRotation}
+            needle={needleRotation}
+            alert={Boolean(fire)}
+            label={dialLabel}
+            proximity={proximity}
+            atExit={atExit}
+          />
 
           <div className="dial-center">
             <div className="dial-caption">
@@ -372,6 +383,7 @@ export default function UserApp() {
                   <span className="distance-unit">米</span>
                 </div>
                 <div className="dial-time">约 {formatDuration(route.seconds)}</div>
+                {proximityText && <div className={`dial-proximity ${atExit ? 'is-here' : ''}`}>{proximityText}</div>}
               </>
             ) : (
               <div className="dial-distance is-blocked">
@@ -477,7 +489,7 @@ export default function UserApp() {
 }
 
 // 表盘：外圈刻度 + 四向字母，中间留给读数，指针指向应走的方向
-function CompassDial({ rotation, needle, alert, label }) {
+function CompassDial({ rotation, needle, alert, label, proximity = 0, atExit = false }) {
   const ticks = []
   for (let degree = 0; degree < 360; degree += 5) {
     const major = degree % 45 === 0
@@ -518,11 +530,19 @@ function CompassDial({ rotation, needle, alert, label }) {
         })}
       </g>
       <g style={{ transform: `rotate(${needle}deg)`, transformOrigin: '120px 120px', transition: 'transform .45s cubic-bezier(.32,.72,0,1)' }}>
+        {/* 接近目标时出现的脉冲光环（参考 Apple 查找附近：越近越明显） */}
+        <circle
+          cx="120"
+          cy="120"
+          r={62 + 10 * proximity}
+          className={atExit ? 'aim-halo is-here' : 'aim-halo'}
+          style={{ opacity: 0.12 + 0.5 * proximity }}
+        />
         <polygon
-          points="120,22 130,56 110,56"
+          points="120,14 138,64 120,51 102,64"
           className={alert ? 'needle needle-alert' : 'needle'}
         />
-        <line x1="120" y1="56" x2="120" y2="104" className={alert ? 'needle-line needle-alert' : 'needle-line'} />
+        <line x1="120" y1="54" x2="120" y2="104" className={alert ? 'needle-line needle-alert' : 'needle-line'} />
       </g>
       <circle cx="120" cy="120" r="3" className="dial-pin" />
     </svg>

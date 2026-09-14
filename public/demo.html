@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#05080f" />
+    <title>热感哨兵 · 演示中心</title>
+    <style>
+      :root { color-scheme: dark; --bg:#05080f; --panel:#0d1622; --line:rgba(56,189,248,.22); --text:#eef6ff; --muted:#8aa6c4; --accent:#38bdf8; --warn:#f59e0b; --danger:#ff3b30; }
+      * { box-sizing: border-box; }
+      body { margin:0; background: radial-gradient(circle at 80% 0, rgba(37,99,235,.22), transparent 34%), radial-gradient(circle at 10% 90%, rgba(239,68,68,.12), transparent 32%), var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
+      main { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 72px; }
+      h1 { margin: 0 0 10px; font-size: 34px; letter-spacing: -.03em; }
+      .lead { margin: 0 0 26px; color: var(--muted); font-size: 15px; line-height: 1.8; }
+      .cta { display: flex; flex-direction: column; gap: 10px; padding: 18px; border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(145deg, rgba(21,38,64,.9), rgba(7,16,31,.92)); }
+      .cta a.primary { display: flex; align-items: center; justify-content: center; min-height: 54px; color: #04121f; border-radius: 14px; background: linear-gradient(110deg, #38bdf8, #7dd3fc); font-size: 17px; font-weight: 800; text-decoration: none; }
+      .cta small { color: var(--muted); font-size: 12px; line-height: 1.6; }
+      .grid { display: grid; gap: 12px; margin-top: 24px; }
+      .card { padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+      .card h2 { margin: 0 0 6px; font-size: 17px; }
+      .card p { margin: 0 0 10px; color: var(--muted); font-size: 13px; line-height: 1.75; }
+      .card .links { display: flex; flex-wrap: wrap; gap: 8px; }
+      .card a { padding: 8px 12px; color: #cfe8ff; border: 1px solid var(--line); border-radius: 10px; background: rgba(37,99,235,.14); font-size: 12px; text-decoration: none; }
+      .tips { margin-top: 26px; padding: 16px 18px; border: 1px solid rgba(245,158,11,.28); border-radius: 16px; background: rgba(245,158,11,.07); color: #f0d3a6; font-size: 12px; line-height: 1.8; }
+      code { color: #93c5fd; }
+      @media (max-width: 520px) { h1 { font-size: 27px; } main { padding-top: 30px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>热感哨兵 · 演示中心</h1>
+      <p class="lead">
+        一套完整闭环：热像 AI 检测 → 分级报警（含火情位置）→ 校园三维态势 → 每层人流监看 → 双端逃生指引。
+        下面既可以一键连播，也可以按步骤单独演示。
+      </p>
+
+      <div class="cta">
+        <a class="primary" href="./mobile-app.html?demo=1">▶ 一键演示（自动连播 5 步）</a>
+        <small>自动流程：① 载入示例并开始检测 → ② 触发全屏报警（显示火情位置）→ ③ 火势蔓延成多火源 → ④ 切到逃生页看每层人流 → ⑤ 提示打开用户端。约 30 秒走完。</small>
+      </div>
+
+      <div class="grid">
+        <section class="card">
+          <h2>1 · 检测：热像异常识别</h2>
+          <p>“这里用手机或 ESP32 热像矩阵采集，AI 在明火和烟雾出现前就识别温度异常，并给出风险等级。”<br />可现场切三种工况：正常运行 / 缓慢升温 / 高温火情。</p>
+          <div class="links">
+            <a href="./mobile-app.html">打开系统端（检测页）</a>
+            <a href="./mobile-app.html?demo=1">从这一步开始自动演示</a>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>2 · 报警：全屏警报 + 火情具体位置</h2>
+          <p>“高风险会立刻弹出全屏警报（警笛 + 语音 + 震动），并直接把<b>火情位置</b>写到警报上：楼栋 + 楼层 + 位置，例如「R座綜合教學大樓 4 樓」。”</p>
+          <div class="links">
+            <a href="./mobile-app.html?demo=1">一键演示（自动触发报警）</a>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>3 · 校园三维态势（含航拍底图）</h2>
+          <p>“地图页是澳门科技大学校园微缩模型，底面铺的是真实航拍影像；点任意楼体进入楼层视角，可逐层切换、放大到该楼层、楼层展开。火源所在楼层整层标红。”</p>
+          <div class="links">
+            <a href="./mobile-app.html">打开「地图」标签</a>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>4 · 人流监看：每层实时人数</h2>
+          <p>“逃生页里新增了人流监看：每层剩余人数、撤离进度、两条楼梯的通行量与人/秒都在实时变化；封锁 A 梯后能看到 B 梯排队、清空时间变长。”</p>
+          <div class="links">
+            <a href="./mobile-app.html?demo=1">连播到第 4 步</a>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>5 · 用户端：极简表盘（距离 + 方向）</h2>
+          <p>“用户端只有一个表盘：一个数字告诉你还有多远、箭头指向往哪走、下面写剩余楼层。箭头参考 Apple「查找附近」的距离+方向表达，越接近出口光环越明显。”</p>
+          <div class="links">
+            <a href="./user-app.html">打开用户端</a>
+            <a href="./mobile-app.html">系统端（同屏演示双端联动）</a>
+          </div>
+        </section>
+      </div>
+
+      <div class="tips">
+        演示建议：<br />
+        ① 系统端与用户端在<b>同一浏览器</b>里各开一个标签页，报警会通过本地存储即时同步到用户端；<br />
+        ② 手机上想要全屏体验，用 Safari/Chrome 打开后「添加到主屏幕」；<br />
+        ③ 校园航拍影像来自公开影像服务（Esri World Imagery），正式投稿前请核对署名要求。
+      </div>
+    </main>
+  </body>
+</html>

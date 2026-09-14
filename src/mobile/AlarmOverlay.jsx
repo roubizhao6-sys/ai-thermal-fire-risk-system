@@ -18,6 +18,7 @@ export default function AlarmOverlay({
   onStopDrill,
   onSpreadFire,
   onEnableSound,
+  locationDetail,
 }) {
   if (!alarm) return null
 
@@ -40,6 +41,11 @@ export default function AlarmOverlay({
           <div className="alarm-icon"><Flame size={46} strokeWidth={2.2} /></div>
           <h2>火警警报</h2>
           <p className="alarm-location">{alarm.location}</p>
+          {locationDetail && (
+            <p className="alarm-location-detail">
+              <Flame size={14} />火情位置 · {locationDetail}
+            </p>
+          )}
           <p className="alarm-lead">
             {acknowledged ? '已静音，但危险仍未解除' : isDrill ? '这是一次演练，请按指引撤离' : '立即沿逃生路线撤离，切勿搭乘电梯'}
           </p>

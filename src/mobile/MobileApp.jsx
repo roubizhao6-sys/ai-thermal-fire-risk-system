@@ -62,10 +62,11 @@ import AlarmOverlay from './AlarmOverlay.jsx'
 import CityMap from './CityMap.jsx'
 import EvacuationView from './EvacuationView.jsx'
 import { SPOT_MAPPING_NOTE, campusLocationForNode } from './campus.js'
+import { advanceCrowd, createCrowdState } from './crowd.js'
 
 // 3D 引擎（three.js）体积较大，只有打开校园三维视图时才加载
 const Campus3D = lazy(() => import('./Campus3D.jsx'))
-import { FLOOR_COUNT, positionNodeId } from './building.js'
+import { BUILDING, FLOOR_COUNT, positionNodeId } from './building.js'
 import { planRoute } from './evacuation.js'
 import { DEFAULT_THRESHOLDS, createFrame, normalizePacket, riskFromMaxTemp } from './thermal.js'
 import {
@@ -758,6 +759,8 @@ export default function MobileApp() {
   const [dashView, setDashView] = useState('dashboard')
   const [mapView, setMapView] = useState('campus')
   const [campusPick, setCampusPick] = useState(null)
+  const [crowd, setCrowd] = useState(() => createCrowdState())
+  const [demoStep, setDemoStep] = useState(0)
   const [alarm, setAlarm] = useState(null)
   const [overlayOpen, setOverlayOpen] = useState(false)
   const [fire, setFire] = useState(null)
@@ -968,6 +971,103 @@ export default function MobileApp() {
     const list = Array.isArray(fire.nodes) && fire.nodes.length ? fire.nodes : [fire.nodeId]
     return list.filter(Boolean).map((nodeId) => ({ nodeId }))
   }, [fire])
+
+  // 人流：报警时每秒推进一次；封锁的节点（如 A4 = A 梯）折算成楼梯封锁，直接影响通行能力
+  const blockedStairIds = useMemo(
+    () => [...new Set((blockedNodes ?? []).map((nodeId) => String(nodeId)[0]).filter((spot) => spot === 'A' || spot === 'B'))],
+    [blockedNodes],
+  )
+  const floorOfNode = (nodeId, fallback = position.floor) => BUILDING?.nodes?.[nodeId]?.floor ?? fallback
+  const fireFloorForCrowd = fire ? floorOfNode(fire.nodeId, fire.floor ?? position.floor) : null
+  const fireLocationDetail = fire
+    ? `${campusLocationForNode(fire.nodeId)?.label ?? `${fireFloorForCrowd} 楼`}${fire.floor ? `（${fire.floor} 楼·${fire.nodeId}）` : `（${fire.nodeId}）`}`
+    : null
+  useEffect(() => {
+    if (!fire) {
+      setCrowd((current) => (current.alarm ? createCrowdState() : current))
+      return undefined
+    }
+    const timer = window.setInterval(() => {
+      setCrowd((current) => advanceCrowd(current, 1, {
+        alarm: true,
+        fireFloor: floorOfNode(fire.nodeId, fire.floor ?? position.floor),
+        blockedStairs: blockedStairIds,
+      }))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [fire, blockedStairIds, position.floor])
+
+  // ?demo=1 一键演示：按脚本自动推进「检测 → 报警 → 蔓延 → 人流 → 用户端」
+  const demoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1'
+  useEffect(() => {
+    if (!demoMode) return undefined
+    const timers = []
+    const plan = [
+      {
+        at: 900,
+        step: 1,
+        label: '载入示例热像图并开始 AI 检测',
+        run: () => {
+          setImage(DEMO_THERMAL)
+          setFileName('示例热成像-01.jpg')
+          setDetected(false)
+          window.setTimeout(() => runDetection(), 500)
+        },
+      },
+      {
+        at: 7000,
+        step: 2,
+        label: '检测判定高风险 → 自动触发全屏报警（含火情位置）',
+        run: () => {
+          const floor = 4
+          const startedAt = Date.now()
+          setFire({ nodeId: `C${floor}`, floor, startedAt, mode: 'live' })
+          pushAlarm({
+            mode: 'live',
+            startedAt,
+            temp: 78.4,
+            hotspots: 3,
+            location: `综合教学楼 ${floor} 楼走廊中段`,
+            sourceLabel: '热成像 AI 检测',
+          })
+        },
+      },
+      {
+        at: 14000,
+        step: 3,
+        label: '火势蔓延到上一层 → 多火源同时避开',
+        run: () => setFire((current) => {
+          if (!current) return current
+          const nodes = Array.isArray(current.nodes) && current.nodes.length ? current.nodes : [current.nodeId]
+          const topFloor = Math.max(...nodes.map((id) => Number(String(id).replace(/\D/g, '')) || 1))
+          if (topFloor >= FLOOR_COUNT) return current
+          return { ...current, nodes: [...nodes, `C${topFloor + 1}`] }
+        }),
+      },
+      {
+        at: 21000,
+        step: 4,
+        label: '看每层人流与楼梯负载（逃生页 · 人流监看）',
+        run: () => {
+          setOverlayOpen(false)
+          setActiveTab('evacuation')
+        },
+      },
+      {
+        at: 30000,
+        step: 5,
+        label: '同一浏览器打开用户端：极简表盘 + 距离/方向指引',
+        run: () => setNotice({ id: Date.now(), text: '演示结束：可切到「用户端」标签查看极简逃生指引（距离+方向）', tone: 'info' }),
+      },
+    ]
+    plan.forEach((item) => {
+      timers.push(window.setTimeout(() => {
+        setDemoStep(item.step)
+        item.run()
+      }, item.at))
+    })
+    return () => timers.forEach((id) => window.clearTimeout(id))
+  }, [demoMode])
 
   const alarmActive = Boolean(alarm && !alarm.acknowledged)
   const alarmId = alarm?.id
@@ -1275,6 +1375,7 @@ export default function MobileApp() {
           position={position}
           blocked={blockedNodes}
           nowMs={nowMs}
+          crowd={crowd}
           onPositionChange={setPosition}
           onToggleBlock={toggleBlockedNode}
           onStartDrillAt={(nodeId, floor) => startDrill(floor, nodeId[0])}
@@ -1289,6 +1390,14 @@ export default function MobileApp() {
 
   return (
     <div className={`mobile-app-shell ${alarm ? 'has-alarm' : ''}`}>
+      {demoMode && demoStep > 0 && (
+        <div className="demo-banner">
+          <span className="demo-badge">演示 {demoStep}/5</span>
+          <span className="demo-text">
+            {['', '载入示例热像图并开始 AI 检测', '检测判定高风险 → 触发全屏报警（含火情位置）', '火势蔓延到上一层 → 多火源同时避开', '看每层人流与楼梯负载（人流监看）', '切到用户端看极简表盘（距离 + 方向）'][demoStep]}
+          </span>
+        </div>
+      )}
       <header className={`mobile-topbar ${scrolled ? 'is-scrolled' : ''}`}>
         <div className="mobile-brand"><span><Flame size={19} /></span><div><strong>热感哨兵</strong><small>AI火警网警</small></div></div>
         <span className="nav-title">
@@ -1356,6 +1465,7 @@ export default function MobileApp() {
           nowMs={nowMs}
           soundOn={settings.sound}
           audioReady={audioReady}
+          locationDetail={fireLocationDetail}
           onEvacuate={() => {
             setOverlayOpen(false)
             setActiveTab('evacuation')

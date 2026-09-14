@@ -17,6 +17,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { BUILDING, FLOOR_COUNT, positionNodeId } from './building.js'
+import CrowdPanel from './CrowdPanel.jsx'
 import { HAZARD_META } from './evacuation.js'
 import FloorPlan from './FloorPlan.jsx'
 import FollowMode from './FollowMode.jsx'
@@ -46,7 +47,7 @@ function formatDuration(seconds) {
   return `约 ${minutes} 分 ${String(seconds % 60).padStart(2, '0')} 秒`
 }
 
-export default function EvacuationView({ route, fire, position, blocked, nowMs, onPositionChange, onToggleBlock, onStartDrillAt, onSpreadFire, onClearFire }) {
+export default function EvacuationView({ route, fire, position, blocked, nowMs, crowd, onPositionChange, onToggleBlock, onStartDrillAt, onSpreadFire, onClearFire }) {
   const [viewFloor, setViewFloor] = useState(position.floor)
   const [follow, setFollow] = useState(false)
 
@@ -236,6 +237,8 @@ export default function EvacuationView({ route, fire, position, blocked, nowMs, 
         </div>
         <p className="card-hint">被封锁的节点会在平面图上标记为 ✕，路线将自动改走其他楼梯。</p>
       </section>
+
+      {crowd && <CrowdPanel crowd={crowd} alarmActive={Boolean(fire)} />}
 
       <section className="mobile-card">
         <div className="card-title"><div><strong>火情演练</strong><small>以当前楼层作为起火点，可蔓延出多火源</small></div><Flame size={18} /></div>
