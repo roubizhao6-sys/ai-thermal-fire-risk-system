@@ -28,6 +28,19 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 p { margin: 0; }
 :focus-visible { outline: 2px solid var(--alert); outline-offset: 3px; border-radius: 8px; }
 
+/* 只给读屏软件的一句话状态：视觉上不存在，但会被播报 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .compass-app {
   position: relative;
   display: flex;

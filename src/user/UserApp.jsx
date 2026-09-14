@@ -2,7 +2,7 @@
 // 设计参考 iOS 自带「指南针」：单屏、一个大表盘、读数在表盘正中、几乎没有卡片与按钮。
 // 全部信息压缩成三件事：往哪个方向走、还有多远、走哪条楼梯。
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BUILDING, positionNodeId } from '../mobile/building.js'
 import { planRoute } from '../mobile/evacuation.js'
 
@@ -68,6 +68,7 @@ export default function UserApp() {
   const [dialMode, setDialMode] = useState('north') // north = 固定指北；device = 跟随手机朝向
   const [deviceHeading, setDeviceHeading] = useState(null)
   const [hint, setHint] = useState('')
+  const sheetTitleRef = useRef(null)
 
   useEffect(() => {
     localStorage.setItem('thermalGuardUserPosition', JSON.stringify(position))
@@ -106,6 +107,20 @@ export default function UserApp() {
     return () => window.removeEventListener('deviceorientation', onOrientation, true)
   }, [dialMode])
 
+  // 位置弹层：打开时把焦点交给标题，Esc 可关闭
+  useEffect(() => {
+    if (sheetOpen) sheetTitleRef.current?.focus()
+  }, [sheetOpen])
+
+  useEffect(() => {
+    if (!sheetOpen) return undefined
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setSheetOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [sheetOpen])
+
   const elapsedSec = fire ? Math.max(0, (nowMs - fire.startedAt) / 1000) : 0
   const route = useMemo(
     () => planRoute({ startId: positionNodeId(position.floor, position.spot), fire, elapsedSec }),
@@ -138,6 +153,14 @@ export default function UserApp() {
       ? '已在本层'
       : `${Math.abs(floorDelta)} 层 · ${floorDelta < 0 ? '下行' : '上行'}`
     : '—'
+
+  // 给读屏软件的一句话状态：只随路线变化，不随秒数跳动，避免每秒重复播报
+  const statusText = route?.ok
+    ? `${fire ? '火警，请立即撤离。' : '当前无火警。'}撤离至 ${route.exitLabel}，${Math.round(route.meters)} 米，约 ${formatDuration(route.seconds)}，${floorDelta === 0 ? '已在本层' : `剩余 ${Math.abs(floorDelta)} 层，${floorDelta < 0 ? '下行' : '上行'}`}。`
+    : `${fire ? '火警。' : ''}${route?.reason || '正在定位当前位置'}`
+  const dialLabel = route?.ok
+    ? `撤离方向表盘：目标${cardinal.label}方向，距离 ${Math.round(route.meters)} 米`
+    : '撤离方向表盘：通道受阻'
 
   const requestCompass = async () => {
     if (dialMode === 'device') {
@@ -180,9 +203,13 @@ export default function UserApp() {
         </div>
       )}
 
+      <p className="sr-only" role="status" aria-live={fire ? 'assertive' : 'polite'} aria-atomic="true">
+        {statusText}
+      </p>
+
       <main className="compass-stage">
         <div className="dial-wrap">
-          <CompassDial rotation={dialRotation} needle={needleRotation} alert={Boolean(fire)} />
+          <CompassDial rotation={dialRotation} needle={needleRotation} alert={Boolean(fire)} label={dialLabel} />
 
           <div className="dial-center">
             <div className="dial-caption">
@@ -205,21 +232,21 @@ export default function UserApp() {
           </div>
         </div>
 
-        <div className="stage-readouts">
+        <div className="stage-readouts" role="list">
           {route?.ok ? (
             <>
-              <div className="readout">
+              <div className="readout" role="listitem">
                 <span>{fire ? '撤离至' : '最近出口'}</span>
                 <strong>{route.exitLabel}</strong>
               </div>
               <div className="readout-sep" aria-hidden="true" />
-              <div className="readout">
+              <div className="readout" role="listitem">
                 <span>剩余楼层</span>
                 <strong>{remainingFloors}</strong>
               </div>
             </>
           ) : (
-            <div className="readout readout-wide">
+            <div className="readout readout-wide" role="listitem">
               <span>提示</span>
               <strong>{route?.reason || '等待定位'}</strong>
             </div>
@@ -234,37 +261,51 @@ export default function UserApp() {
       </main>
 
       <footer className="compass-tools">
-        <button type="button" onClick={toggleDrill}>{fire ? '结束演练' : '演练'}</button>
+        <button type="button" onClick={toggleDrill} aria-pressed={Boolean(fire)}>{fire ? '结束演练' : '演练'}</button>
         <button type="button" onClick={() => setSheetOpen(true)}>我的位置</button>
-        <button type="button" onClick={requestCompass}>{dialMode === 'device' ? '指北' : '罗盘'}</button>
+        <button
+          type="button"
+          onClick={requestCompass}
+          aria-label={dialMode === 'device' ? '固定指北' : '跟随手机朝向'}
+        >
+          {dialMode === 'device' ? '指北' : '罗盘'}
+        </button>
       </footer>
 
       {hint && <div className="compass-toast">{hint}</div>}
 
       {sheetOpen && (
         <div className="sheet-backdrop" onClick={() => setSheetOpen(false)}>
-          <section className="position-sheet" onClick={(event) => event.stopPropagation()}>
+          <section
+            className="position-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="position-sheet-title"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="sheet-handle" />
-            <h2>我的位置</h2>
+            <h2 id="position-sheet-title" tabIndex={-1} ref={sheetTitleRef}>我的位置</h2>
             <p>实际部署时由蓝牙信标自动定位，这里用于演示手动选点。</p>
-            <div className="floor-row-picker">
+            <div className="floor-row-picker" role="group" aria-label="选择楼层">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((floor) => (
                 <button
                   key={floor}
                   type="button"
                   className={position.floor === floor ? 'active' : ''}
+                  aria-pressed={position.floor === floor}
                   onClick={() => setPosition((current) => ({ ...current, floor }))}
                 >
                   {floor}
                 </button>
               ))}
             </div>
-            <div className="spot-row-picker">
+            <div className="spot-row-picker" role="group" aria-label="选择位置">
               {SPOTS.map((spot) => (
                 <button
                   key={spot.id}
                   type="button"
                   className={position.spot === spot.id ? 'active' : ''}
+                  aria-pressed={position.spot === spot.id}
                   onClick={() => setPosition((current) => ({ ...current, spot: spot.id }))}
                 >
                   {spot.label}
@@ -280,7 +321,7 @@ export default function UserApp() {
 }
 
 // 表盘：外圈刻度 + 四向字母，中间留给读数，指针指向应走的方向
-function CompassDial({ rotation, needle, alert }) {
+function CompassDial({ rotation, needle, alert, label }) {
   const ticks = []
   for (let degree = 0; degree < 360; degree += 5) {
     const major = degree % 45 === 0
@@ -304,7 +345,7 @@ function CompassDial({ rotation, needle, alert }) {
   }
 
   return (
-    <svg className="compass-dial" viewBox="0 0 240 240" role="img" aria-label="撤离方向表盘">
+    <svg className="compass-dial" viewBox="0 0 240 240" role="img" aria-label={label}>
       <g style={{ transform: `rotate(${rotation}deg)`, transformOrigin: '120px 120px', transition: 'transform .25s ease-out' }}>
         <circle cx="120" cy="120" r="104" className="dial-ring" />
         {ticks}
