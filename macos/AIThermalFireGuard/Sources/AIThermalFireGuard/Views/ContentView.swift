@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var store: ThermalMonitorStore
+    @EnvironmentObject private var authStore: AuthStore
 
     var body: some View {
         NavigationSplitView {
@@ -27,6 +28,13 @@ struct ContentView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(.regularMaterial, in: Capsule())
+
+                Button {
+                    authStore.logout()
+                } label: {
+                    Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+                .help("退出当前本机账号")
 
                 Button {
                     store.isMonitoring.toggle()

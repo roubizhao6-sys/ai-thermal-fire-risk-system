@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Building3DView from './Building3DView.jsx'
 import Campus3DView from './Campus3DView.jsx'
 import CampusBuildingPanel from './CampusBuildingPanel.jsx'
+import { useAuth } from './AuthGate.jsx'
 import {
   Activity,
   AlertTriangle,
@@ -60,6 +61,7 @@ import {
   Trash2,
   TrendingUp,
   Upload,
+  UserRound,
   Wifi,
   WifiOff,
   X,
@@ -1182,6 +1184,7 @@ function CommandCenter({ frame, inference, onClose, onStartDrill }) {
 }
 
 export default function MobileApp() {
+  const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [showDevices, setShowDevices] = useState(false)
   const [phase, setPhase] = useState(0)
@@ -1460,7 +1463,7 @@ export default function MobileApp() {
     <div className="mobile-app-shell">
       <header className="mobile-topbar">
         <div className="mobile-brand"><span><Flame size={19} /></span><div><strong>热感哨兵</strong><small>AI火警网警</small></div></div>
-        <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="AI指挥中心" onClick={() => setShowCommandCenter(true)}><Siren size={18} /></button><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
+        <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="退出登录" onClick={logout}><UserRound size={17} /></button><button type="button" aria-label="AI指挥中心" onClick={() => setShowCommandCenter(true)}><Siren size={18} /></button><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
       </header>
       <main className="mobile-main">{page}</main>
       <nav className="mobile-tabs">

@@ -1,11 +1,12 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import MobileApp from './MobileApp.jsx'
+import AuthGate from './AuthGate.jsx'
 import './mobile.css'
 
 createRoot(document.getElementById('mobile-root')).render(
   <React.StrictMode>
-    <MobileApp />
+    <AuthGate><MobileApp /></AuthGate>
   </React.StrictMode>
 )
 

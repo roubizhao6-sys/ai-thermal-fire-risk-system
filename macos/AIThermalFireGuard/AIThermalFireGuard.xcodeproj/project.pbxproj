@@ -18,6 +18,8 @@
 		254013107B31571AF3694AC1 /* AppSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EF0F537B646EBC2AA992C36 /* AppSection.swift */; };
 		26A0DB5CBF475636AB04BBD2 /* ThermalGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C26052F3C5D0AF673E3693 /* ThermalGridView.swift */; };
 		37FB9C9BE932B615E4F5F28D /* PanelCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F94362609B0C9F14CA6A2DC /* PanelCard.swift */; };
+		4C132FEB4A33D987773D815A /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC10CA302CA45F4AAAF556C6 /* LoginView.swift */; };
+		7908172F346C97AC86B5EA3A /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA26ABC4461690D02C213C0B /* AuthStore.swift */; };
 		7D8106A9D6F86D446EA175CA /* MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB099E1E16E07F71F4B5B67 /* MetricCard.swift */; };
 		806D4AF19F8A7D004D4D8156 /* RiskBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398F72AB794BDEDCA08417DB /* RiskBadge.swift */; };
 		A79E9FB6D3E1A915F918FCB5 /* ThermalModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B91548BE924226D89D885F26 /* ThermalModels.swift */; };
@@ -49,6 +51,7 @@
 		98475304E7D34DD662F6528E /* Thermal3DSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Thermal3DSceneView.swift; sourceTree = "<group>"; };
 		98BEE512A3164B73EAA81A24 /* SimulatorHardwareClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulatorHardwareClient.swift; sourceTree = "<group>"; };
 		99241E2EE8F48653074BA840 /* LiveMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMonitorView.swift; sourceTree = "<group>"; };
+		AA26ABC4461690D02C213C0B /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		AFE9305B5857FE2552461A7B /* EvacuationGuidanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvacuationGuidanceView.swift; sourceTree = "<group>"; };
 		B91548BE924226D89D885F26 /* ThermalModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalModels.swift; sourceTree = "<group>"; };
 		D11B09E28CC9E84CDFE59ED5 /* SerialHardwareClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialHardwareClient.swift; sourceTree = "<group>"; };
@@ -56,6 +59,7 @@
 		D8DB9EE030732D47693520E4 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		DEB099E1E16E07F71F4B5B67 /* MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCard.swift; sourceTree = "<group>"; };
 		E23461BBE5C4D2343484FD74 /* HardwareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareView.swift; sourceTree = "<group>"; };
+		EC10CA302CA45F4AAAF556C6 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		EC827076426E049F456C8555 /* AIThermalFireGuardApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIThermalFireGuardApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -79,6 +83,7 @@
 		3DC1E249FA55703B3824071C /* Stores */ = {
 			isa = PBXGroup;
 			children = (
+				AA26ABC4461690D02C213C0B /* AuthStore.swift */,
 				72A077293E050CEEE044C66B /* ThermalMonitorStore.swift */,
 			);
 			path = Stores;
@@ -143,6 +148,7 @@
 				0D7F817614B2F0A645C16816 /* ExperimentGuideView.swift */,
 				E23461BBE5C4D2343484FD74 /* HardwareView.swift */,
 				99241E2EE8F48653074BA840 /* LiveMonitorView.swift */,
+				EC10CA302CA45F4AAAF556C6 /* LoginView.swift */,
 				86FDBB89CD7A2FE140F8076A /* SettingsView.swift */,
 				D7965EFA57F0367001C9384E /* SidebarView.swift */,
 				E98A3743B0DAA828084C0981 /* Components */,
@@ -231,6 +237,7 @@
 				CF76FC76C0D47123CA33AB6F /* AIThermalFireGuardApp.swift in Sources */,
 				00E887A8EC359688EA6D07A6 /* AlertsView.swift in Sources */,
 				254013107B31571AF3694AC1 /* AppSection.swift in Sources */,
+				7908172F346C97AC86B5EA3A /* AuthStore.swift in Sources */,
 				CDC06CDC5555FA3817269946 /* ContentView.swift in Sources */,
 				20F92EBA2200C59F3CB9C005 /* DashboardView.swift in Sources */,
 				0240F772CE217658AF24558B /* EvacuationGuidanceView.swift in Sources */,
@@ -238,6 +245,7 @@
 				B5CD9306EE9CBFE718CA7C19 /* HardwareClient.swift in Sources */,
 				0FA9501C8C24CC9D1BA25F14 /* HardwareView.swift in Sources */,
 				03CD6894BBCAF401CFE3AB10 /* LiveMonitorView.swift in Sources */,
+				4C132FEB4A33D987773D815A /* LoginView.swift in Sources */,
 				7D8106A9D6F86D446EA175CA /* MetricCard.swift in Sources */,
 				37FB9C9BE932B615E4F5F28D /* PanelCard.swift in Sources */,
 				806D4AF19F8A7D004D4D8156 /* RiskBadge.swift in Sources */,
@@ -264,14 +272,14 @@
 				CODE_SIGN_ENTITLEMENTS = AppStore/AIThermalFireGuard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = AppStore/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.thermalguard.AIThermalFireGuard;
 				PRODUCT_NAME = AIThermalFireGuard;
 				SDKROOT = macosx;
@@ -286,14 +294,14 @@
 				CODE_SIGN_ENTITLEMENTS = AppStore/AIThermalFireGuard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = AppStore/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.thermalguard.AIThermalFireGuard;
 				PRODUCT_NAME = AIThermalFireGuard;
 				SDKROOT = macosx;
