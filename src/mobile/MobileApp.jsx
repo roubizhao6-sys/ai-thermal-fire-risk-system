@@ -103,6 +103,7 @@ function decodeCamera(value) {
 function initialActiveTab() {
   try {
     const params = new URLSearchParams(window.location.search)
+    if (params.get('cmd') === '1') return 'dashboard'
     if (params.get('camera') || params.get('view') === 'camera') return 'camera'
   } catch {}
   return 'home'
@@ -1119,7 +1120,7 @@ export default function MobileApp() {
   const [toast, setToast] = useState('')
   const [inference, setInference] = useState(() => computeInference(createFrame(), null, null))
   const [showDrill, setShowDrill] = useState(false)
-  const [showCommandCenter, setShowCommandCenter] = useState(false)
+  const [showCommandCenter, setShowCommandCenter] = useState(() => { try { return new URLSearchParams(window.location.search).get('cmd') === '1' } catch { return false } })
   const previousFrameRef = useRef(null)
   const timerRef = useRef(null)
   const socketRef = useRef(null)
