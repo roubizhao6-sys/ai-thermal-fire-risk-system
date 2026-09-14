@@ -25,7 +25,8 @@ async function precacheShellAssets(cache) {
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE)
-    await cache.addAll(CORE)
+    // 任何一个文件缺失都不该让整个离线能力失效，因此逐个添加、只保留成功的
+    await Promise.allSettled(CORE.map(url => cache.add(url)))
     await precacheShellAssets(cache)
     await self.skipWaiting()
   })())
@@ -35,7 +36,7 @@ self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     // 清掉旧版本缓存，避免版本升级后缓存无限堆积
     const keys = await caches.keys()
-    await Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))
+    await Promise.allSettled(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))
     await self.clients.claim()
   })())
 })
