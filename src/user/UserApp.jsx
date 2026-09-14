@@ -116,6 +116,23 @@ export default function UserApp() {
     if (!sheetOpen) return undefined
     const onKeyDown = (event) => {
       if (event.key === 'Escape') setSheetOpen(false)
+      if (event.key !== 'Tab') return
+      // 弹层是模态的：Tab 只在弹层内部循环，不会跑到背后的按钮上
+      const sheet = sheetTitleRef.current?.closest('.position-sheet')
+      if (!sheet) return
+      const focusables = [...sheet.querySelectorAll('button, [href], input, [tabindex]:not([tabindex="-1"])')]
+        .filter((element) => !element.hasAttribute('disabled'))
+      if (!focusables.length) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement
+      if (event.shiftKey && (active === first || active === sheetTitleRef.current)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && (active === last || !sheet.contains(active))) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
