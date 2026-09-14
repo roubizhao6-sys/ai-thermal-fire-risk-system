@@ -744,6 +744,15 @@ function ArEvacuationView({ route, risk }) {
     }
   }, [status])
 
+  useEffect(() => {
+    if (status !== 'active') return undefined
+    const video = videoRef.current
+    if (!video || !streamRef.current) return undefined
+    video.srcObject = streamRef.current
+    video.play().catch(() => {})
+    return undefined
+  }, [status])
+
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
   }, [])
@@ -759,10 +768,6 @@ function ArEvacuationView({ route, risk }) {
       if (!navigator.mediaDevices?.getUserMedia) { setStatus('unsupported'); return }
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play().catch(() => {})
-      }
       setStatus('active')
       navigator.vibrate?.(40)
     } catch {
