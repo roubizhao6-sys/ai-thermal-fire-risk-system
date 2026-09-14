@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -61,6 +61,10 @@ import AlarmCenterView from './AlarmCenterView.jsx'
 import AlarmOverlay from './AlarmOverlay.jsx'
 import CityMap from './CityMap.jsx'
 import EvacuationView from './EvacuationView.jsx'
+import { SPOT_MAPPING_NOTE, campusLocationForNode } from './campus.js'
+
+// 3D 引擎（three.js）体积较大，只有打开校园三维视图时才加载
+const Campus3D = lazy(() => import('./Campus3D.jsx'))
 import { FLOOR_COUNT, positionNodeId } from './building.js'
 import { planRoute } from './evacuation.js'
 import { DEFAULT_THRESHOLDS, createFrame, normalizePacket, riskFromMaxTemp } from './thermal.js'
@@ -752,6 +756,8 @@ export default function MobileApp() {
   const [settings, setSettings] = useState(() => ({ ...DEFAULT_ALARM_SETTINGS, ...loadStored('thermalGuardAlarmSettings', {}) }))
   const [alertSection, setAlertSection] = useState('records')
   const [dashView, setDashView] = useState('dashboard')
+  const [mapView, setMapView] = useState('campus')
+  const [campusPick, setCampusPick] = useState(null)
   const [alarm, setAlarm] = useState(null)
   const [overlayOpen, setOverlayOpen] = useState(false)
   const [fire, setFire] = useState(null)
@@ -955,6 +961,13 @@ export default function MobileApp() {
     () => planRoute({ startId: positionNodeId(position.floor, position.spot), fire, elapsedSec, blocked: blockedNodes }),
     [position.floor, position.spot, fire, elapsedSec, blockedNodes],
   )
+
+  // 校园 3D：把火源（可能多处）映射为校园建筑 + 楼层
+  const campusFires = useMemo(() => {
+    if (!fire) return []
+    const list = Array.isArray(fire.nodes) && fire.nodes.length ? fire.nodes : [fire.nodeId]
+    return list.filter(Boolean).map((nodeId) => ({ nodeId }))
+  }, [fire])
 
   const alarmActive = Boolean(alarm && !alarm.acknowledged)
   const alarmId = alarm?.id
@@ -1202,7 +1215,37 @@ export default function MobileApp() {
 
   const page = useMemo(() => {
     if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
-    if (activeTab === 'map') return <CityMap fire={fire} activeDevice={activeDevice} />
+    if (activeTab === 'map') {
+      return (
+        <section className="mobile-card campus-card">
+          <div className="card-title">
+            <div><strong>校园三维态势</strong><small>澳门科技大学校园微缩模型 · 火源定位到具体楼层</small></div>
+            <div className="view-switcher view-switcher-compact">
+              <button type="button" className={mapView === 'campus' ? 'active' : ''} onClick={() => setMapView('campus')}>校园 3D</button>
+              <button type="button" className={mapView === 'city' ? 'active' : ''} onClick={() => setMapView('city')}>城市热力图</button>
+            </div>
+          </div>
+          {mapView === 'campus' ? (
+            <>
+              <div className="campus-3d-holder">
+                <Suspense fallback={<div className="campus-3d-loading">正在加载校园三维模型…</div>}>
+                  <Campus3D fires={campusFires} onPick={setCampusPick} />
+                </Suspense>
+              </div>
+              <p className="card-hint">
+                {fire
+                  ? `当前火源：${campusFires.map((item) => campusLocationForNode(item.nodeId)?.label).filter(Boolean).join('、') || '未映射到校园'}`
+                  : '暂无火情。拖动旋转、滚轮缩放，点击楼体可查看该楼楼层。'}
+                {campusPick ? `｜已选 ${campusPick.building.name}（共 ${campusPick.building.floors} 层，你点了第 ${campusPick.floor} 层）` : ''}
+              </p>
+              <p className="card-hint">{SPOT_MAPPING_NOTE}</p>
+            </>
+          ) : (
+            <CityMap fire={fire} activeDevice={activeDevice} />
+          )}
+        </section>
+      )
+    }
     // 「预警」标签：分段控件在事件记录与报警设置之间切换
     if (activeTab === 'alerts' && alertSection === 'settings') {
       return (
