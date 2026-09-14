@@ -486,7 +486,7 @@ function EscapeCompass({ risk, maxTemp }) {
   )
 }
 
-function Thermal3DScene({ frame }) {
+function Thermal3DScene({ frame, camera }) {
   const fallbackHotspots = [
     { x: 28, y: 24, temp: frame?.maxTemp || 72 },
     { x: 64, y: 30, temp: (frame?.maxTemp || 72) - 13 },
@@ -531,7 +531,7 @@ function Thermal3DScene({ frame }) {
         <b>{frame?.width || 32}×{frame?.height || 24} · 3.1 帧/秒</b>
       </div>
       <div className="scene-hud scene-hud-bottom">
-        <span><i />热成像板已联动</span>
+        <span><i />{camera?.name || '热成像板'} · {camera?.location || '实时联动'}</span>
         <b>最高 {maxTemp.toFixed(1)}°C</b>
       </div>
       <div className="scene-axis"><span>X</span><span>Y</span><span>Z</span></div>
@@ -589,14 +589,14 @@ function LivePlayer({ camera, frame, viewMode }) {
 
   return (
     <div className="live-player" ref={playerRef}>
-      {viewMode === 'thermal3d' || camera.type === 'sensor' ? <Thermal3DScene frame={frame} /> : null}
+      {viewMode === 'thermal3d' || camera.type === 'sensor' ? <Thermal3DScene frame={frame} camera={camera} /> : null}
       {viewMode !== 'thermal3d' && camera.type === 'demo' && <img src={camera.url} alt={`${camera.name}演示监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'mjpeg' && <img src={camera.url} alt={`${camera.name}实时监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'hls' && <video ref={videoRef} controls muted autoPlay playsInline />}
       <div className="live-grid" />
       {camera.type === 'demo' && <div className="live-scan" />}
       <div className="live-status"><i />{viewMode === 'thermal3d' || camera.type === 'sensor' ? '热感板联动' : camera.type === 'demo' ? '公开演示流' : camera.public ? '公开监控' : '本机监控'}</div>
-      <div className="live-camera-name"><Video size={14} /><span>{camera.name}</span><small>{camera.location || '未设置位置'}</small></div>
+      {viewMode !== 'thermal3d' && camera.type !== 'sensor' && <div className="live-camera-name"><Video size={14} /><span>{camera.name}</span><small>{camera.location || '未设置位置'}</small></div>}
       <button className="fullscreen-button" type="button" onClick={enterFullscreen}><Maximize2 size={16} /></button>
       <div className="live-time">{currentTime}</div>
     </div>
