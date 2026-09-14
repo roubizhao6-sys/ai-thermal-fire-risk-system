@@ -96,6 +96,7 @@ export default function Campus3D({ fires = [], onPick }) {
   const [focus, setFocus] = useState(null)
   const [exploded, setExploded] = useState(false)
   const [zoom, setZoom] = useState(1)
+  const [panelCollapsed, setPanelCollapsed] = useState(false)
   const zoomRef = useRef(zoom)
   zoomRef.current = zoom
 
@@ -640,35 +641,41 @@ export default function Campus3D({ fires = [], onPick }) {
       <div className="campus-3d-stage" ref={stageRef} />
 
       {focus && focusedBuilding ? (
-        <div className="campus-floor-panel">
+        <div className={`campus-floor-panel ${panelCollapsed ? 'is-collapsed' : ''}`}>
           <div className="campus-floor-head">
             <div>
               <strong>{focusedBuilding.name}</strong>
               <small>共 {focusedBuilding.floors} 層 · 当前第 {focus.floor} 層 · 视距 {Math.round(zoom * 100)}%</small>
             </div>
-            <button type="button" onClick={() => setFocus(null)}>返回校园</button>
+            <div className="campus-floor-head-actions">
+              <button type="button" onClick={() => setPanelCollapsed((value) => !value)}>{panelCollapsed ? '展开' : '收起'}</button>
+              <button type="button" onClick={() => setFocus(null)}>返回校园</button>
+            </div>
           </div>
-          <div className="campus-floor-grid">
-            {Array.from({ length: focusedBuilding.floors }, (_, index) => index + 1).map((floor) => (
-              <button
-                key={floor}
-                type="button"
-                className={focus.floor === floor ? 'active' : ''}
-                onClick={() => setFocus({ buildingId: focusedBuilding.id, floor })}
-              >
-                {floor} 層
-              </button>
-            ))}
-          </div>
-          <div className="campus-floor-actions">
-            <button type="button" disabled={focus.floor <= 1} onClick={() => setFocus({ buildingId: focusedBuilding.id, floor: focus.floor - 1 })}>下一层</button>
-            <button type="button" disabled={focus.floor >= focusedBuilding.floors} onClick={() => setFocus({ buildingId: focusedBuilding.id, floor: focus.floor + 1 })}>上一层</button>
-            <button type="button" onClick={() => setZoom((value) => Math.max(0.32, Number((value - 0.16).toFixed(2))))}>放大 ＋</button>
-            <button type="button" onClick={() => setZoom((value) => Math.min(1.6, Number((value + 0.16).toFixed(2))))}>缩小 －</button>
-            <button type="button" onClick={() => setZoom(0.5)}>放大该层</button>
-            <button type="button" className={exploded ? 'active' : ''} onClick={() => setExploded((value) => !value)}>{exploded ? '楼层合并' : '楼层展开'}</button>
-          </div>
-          {focusedBuilding.note && <p className="campus-floor-note">{focusedBuilding.note}</p>}
+          {!panelCollapsed && (
+            <>
+              <div className="campus-floor-grid">
+                {Array.from({ length: focusedBuilding.floors }, (_, index) => index + 1).map((floor) => (
+                  <button
+                    key={floor}
+                    type="button"
+                    className={focus.floor === floor ? 'active' : ''}
+                    onClick={() => setFocus({ buildingId: focusedBuilding.id, floor })}
+                  >
+                    {floor} 層
+                  </button>
+                ))}
+              </div>
+              <div className="campus-floor-actions">
+                <button type="button" disabled={focus.floor <= 1} onClick={() => setFocus({ buildingId: focusedBuilding.id, floor: focus.floor - 1 })}>下一层</button>
+                <button type="button" disabled={focus.floor >= focusedBuilding.floors} onClick={() => setFocus({ buildingId: focusedBuilding.id, floor: focus.floor + 1 })}>上一层</button>
+                <button type="button" onClick={() => setZoom((value) => Math.max(0.32, Number((value - 0.16).toFixed(2))))}>放大 ＋</button>
+                <button type="button" onClick={() => setZoom((value) => Math.min(1.6, Number((value + 0.16).toFixed(2))))}>缩小 －</button>
+                <button type="button" onClick={() => setZoom(0.5)}>放大该层</button>
+                <button type="button" className={exploded ? 'active' : ''} onClick={() => setExploded((value) => !value)}>{exploded ? '楼层合并' : '楼层展开'}</button>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="campus-3d-legend">
