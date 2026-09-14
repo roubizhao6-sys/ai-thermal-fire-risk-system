@@ -1,0 +1,41 @@
+{
+  "name": "thermal-video",
+  "version": "1.0.0",
+  "description": "My Remotion video",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@react-three/fiber": "9.2.0",
+    "@remotion/cli": "4.0.524",
+    "@remotion/media": "4.0.524",
+    "@remotion/tailwind-v4": "4.0.524",
+    "@remotion/three": "4.0.524",
+    "@remotion/transitions": "4.0.524",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.524",
+    "tailwindcss": "4.0.0",
+    "three": "0.178.0"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.524",
+    "@types/react": "19.2.7",
+    "@types/three": "0.170.0",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "voice": "bash scripts/generate-voice.sh",
+    "render": "node node_modules/@remotion/cli/remotion-cli.js render src/index.ts ThermalAssemblyTutorial out/thermal-tutorial.mp4 --gl=angle --codec=h264 --crf=18 --pixel-format=yuv420p --audio-codec=aac --concurrency=2"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}

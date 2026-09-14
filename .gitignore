@@ -7,3 +7,4 @@ qa-*.png
 *.xcuserstate
 .tools/
 build/
+output/*.mp4
