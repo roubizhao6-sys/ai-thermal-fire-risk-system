@@ -500,3 +500,27 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .zone-4 { left: calc(50% - 8px); bottom: 17px; right: 62px; height: 44px; }
 .campus-floor-legend { display: flex; align-items: center; gap: 5px; margin-top: 7px; color: #7da4c7; font-size: 8px; }
 .campus-data-warning { display: flex; align-items: flex-start; gap: 6px; margin-top: 9px; padding: 8px; color: #d8a16b; border: 1px solid rgba(245,158,11,.16); border-radius: 8px; background: rgba(245,158,11,.05); font-size: 8px; line-height: 1.55; }
+
+.campus-scene-head { display: flex; align-items: center; justify-content: space-between; gap: 9px; margin-top: 12px; }
+.campus-scene-head > div { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.campus-scene-head svg { color: #75c7f4; }
+.campus-scene-head strong { font-size: 10px; }
+.campus-scene-head span { color: #6d86a1; font-size: 8px; }
+.campus-scene-head button { padding: 5px 7px; color: #9dd7ff; border: 1px solid rgba(56,189,248,.16); border-radius: 7px; background: rgba(59,130,246,.07); font-size: 8px; white-space: nowrap; }
+.campus-scene-list { display: flex; gap: 7px; overflow-x: auto; margin-top: 8px; padding-bottom: 5px; scrollbar-width: none; }
+.campus-scene-list::-webkit-scrollbar { display: none; }
+.campus-scene-list button { flex: 0 0 128px; min-height: 62px; display: grid; grid-template-columns: 23px 1fr; grid-template-rows: 1fr auto; align-items: center; gap: 3px 6px; padding: 8px; color: #c6d9eb; border: 1px solid rgba(56,189,248,.14); border-radius: 9px; background: linear-gradient(145deg, rgba(16,42,70,.7), rgba(5,15,29,.8)); text-align: left; }
+.campus-scene-list button i { grid-row: span 2; display: grid; place-items: center; width: 23px; height: 23px; color: #8bd4ff; border-radius: 6px; background: rgba(59,130,246,.12); font-size: 7px; font-style: normal; }
+.campus-scene-list button span { overflow: hidden; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.campus-scene-list button b { color: #5fc4f1; font-size: 7px; }
+.campus-scene-list p { color: #7892ac; font-size: 8px; }
+.pano-overlay { position: fixed; z-index: 130; inset: 0; display: flex; align-items: stretch; justify-content: center; padding: max(8px,env(safe-area-inset-top)) 8px max(8px,env(safe-area-inset-bottom)); background: rgba(1,5,12,.9); backdrop-filter: blur(10px); }
+.pano-sheet { width: 100%; max-width: 720px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(96,165,250,.2); border-radius: 18px; background: #07101e; }
+.pano-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid rgba(96,165,250,.13); }
+.pano-head > div { display: flex; flex-direction: column; gap: 2px; }
+.pano-head span { color: #62b8ec; font-size: 8px; }
+.pano-head strong { font-size: 13px; }
+.pano-head button { width: 34px; height: 34px; display: grid; place-items: center; color: #9fb5cd; border-radius: 9px; background: rgba(100,116,139,.12); }
+.pano-sheet iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #020713; }
+.pano-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); color: #718aa5; font-size: 8px; }
+.pano-foot a { display: flex; align-items: center; gap: 5px; color: #a5d9ff; text-decoration: none; }
