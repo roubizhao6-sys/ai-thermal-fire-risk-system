@@ -145,11 +145,17 @@ p { margin: 0; }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 45px;
+  gap: 34px;
   padding: 6px 16px calc(4px + env(safe-area-inset-bottom));
 }
 .compass-tools button {
-  padding: 8px 2px;
+  /* Apple HIG：可点区域不小于 44×44，外观仍是纯文字 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 10px;
   color: var(--text-2);
   font-size: 15px;
   font-weight: 400;
@@ -183,10 +189,11 @@ p { margin: 0; }
 .sheet-handle { width: 36px; height: 5px; margin: 0 auto 16px; border-radius: 999px; background: rgba(235, 235, 245, .3); }
 .position-sheet h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
 .position-sheet p { margin-top: 6px; color: var(--text-3); font-size: 12px; line-height: 1.5; }
-.floor-row-picker { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 18px; }
+/* 楼层选择：窄屏两行四列，保证每个可点区域都有 44px 宽 */
+.floor-row-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 18px; }
 .spot-row-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
 .floor-row-picker button, .spot-row-picker button {
-  min-height: 42px;
+  min-height: 44px;
   color: var(--text-2);
   border-radius: 10px;
   background: rgba(120, 120, 128, .18);
@@ -200,6 +207,10 @@ p { margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+@media (min-width: 440px) {
+  .floor-row-picker { grid-template-columns: repeat(8, 1fr); }
 }
 
 @media (min-width: 700px) {
