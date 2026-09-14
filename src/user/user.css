@@ -58,13 +58,13 @@ p { margin: 0; }
   align-items: center;
   justify-content: center;
   gap: 18px;
-  padding: 0 20px;
+  padding: 0 12px;
 }
 
 /* 表盘占屏幕的主要面积，居中 */
 .dial-wrap {
   position: relative;
-  width: min(92vw, 468px);
+  width: min(94vw, 480px);
   aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
@@ -83,7 +83,7 @@ p { margin: 0; }
 }
 .dial-letter.is-north { fill: var(--text); }
 .needle { fill: var(--safe); }
-.needle-line { stroke: var(--safe); stroke-width: 2.5; stroke-linecap: round; }
+.needle-line { stroke: var(--safe); stroke-width: 3; stroke-linecap: round; }
 .needle.needle-alert { fill: var(--alert); }
 .needle-line.needle-alert { stroke: var(--alert); }
 .dial-pin { fill: var(--text-3); }

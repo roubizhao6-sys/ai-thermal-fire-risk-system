@@ -322,10 +322,10 @@ function CompassDial({ rotation, needle, alert }) {
       </g>
       <g style={{ transform: `rotate(${needle}deg)`, transformOrigin: '120px 120px', transition: 'transform .45s cubic-bezier(.32,.72,0,1)' }}>
         <polygon
-          points="120,32 126,52 114,52"
+          points="120,22 130,56 110,56"
           className={alert ? 'needle needle-alert' : 'needle'}
         />
-        <line x1="120" y1="52" x2="120" y2="96" className={alert ? 'needle-line needle-alert' : 'needle-line'} />
+        <line x1="120" y1="56" x2="120" y2="104" className={alert ? 'needle-line needle-alert' : 'needle-line'} />
       </g>
       <circle cx="120" cy="120" r="3" className="dial-pin" />
     </svg>
