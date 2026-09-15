@@ -37,6 +37,7 @@ export default function ArNavigator({
   const streamRef = useRef(null)
   const wakeRef = useRef(null)
   const headingRef = useRef(null)
+  const attemptRef = useRef(0)
   const [camera, setCamera] = useState('idle') // idle | requesting | active | denied | unsupported | insecure
   const [facing, setFacing] = useState('environment')
   const [headingState, setHeadingState] = useState('idle') // idle | active | unsupported | denied | simulated
@@ -122,12 +123,24 @@ export default function ArNavigator({
     }
     setCamera('requesting')
     setNotice('')
+    const attempt = attemptRef.current + 1
+    attemptRef.current = attempt
     try {
       stopCamera()
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: mode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      })
+      // 浏览器被拦截或权限弹窗未处理时，getUserMedia 可能长时间挂起：给 8 秒兜底，避免界面卡在“正在请求”
+      const stream = await Promise.race([
+        navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: mode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        }),
+        new Promise((_, reject) => {
+          window.setTimeout(() => reject(new Error('camera-timeout')), 8000)
+        }),
+      ])
+      if (attempt !== attemptRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
       streamRef.current = stream
       await attachStream(stream)
       setCamera('active')
@@ -135,6 +148,12 @@ export default function ArNavigator({
       const caps = track?.getCapabilities?.() ?? {}
       setHasTorch(Boolean(caps.torch))
     } catch (error) {
+      if (attempt !== attemptRef.current) return
+      if (error?.message === 'camera-timeout') {
+        setCamera('unsupported')
+        setNotice('摄像头授权没有响应（可能被浏览器拦截或没有可用摄像头），已保留表盘导航，可点下方按钮重试')
+        return
+      }
       const denied = error?.name === 'NotAllowedError' || error?.name === 'SecurityError'
       setCamera(denied ? 'denied' : 'unsupported')
       setNotice(denied
