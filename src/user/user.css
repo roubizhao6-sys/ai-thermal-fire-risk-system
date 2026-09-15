@@ -256,3 +256,34 @@ button { border: none; background: transparent; color: inherit; }
 .usr-plan-add { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 46px; color: #fff; border: 1px dashed rgba(96,165,250,.4); border-radius: 12px; background: rgba(59,130,246,.08); font-size: 11px; font-weight: 700; }
 
 .usr-ver { margin-left: 5px; padding: 2px 6px; color: #e9d5ff; border: 1px solid rgba(192,132,252,.45); border-radius: 999px; background: rgba(124,58,237,.22); font-size: 8px; font-style: normal; font-weight: 700; vertical-align: middle; }
+
+/* ===== 单屏大表盘逃生（向队友版靠拢） ===== */
+.usr-stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 4px 0 2px; }
+.usr-dial-wrap { position: relative; width: min(78vw, 300px); aspect-ratio: 1 / 1; }
+.usr-dial-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.usr-dial-ring { fill: none; stroke: rgba(108,155,218,.28); stroke-width: 1.4; }
+.usr-dial-ring-inner { fill: none; stroke: rgba(108,155,218,.12); stroke-width: 1; }
+.usr-dial-letter { fill: #718ba6; font-size: 15px; font-weight: 700; }
+.usr-dial-letter.is-north { fill: #fb7185; }
+.usr-dial-arrow { fill: #f97316; filter: drop-shadow(0 0 8px rgba(249,115,22,.8)); }
+.usr-dial-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; }
+.usr-dial-caption { color: #7d97b3; font-size: 10px; letter-spacing: .1em; }
+.usr-dial-exit { color: #e6f0fb; font-size: 14px; font-weight: 700; }
+.usr-dial-distance { display: flex; align-items: baseline; gap: 4px; margin-top: 2px; }
+.usr-dial-distance span { color: #fff; font-size: 52px; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; }
+.usr-dial-distance em { color: #8ba5be; font-size: 18px; font-style: normal; font-weight: 300; }
+.usr-dial-time { color: #8ba5be; font-size: 11px; }
+.usr-readouts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; width: 100%; }
+.usr-readouts > div { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border: 1px solid rgba(96,165,250,.13); border-radius: 12px; background: rgba(5,15,29,.55); }
+.usr-readouts span { color: #748da8; font-size: 9px; }
+.usr-readouts strong { color: #d9ecfb; font-size: 12px; text-align: center; }
+.usr-tools { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 8px; width: 100%; }
+.usr-tools button, .usr-tools a { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 5px; border-radius: 12px; font-size: 11px; font-weight: 700; text-decoration: none; }
+.usr-tools .usr-tool-ar { color: #fff; background: linear-gradient(110deg, #dc2626, #f97316); }
+.usr-tools .usr-tool-119 { color: #fff; background: linear-gradient(110deg, #ef4444, #dc2626); }
+.usr-tools button:last-child { color: #dcecff; border: 1px solid rgba(96,165,250,.18); background: rgba(59,130,246,.08); }
+.usr-ar-page .usr-exit-chips { margin-bottom: 4px; }
+
+.usr-plan-ai { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 42px; margin-top: 8px; color: #fff; border: none; border-radius: 11px; background: linear-gradient(110deg, #7c3aed, #2563eb); font-size: 10px; font-weight: 700; }
+.usr-plan-ai:disabled { opacity: .6; }
+.usr-plan-analysis { margin: 9px 0 0; padding: 10px 11px; color: #d6e7fb; border: 1px solid rgba(124,58,237,.28); border-radius: 10px; background: rgba(124,58,237,.1); font-size: 9px; line-height: 1.6; white-space: pre-wrap; }

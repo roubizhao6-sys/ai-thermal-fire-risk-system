@@ -211,29 +211,55 @@ function DetectionHome({ onEvacuate }) {
   )
 }
 
+function CompassDial({ heading, bearing, distance, exitName, seconds }) {
+  const arrowRotation = ((bearing - heading + 540) % 360) - 180
+  return (
+    <div className="usr-dial-wrap">
+      <svg className="usr-dial-svg" viewBox="0 0 240 240" aria-hidden="true">
+        <circle cx="120" cy="120" r="104" className="usr-dial-ring" />
+        <circle cx="120" cy="120" r="78" className="usr-dial-ring-inner" />
+        <g style={{ transform: `rotate(${-heading}deg)`, transformOrigin: '120px 120px' }}>
+          <text x="120" y="32" textAnchor="middle" className="usr-dial-letter is-north">N</text>
+          <text x="210" y="126" textAnchor="middle" className="usr-dial-letter">E</text>
+          <text x="120" y="220" textAnchor="middle" className="usr-dial-letter">S</text>
+          <text x="30" y="126" textAnchor="middle" className="usr-dial-letter">W</text>
+        </g>
+        <g style={{ transform: `rotate(${arrowRotation}deg)`, transformOrigin: '120px 120px' }}>
+          <polygon points="120,20 133,60 120,49 107,60" className="usr-dial-arrow" />
+        </g>
+      </svg>
+      <div className="usr-dial-center">
+        <div className="usr-dial-caption">前往</div>
+        <div className="usr-dial-exit">{exitName}</div>
+        <div className="usr-dial-distance"><span>{distance}</span><em>米</em></div>
+        <div className="usr-dial-time">约 {seconds} 秒</div>
+      </div>
+    </div>
+  )
+}
+
 function ArEscape({ exit, onPickExit, siren, onOpenAr }) {
   const heading = useHeading()
   const turn = shortestTurn(exit.bearing, heading)
-  const turnText = Math.abs(turn) < 15 ? '保持当前方向直行' : turn > 0 ? `向右转 ${Math.round(Math.abs(turn))}°` : `向左转 ${Math.round(Math.abs(turn))}°`
+  const turnText = Math.abs(turn) < 15 ? '保持直行' : turn > 0 ? `右转 ${Math.round(Math.abs(turn))}°` : `左转 ${Math.round(Math.abs(turn))}°`
+  const seconds = Math.max(6, Math.round(exit.distance / 1.3))
   return (
     <div className="usr-page usr-ar-page">
-      <header className="usr-page-head"><span>AR 实景逃生</span><h1>跟着箭头跑</h1><p>摄像头实景 + 方向箭头 + 表盘兜底</p></header>
-
       <div className="usr-exit-chips">{EXITS.map((e) => <button type="button" key={e.id} className={e.id === exit.id ? 'active' : ''} onClick={() => onPickExit(e.id)}>{e.name}</button>)}</div>
 
-      <section className="usr-card usr-ar-launch-card">
-        <div className="usr-ar-launch">
-          <div className="usr-ar-launch-badge"><i />实时逃生引导</div>
-          <h2>{turnText}</h2>
-          <p>前往 <strong>{exit.name}</strong> · {exit.distance} 米 · 方位 {exit.bearing}°</p>
-          <button type="button" className="usr-ar-launch-btn" onClick={onOpenAr}><Camera size={18} />开启 AR 实景导航</button>
-          <small>进入后可切换前后摄像头、开启手电筒；摄像头不可用时自动退回表盘模式。</small>
+      <main className="usr-stage">
+        <CompassDial heading={heading} bearing={exit.bearing} distance={exit.distance} exitName={exit.name} seconds={seconds} />
+        <div className="usr-readouts">
+          <div><span>方向指引</span><strong>{turnText}</strong></div>
+          <div><span>出口方位</span><strong>{exit.bearing}° {directionLabel(exit.bearing)}</strong></div>
+          <div><span>当前朝向</span><strong>{Math.round(heading)}° {directionLabel(heading)}</strong></div>
         </div>
-        <div className="usr-ar-actions">
-          <a href="tel:119"><Phone size={16} />一键报警 119</a>
-          <button type="button" onClick={siren.toggle}>{siren.on ? <VolumeX size={16} /> : <Volume2 size={16} />}{siren.on ? '静音' : '警报'}</button>
+        <div className="usr-tools">
+          <button type="button" className="usr-tool-ar" onClick={onOpenAr}><Camera size={17} />AR 实景导航</button>
+          <a href="tel:119" className="usr-tool-119"><Phone size={16} />119</a>
+          <button type="button" onClick={siren.toggle}>{siren.on ? <VolumeX size={16} /> : <Volume2 size={16} />}警报</button>
         </div>
-      </section>
+      </main>
 
       <TrappedDialogue exit={exit} />
 
@@ -241,7 +267,6 @@ function ArEscape({ exit, onPickExit, siren, onOpenAr }) {
     </div>
   )
 }
-
 function GpsPanel() {
   const gps = useGeoLocation()
   const active = gps.status === 'active' || gps.status === 'requesting'
@@ -452,6 +477,39 @@ function UpgradeHighlights() {
   )
 }
 
+function readLlmConfig() {
+  try { return JSON.parse(localStorage.getItem('thermalGuardLlm') || 'null') || {} } catch { return {} }
+}
+
+async function analyzeFloorPlan(planDataUrl) {
+  const config = readLlmConfig()
+  const text = '这是一张楼层平面图。请用简体中文简要识别：1) 疏散通道走向 2) 安全出口位置 3) 需要注意的隐患点。分 3 条要点回答，每条不超过 25 字。'
+  const content = [{ type: 'text', text }, { type: 'image_url', image_url: { url: planDataUrl } }]
+  if (config.proxy) {
+    const res = await fetch(`${String(config.proxy).replace(/\/+$/, '')}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-token': config.proxyToken || '' },
+      body: JSON.stringify({ messages: [{ role: 'user', content }] }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    return data.reply || null
+  }
+  if (config.endpoint && config.apiKey) {
+    const base = String(config.endpoint).replace(/\/+$/, '')
+    const url = base.endsWith('/chat/completions') ? base : `${base}/chat/completions`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
+      body: JSON.stringify({ model: config.model || 'gpt-4o-mini', messages: [{ role: 'user', content }] }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    return data.choices?.[0]?.message?.content || null
+  }
+  throw new Error('no-config')
+}
+
 function FloorPlanPanel() {
   const [plan, setPlan] = useState(() => { try { return localStorage.getItem('thermalGuardPlan') || '' } catch { return '' } })
   const fileRef = useRef(null)
@@ -463,6 +521,15 @@ function FloorPlanPanel() {
     reader.readAsDataURL(file)
   }
   const clear = () => { setPlan(''); try { localStorage.removeItem('thermalGuardPlan') } catch {} }
+  const [analysis, setAnalysis] = useState('')
+  const [busy, setBusy] = useState(false)
+  const analyze = async () => {
+    if (!plan || busy) return
+    setBusy(true); setAnalysis('正在识别平面图…')
+    try { const result = await analyzeFloorPlan(plan); setAnalysis(result || '未识别出内容，请换一张更清晰的图。') }
+    catch (e) { setAnalysis(e.message === 'no-config' ? '请先在系统端「AI 火警精灵」里配置大模型，再回来识别。' : '识别失败：模型可能不支持图片，请换支持视觉的模型。') }
+    setBusy(false)
+  }
   return (
     <section className="usr-card usr-plan-card">
       <div className="usr-card-head"><div><strong>我的楼层平面图</strong><small>上传后作为火警逃生参考图</small></div><ImageIcon size={18} /></div>
@@ -470,7 +537,9 @@ function FloorPlanPanel() {
         ? <><img className="usr-plan-img" src={plan} alt="楼层平面图" /><div className="usr-plan-actions"><button type="button" onClick={() => fileRef.current?.click()}><Upload size={14} />更换</button><button type="button" onClick={clear}><X size={14} />删除</button></div></>
         : <button type="button" className="usr-plan-add" onClick={() => fileRef.current?.click()}><Upload size={16} />上传楼层平面图</button>}
       <input ref={fileRef} type="file" accept="image/*" onChange={pick} style={{ display: 'none' }} />
-      <p className="usr-note"><Info size={12} />图片仅保存在本机，用于火警时参考。</p>
+      {plan && <button type="button" className="usr-plan-ai" onClick={analyze} disabled={busy}><Sparkles size={15} />{busy ? '正在 AI 识别…' : 'AI 识别疏散通道 / 出口'}</button>}
+      {analysis && <p className="usr-plan-analysis">{analysis}</p>}
+      <p className="usr-note"><Info size={12} />图片仅保存在本机；AI 识别需先在系统端配置支持视觉的大模型。</p>
     </section>
   )
 }
