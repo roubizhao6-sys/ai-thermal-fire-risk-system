@@ -1985,6 +1985,8 @@ function HazardReport() {
   )
 }
 
+const DEFAULT_LLM = { endpoint: 'https://api.deepseek.com/v1', apiKey: 'sk-dc844ba5cb154106a6fb568d79ce3948', model: 'deepseek-chat' }
+
 const LLM_PRESETS = [
   { id: 'deepseek', name: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
   { id: 'moonshot', name: 'Kimi', endpoint: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
@@ -1999,7 +2001,10 @@ function localFireAnswer(q) {
 }
 
 function loadLlmConfig() {
-  try { return JSON.parse(localStorage.getItem('thermalGuardLlm') || 'null') } catch { return null }
+  try {
+    const saved = JSON.parse(localStorage.getItem('thermalGuardLlm') || 'null')
+    return { ...DEFAULT_LLM, ...(saved || {}) }
+  } catch { return { ...DEFAULT_LLM } }
 }
 
 function AiSprite({ frame, open, onOpenChange }) {
@@ -2007,7 +2012,7 @@ function AiSprite({ frame, open, onOpenChange }) {
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [config, setConfig] = useState(() => loadLlmConfig() || { endpoint: '', apiKey: '', model: 'gpt-4o-mini' })
+  const [config, setConfig] = useState(() => loadLlmConfig())
   const [testState, setTestState] = useState('')
   const listRef = useRef(null)
 
