@@ -17,7 +17,7 @@ const EXITS = [
 
 const FLOORS = ['G', '1F', '2F', '3F', '4F', '5F']
 
-const DEFAULT_LLM = { endpoint: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: '', model: 'doubao-1-5-pro-32k-250115' }
+const DEFAULT_LLM = { endpoint: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: '', model: 'doubao-1-5-pro-32k-250115', proxy: '', proxyToken: '' }
 const LLM_PRESETS = [
   { id: 'deepseek', name: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
   { id: 'moonshot', name: 'Kimi', endpoint: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
@@ -240,9 +240,20 @@ function UserSprite({ onClose }) {
   useEffect(() => { try { localStorage.setItem('thermalGuardLlm', JSON.stringify(config)) } catch {} }, [config])
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [msgs, thinking])
 
-  const llmReady = Boolean(config.endpoint && config.apiKey)
+  const llmReady = Boolean((config.endpoint && config.apiKey) || config.proxy)
 
   const callLLM = async (q) => {
+    if (config.proxy && config.proxy.trim()) {
+      const proxyUrl = `${config.proxy.trim().replace(/\/+$/, '')}/chat`
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-proxy-token': (config.proxyToken || '').trim() },
+        body: JSON.stringify({ messages: [{ role: 'system', content: '你是消防助手，请用简体中文简洁回答。' }, ...msgs.slice(-6).map((m) => ({ role: m.role, content: m.text })), { role: 'user', content: q }] }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      return data.reply || null
+    }
     const base = config.endpoint.trim().replace(/\/+$/, '')
     const url = base.endsWith('/chat/completions') ? base : `${base}/chat/completions`
     const res = await fetch(url, {
@@ -269,7 +280,7 @@ function UserSprite({ onClose }) {
       <section className="usr-sprite-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="usr-sprite-head">
           <div className="usr-sprite-avatar"><Sparkles size={18} /></div>
-          <div><strong>AI 火警精灵</strong><small>{llmReady ? '已接入联网大模型' : '本地知识库 · 可联网'}</small></div>
+          <div><strong>AI 火警精灵</strong><small>{config.proxy ? '已接入后端代理' : llmReady ? '已接入联网大模型' : '本地知识库 · 可联网'}</small></div>
           <div className="usr-sprite-head-actions">
             <button type="button" onClick={() => setShowSettings((v) => !v)}><Cpu size={17} /></button>
             <button type="button" onClick={onClose}><X size={18} /></button>
@@ -281,7 +292,9 @@ function UserSprite({ onClose }) {
             <label>API 地址<input value={config.endpoint} onChange={(e) => setConfig((c) => ({ ...c, endpoint: e.target.value }))} /></label>
             <label>API 密钥<input type="password" value={config.apiKey} onChange={(e) => setConfig((c) => ({ ...c, apiKey: e.target.value }))} /></label>
             <label>模型<input value={config.model} onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))} /></label>
-            <p className="usr-sprite-note"><Info size={12} />密钥仅存本机，接口需允许跨域。</p>
+            <label>代理地址（无需密钥）<input value={config.proxy} onChange={(e) => setConfig((c) => ({ ...c, proxy: e.target.value }))} placeholder="https://xxx.workers.dev" /></label>
+            <label>代理访问令牌（可选）<input value={config.proxyToken} onChange={(e) => setConfig((c) => ({ ...c, proxyToken: e.target.value }))} /></label>
+            <p className="usr-sprite-note"><Info size={12} />可填 API 密钥直连，或填「代理地址」通过后端代理访问（无需密钥）。</p>
           </div>
         ) : (
           <>

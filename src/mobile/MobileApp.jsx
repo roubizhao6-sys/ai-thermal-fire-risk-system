@@ -2087,7 +2087,7 @@ function HazardReport() {
   )
 }
 
-const DEFAULT_LLM = { endpoint: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: '', model: 'doubao-1-5-pro-32k-250115' }
+const DEFAULT_LLM = { endpoint: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: '', model: 'doubao-1-5-pro-32k-250115', proxy: '', proxyToken: '' }
 
 const LLM_PRESETS = [
   { id: 'deepseek', name: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
@@ -2158,13 +2158,24 @@ function AiSprite({ frame, open, onOpenChange }) {
   useEffect(() => { try { localStorage.setItem('thermalGuardLlm', JSON.stringify(config)) } catch {} }, [config])
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [msgs, thinking, showSettings])
 
-  const llmReady = Boolean(config.endpoint && config.apiKey)
+  const llmReady = Boolean((config.endpoint && config.apiKey) || config.proxy)
 
   const callLLM = async (question) => {
-    const base = config.endpoint.trim().replace(/\/+$/, '')
-    const url = base.endsWith('/chat/completions') ? base : `${base}/chat/completions`
     const history = msgs.slice(-8).map((m) => ({ role: m.role, content: m.text }))
     const system = `你是「燧瞳智感」AI火警网警的消防助手。当前检测状态：风险${riskTitle(frame?.risk || 'low')}，最高温${Number(frame?.maxTemp || 0).toFixed(1)}°C，高温区域${frame?.hotspots?.length || 0}处。请用简体中文，回答简洁专业。`
+    if (config.proxy && config.proxy.trim()) {
+      const proxyUrl = `${config.proxy.trim().replace(/\/+$/, '')}/chat`
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-proxy-token': (config.proxyToken || '').trim() },
+        body: JSON.stringify({ messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: question }] }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      return data.reply || null
+    }
+    const base = config.endpoint.trim().replace(/\/+$/, '')
+    const url = base.endsWith('/chat/completions') ? base : `${base}/chat/completions`
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey.trim()}` },
@@ -2192,7 +2203,7 @@ function AiSprite({ frame, open, onOpenChange }) {
   }
 
   const testConnection = async () => {
-    if (!llmReady) { setTestState('请先填写 API 地址和密钥'); return }
+    if (!llmReady) { setTestState('请先填写 API 密钥，或填写后端代理地址'); return }
     setTestState('测试中…')
     try {
       const reply = await callLLM('请只回复：连接成功')
@@ -2215,7 +2226,7 @@ function AiSprite({ frame, open, onOpenChange }) {
             <div className="sheet-handle" />
             <div className="sprite-head">
               <div className="sprite-avatar"><Sparkles size={18} /></div>
-              <div><strong>AI 火警精灵</strong><small>{llmReady ? '已接入联网大模型' : '本地知识库 · 可联网'}</small></div>
+              <div><strong>AI 火警精灵</strong><small>{config.proxy ? '已接入后端代理' : llmReady ? '已接入联网大模型' : '本地知识库 · 可联网'}</small></div>
               <div className="sprite-head-actions">
                 <button type="button" onClick={() => setShowSettings((v) => !v)} aria-label="设置"><Cpu size={17} /></button>
                 <button type="button" onClick={() => onOpenChange(false)} aria-label="关闭"><X size={18} /></button>
@@ -2231,12 +2242,14 @@ function AiSprite({ frame, open, onOpenChange }) {
                 <label>API 地址<input value={config.endpoint} onChange={(e) => setConfig((c) => ({ ...c, endpoint: e.target.value }))} placeholder="https://api.openai.com/v1" inputMode="url" autoCapitalize="none" /></label>
                 <label>API 密钥<input type="password" value={config.apiKey} onChange={(e) => setConfig((c) => ({ ...c, apiKey: e.target.value }))} placeholder="sk-..." autoCapitalize="none" /></label>
                 <label>模型<input value={config.model} onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))} placeholder="gpt-4o-mini / deepseek-chat" /></label>
+                <label>代理地址（无需密钥）<input value={config.proxy} onChange={(e) => setConfig((c) => ({ ...c, proxy: e.target.value }))} placeholder="https://xxx.workers.dev" inputMode="url" autoCapitalize="none" /></label>
+                <label>代理访问令牌（可选）<input value={config.proxyToken} onChange={(e) => setConfig((c) => ({ ...c, proxyToken: e.target.value }))} placeholder="与代理 PROXY_TOKEN 相同" autoCapitalize="none" /></label>
                 <div className="sprite-settings-actions">
                   <button type="button" onClick={testConnection}><Link2 size={14} />测试连接</button>
                   <button type="button" onClick={() => setShowSettings(false)}>返回对话</button>
                 </div>
                 {testState && <p className="sprite-test-state">{testState}</p>}
-                <p className="sprite-settings-note"><Info size={12} />密钥仅保存在本机浏览器（localStorage），仅供演示；接口需允许跨域(CORS)。</p>
+                <p className="sprite-settings-note"><Info size={12} />可填 API 密钥直连，或填「代理地址」通过后端代理访问（无需密钥、Key 存服务端）。</p>
               </div>
             ) : (
               <>
