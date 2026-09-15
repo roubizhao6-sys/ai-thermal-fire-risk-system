@@ -4,7 +4,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BUILDING, positionNodeId } from '../mobile/building.js'
-import { planRoute } from '../mobile/evacuation.js'
+// 注意：本组件内部也有个变量叫 planRoute（本层逃生路线图），导入必须另起名字，否则整段函数作用域被遮蔽
+import { planRoute as computeRoute } from '../mobile/evacuation.js'
 import ArNavigator from './ArNavigator.jsx'
 import MoreSheet from './MoreSheet.jsx'
 import useGeoLocation from './useGeoLocation.js'
@@ -274,7 +275,7 @@ export default function UserApp() {
     return null
   }, [hazard, position.floor])
   const route = useMemo(
-    () => planRoute({ startId: positionNodeId(position.floor, position.spot), fire: hazardSources, elapsedSec }),
+    () => computeRoute({ startId: positionNodeId(position.floor, position.spot), fire: hazardSources, elapsedSec }),
     [position.floor, position.spot, hazardSources, elapsedSec],
   )
 
