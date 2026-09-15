@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import jsQR from 'jsqr'
 import Building3DView from './Building3DView.jsx'
 import Campus3DView from './Campus3DView.jsx'
+import Campus3D from './Campus3D.jsx'
 import CampusBuildingPanel from './CampusBuildingPanel.jsx'
 import {
   Activity,
@@ -1166,7 +1167,7 @@ function LivePlayer({ camera, frame, viewMode, detections = [] }) {
 
   return (
     <div className="live-player" ref={playerRef}>
-      {viewMode === 'building' ? <Building3DView frame={frame} /> : viewMode === 'campus' ? <Campus3DView frame={frame} /> : viewMode === 'thermal3d' || camera.type === 'sensor' ? <Thermal3DScene frame={frame} camera={camera} /> : null}
+      {viewMode === 'building' ? <Building3DView frame={frame} /> : viewMode === 'campus' ? <Campus3D fires={(frame?.hotspots?.length || frame?.risk === 'high') ? ['C4'] : []} /> : viewMode === 'thermal3d' || camera.type === 'sensor' ? <Thermal3DScene frame={frame} camera={camera} /> : null}
       {viewMode !== 'thermal3d' && camera.type === 'demo' && <img src={camera.url} alt={`${camera.name}演示监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'mjpeg' && <img src={camera.url} alt={`${camera.name}实时监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'hls' && <video ref={videoRef} controls muted autoPlay playsInline />}

@@ -1175,3 +1175,33 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .fusion-alarm-btn { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 44px; margin-top: 11px; color: #fff; border: none; border-radius: 12px; background: linear-gradient(110deg, #dc2626, #ef4444); font-size: 11px; font-weight: 800; }
 .fusion-note { display: flex; align-items: flex-start; gap: 5px; margin: 9px 0 0; color: #7089a4; font-size: 8px; line-height: 1.5; }
 .fusion-note svg { flex: 0 0 auto; margin-top: 1px; color: #f0b96c; }
+.campus-3d-holder { position: relative; width: 100%; height: 380px; margin-top: 10px; border-radius: 18px; overflow: hidden; border: 1px solid rgba(56,189,248,.2); background: #05080f; box-shadow: 0 18px 48px rgba(0,0,0,.35); }
+.campus-3d, .campus-3d-stage { position: absolute; inset: 0; }
+.campus-3d-stage canvas { display: block; width: 100% !important; height: 100% !important; }
+.campus-3d-legend { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 7px 10px; color: #8fb4d6; border: 1px solid rgba(56,189,248,.2); border-radius: 14px; background: rgba(3,8,17,.74); font-size: 9px; backdrop-filter: blur(8px); }
+.campus-jump-fire { min-height: 26px; margin-left: auto; padding: 0 10px; color: #fff; border: 1px solid rgba(255,255,255,.45); border-radius: 999px; background: rgba(255,59,48,.88); font-size: 9px; font-weight: 700; }
+.campus-3d-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #7f9cbb; font-size: 11px; letter-spacing: .04em; }
+.campus-label { padding: 2px 6px; color: #bfe3ff; border: 1px solid rgba(56,189,248,.22); border-radius: 6px; background: rgba(4,12,22,.62); font-size: 9px; white-space: nowrap; }
+.campus-label.is-fire { color: #fff; border-color: rgba(255,255,255,.5); background: rgba(255,59,48,.82); }
+.campus-fire-label { padding: 3px 8px; color: #fff; border: 1px solid rgba(255,255,255,.45); border-radius: 999px; background: rgba(255,59,48,.9); font-size: 9px; font-weight: 700; white-space: nowrap; box-shadow: 0 6px 18px rgba(255,59,48,.35); }
+.campus-label.is-landmark { color: #9fd2f5; border-color: rgba(56,189,248,.3); }
+.campus-label.is-focused { color: #04121f; border-color: rgba(255,255,255,.6); background: rgba(56,189,248,.92); font-weight: 700; }
+
+/* 楼层视角面板 */
+.campus-floor-panel { position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 10px; border: 1px solid rgba(56,189,248,.26); border-radius: 14px; background: rgba(4,11,20,.86); backdrop-filter: blur(10px); box-shadow: 0 14px 40px rgba(0,0,0,.45); }
+.campus-floor-panel.is-collapsed { padding: 8px 10px; }
+.campus-floor-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.campus-floor-head-actions { display: flex; gap: 6px; }
+.campus-floor-head strong { display: block; color: #e6f4ff; font-size: 12px; }
+.campus-floor-head small { display: block; margin-top: 2px; color: #7fa0bf; font-size: 9px; }
+.campus-floor-head button { min-height: 26px; padding: 0 10px; color: #cfe6ff; border: 1px solid rgba(96,165,250,.3); border-radius: 8px; background: rgba(37,99,235,.16); font-size: 9px; }
+/* 楼层改成一整行横向滚动：16 层的宿舍也只占一行，不再挡住地图 */
+.campus-floor-grid { display: flex; gap: 5px; margin-top: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.campus-floor-grid::-webkit-scrollbar { display: none; }
+.campus-floor-grid button { flex: 0 0 auto; min-width: 50px; min-height: 26px; color: #9db8d4; border: 1px solid rgba(96,165,250,.16); border-radius: 7px; background: rgba(12,24,40,.9); font-size: 9px; }
+.campus-floor-grid button.active { color: #04121f; border-color: rgba(255,255,255,.5); background: #38bdf8; font-weight: 700; }
+.campus-floor-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 9px; }
+.campus-floor-actions button { min-height: 30px; color: #cfe6ff; border: 1px solid rgba(96,165,250,.2); border-radius: 9px; background: rgba(23,42,66,.8); font-size: 9px; }
+.campus-floor-actions button.active { color: #04121f; background: #7dd3fc; font-weight: 700; }
+.campus-floor-actions button:disabled { opacity: .35; }
+.campus-floor-note { margin-top: 7px; color: #7fa0bf; font-size: 8px; line-height: 1.5; }
