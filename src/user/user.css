@@ -213,3 +213,27 @@ button { border: none; background: transparent; color: inherit; }
 .usr-ar-launch p strong { color: #ffb07a; }
 .usr-ar-launch-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 54px; margin-top: 8px; color: #fff; border: none; border-radius: 14px; background: linear-gradient(110deg, #dc2626, #f97316); font-size: 15px; font-weight: 800; box-shadow: 0 14px 30px rgba(220,38,38,.35); }
 .usr-ar-launch small { color: #6f8aa4; font-size: 8px; line-height: 1.5; }
+
+/* GPS 校园位置描述 */
+.usr-gps-loc { display: flex; flex-direction: column; gap: 4px; margin-top: 9px; padding: 10px 11px; border: 1px solid rgba(56,189,248,.18); border-radius: 10px; background: rgba(37,99,235,.08); }
+.usr-gps-loc span { color: #8ba5be; font-size: 9px; }
+.usr-gps-loc strong { color: #cfe6ff; font-size: 10px; }
+
+/* 被困者自救问答 */
+.usr-trapped { margin-top: 0; }
+.usr-trapped-progress { height: 6px; margin: 2px 0 10px; border-radius: 999px; background: rgba(96,165,250,.14); overflow: hidden; }
+.usr-trapped-progress i { display: block; height: 100%; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width .3s ease; }
+.usr-trapped-q { margin: 0; color: #eaf3ff; font-size: 14px; font-weight: 700; line-height: 1.5; }
+.usr-trapped-hint { margin: 6px 0 0; color: #8ba5be; font-size: 9px; line-height: 1.5; }
+.usr-trapped-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 11px; }
+.usr-trapped-actions button { min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 5px; border-radius: 11px; font-size: 10px; font-weight: 700; }
+.usr-trapped-actions .yes { color: #fff; background: linear-gradient(110deg, #dc2626, #ef4444); }
+.usr-trapped-actions .no { color: #dcecff; border: 1px solid rgba(96,165,250,.2); background: rgba(59,130,246,.08); }
+.usr-trapped-advice { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 11px; }
+.usr-trapped-advice.danger { color: #ffd0d0; border: 1px solid rgba(239,68,68,.35); background: rgba(239,68,68,.12); }
+.usr-trapped-advice.caution { color: #ffe0b3; border: 1px solid rgba(245,158,11,.35); background: rgba(245,158,11,.12); }
+.usr-trapped-advice.safe { color: #c6f0d6; border: 1px solid rgba(34,197,94,.3); background: rgba(34,197,94,.1); }
+.usr-trapped-advice strong { font-size: 12px; }
+.usr-trapped-advice p { margin: 0; font-size: 10px; line-height: 1.6; }
+.usr-trapped-advice small { color: #a9c2da; font-size: 8px; }
+.usr-trapped-reset { width: 100%; min-height: 38px; margin-top: 9px; color: #dcecff; border: 1px solid rgba(96,165,250,.16); border-radius: 10px; background: rgba(59,130,246,.08); font-size: 9px; }

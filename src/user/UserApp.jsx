@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { fusePreventionSignals } from '../mobile/sensorFusion.js'
 import ArNavigator from './ArNavigator.jsx'
+import useGeoLocation from './useGeoLocation.js'
+import { formatMeters } from './geo.js'
+import { answerQuestion, buildAdvice, createDialogueState, nextQuestion, progressOf, saveUserStatus, summarizeForRescue } from './binaryDialogue.js'
 import jsQR from 'jsqr'
 import {
   Camera, CheckCircle2, Flame, Navigation, Phone, ScanLine, ShieldAlert, ShieldCheck,
@@ -231,8 +234,199 @@ function ArEscape({ exit, onPickExit, siren, onOpenAr }) {
           <button type="button" onClick={siren.toggle}>{siren.on ? <VolumeX size={16} /> : <Volume2 size={16} />}{siren.on ? '静音' : '警报'}</button>
         </div>
       </section>
+
+      <TrappedDialogue exit={exit} />
+
       <p className="usr-disclaimer"><ShieldAlert size={14} />本应用为科研演示原型，逃生路线仅供参考，请结合实际现场标识与工作人员指挥。</p>
     </div>
+  )
+}
+
+function GpsPanel() {
+  const gps = useGeoLocation()
+  const active = gps.status === 'active' || gps.status === 'requesting'
+  return (
+    <section className="usr-card">
+      <div className="usr-card-head"><div><strong>GPS 我的位置</strong><small>校园坐标与最近安全点</small></div><LocateFixed size={18} /></div>
+      <button type="button" className="usr-mini-btn" onClick={() => (active ? gps.stop() : gps.start())}>{active ? '关闭 GPS 定位' : '开启 GPS 定位'}</button>
+      {gps.status === 'requesting' && <p className="usr-gps-pending">正在获取定位… 请允许位置权限。</p>}
+      {gps.error && gps.status !== 'active' && <p className="usr-gps-pending">{gps.error}</p>}
+      {gps.status === 'active' && gps.lat != null && (
+        <>
+          <div className="usr-gps-grid">
+            <div><span>纬度</span><strong>{gps.lat.toFixed(6)}</strong></div>
+            <div><span>经度</span><strong>{gps.lon.toFixed(6)}</strong></div>
+            <div><span>精度</span><strong>±{Math.round(gps.accuracy || 0)} m</strong></div>
+          </div>
+          {gps.location && (
+            <div className="usr-gps-loc">
+              <span>{gps.location.inside ? '位于校园范围内' : '当前距离校园较远'}</span>
+              {gps.location.nearestExit && <strong>最近出口 · {gps.location.nearestExit.point.name} {formatMeters(gps.location.nearestExit.meters)}</strong>}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+function QrScanModal({ onClose, onDetected }) {
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const streamRef = useRef(null)
+  const rafRef = useRef(null)
+  const [msg, setMsg] = useState('正在打开摄像头…')
+
+  useEffect(() => {
+    let cancelled = false
+    const stop = () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); rafRef.current = null; streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null }
+    const tick = () => {
+      if (cancelled) return
+      const video = videoRef.current, canvas = canvasRef.current
+      if (video && canvas && video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+        const scale = Math.min(1, 640 / video.videoWidth)
+        canvas.width = Math.round(video.videoWidth * scale)
+        canvas.height = Math.round(video.videoHeight * scale)
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        try {
+          const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' })
+          if (code && code.data) { stop(); onDetected(code.data); return }
+        } catch {}
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    const start = async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) { setMsg('当前浏览器不支持摄像头'); return }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false })
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
+        streamRef.current = stream
+        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => {}) }
+        setMsg('请对准消防设施二维码')
+        tick()
+      } catch { if (!cancelled) setMsg('无法打开摄像头，请允许相机权限后重试') }
+    }
+    start()
+    return () => { cancelled = true; stop() }
+  }, [onDetected])
+
+  return (
+    <div className="usr-scan-backdrop" onClick={onClose}>
+      <section className="usr-scan-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="usr-scan-head"><div><strong>扫码巡检</strong><small>对准二维码自动识别</small></div><button type="button" onClick={onClose}><X size={18} /></button></div>
+        <div className="usr-scan-stage">
+          <video ref={videoRef} className="usr-scan-video" autoPlay playsInline muted />
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
+          <div className="usr-scan-frame"><span /></div>
+        </div>
+        <p className="usr-scan-status">{msg}</p>
+        <button type="button" className="usr-scan-cancel" onClick={onClose}>取消</button>
+      </section>
+    </div>
+  )
+}
+
+const FACILITIES = [
+  { id: 'f1', name: '灭火器', code: 'A-01', location: '图书馆 1F 东侧', expire: '2027-06' },
+  { id: 'f2', name: '室内消火栓', code: 'B-03', location: '教学楼 B 3F 走廊', expire: '2027-01' },
+  { id: 'f3', name: '应急照明', code: 'C-12', location: '综合大楼 2F 楼梯间', expire: '2026-12' },
+  { id: 'f4', name: '疏散指示', code: 'D-07', location: 'P 座宿舍 5F 出口', expire: '2027-09' },
+]
+
+function InspectionPanel() {
+  const [records, setRecords] = useState(FACILITIES)
+  const [scanOpen, setScanOpen] = useState(false)
+  const [scanMsg, setScanMsg] = useState('')
+  const now = () => new Date().toLocaleString('zh-CN', { hour12: false })
+  const mark = (id) => setRecords((r) => r.map((f) => (f.id === id ? { ...f, last: now(), checks: (f.checks || 0) + 1 } : f)))
+  const detected = (data) => {
+    const code = String(data || '').trim()
+    const found = records.find((f) => f.code.toUpperCase() === code.toUpperCase() || code.includes(f.code.toUpperCase()) || code.includes(f.name))
+    if (found) { setRecords((r) => r.map((f) => (f.id === found.id ? { ...f, last: now(), checks: (f.checks || 0) + 1 } : f))); setScanMsg(`识别成功：${found.name} ${found.code}`) }
+    else setScanMsg(`未匹配到设施：${code || '空二维码'}`)
+    setScanOpen(false)
+  }
+  return (
+    <section className="usr-card">
+      <div className="usr-card-head"><div><strong>消防设施扫码巡检</strong><small>扫码识别 + 到期提醒</small></div><QrCode size={18} /></div>
+      <button type="button" className="usr-scan-btn" onClick={() => { setScanMsg(''); setScanOpen(true) }}><ScanLine size={15} />扫码检查</button>
+      {scanMsg && <p className="usr-scan-msg">{scanMsg}</p>}
+      <div className="usr-inspection-list">
+        {records.map((f) => (
+          <div className="usr-inspection-row" key={f.id}>
+            <span><QrCode size={14} /></span>
+            <div><strong>{f.name} · {f.code}</strong><small>{f.location}{f.last ? ` · 上次 ${f.last}` : ' · 尚未登记'}</small><em>有效期至 {f.expire}{f.checks ? ` · 已检 ${f.checks} 次` : ''}</em></div>
+            <button type="button" onClick={() => mark(f.id)}><CheckCircle2 size={13} />登记</button>
+          </div>
+        ))}
+      </div>
+      <p className="usr-note"><Info size={12} />二维码内容示例：设施编号 A-01。</p>
+      {scanOpen && <QrScanModal onClose={() => setScanOpen(false)} onDetected={detected} />}
+    </section>
+  )
+}
+
+function HazardReport() {
+  const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('thermalGuardHazards') || '[]') } catch { return [] } })
+  const [desc, setDesc] = useState('')
+  const [loc, setLoc] = useState('')
+  const [img, setImg] = useState('')
+  const fileRef = useRef(null)
+  const pick = (e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => setImg(r.result); r.readAsDataURL(f) }
+  const submit = () => {
+    if (!desc.trim() && !loc.trim()) return
+    const next = [{ id: `hz-${Date.now()}`, desc: desc.trim() || '未描述', loc: loc.trim() || '未填写位置', img, time: new Date().toLocaleString('zh-CN', { hour12: false }) }, ...items].slice(0, 20)
+    setItems(next); localStorage.setItem('thermalGuardHazards', JSON.stringify(next)); setDesc(''); setLoc(''); setImg('')
+  }
+  return (
+    <section className="usr-card">
+      <div className="usr-card-head"><div><strong>隐患上报</strong><small>拍照记录隐患位置</small></div><AlertTriangle size={18} /></div>
+      <div className="usr-hazard-form">
+        <input value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="隐患位置，如：三楼配电箱旁" />
+        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="隐患描述，如：线路发热" rows={2} />
+        <div className="usr-hazard-row">
+          <button type="button" onClick={() => fileRef.current?.click()}><Camera size={14} />{img ? '更换照片' : '拍照/选图'}</button>
+          {img && <img src={img} alt="" />}
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={pick} style={{ display: 'none' }} />
+        </div>
+        <button type="button" className="usr-hazard-submit" onClick={submit}><Send size={14} />提交隐患</button>
+      </div>
+      {items.length > 0 && <div className="usr-hazard-list">{items.map((h) => <div key={h.id}><span><AlertTriangle size={13} /></span><div><strong>{h.loc}</strong><p>{h.desc}</p><small>{h.time}</small></div>{h.img && <img src={h.img} alt="" />}</div>)}</div>}
+    </section>
+  )
+}
+
+function TrappedDialogue({ exit }) {
+  const [state, setState] = useState(() => createDialogueState())
+  const question = nextQuestion(state)
+  const progress = progressOf(state)
+  const advice = state.done ? buildAdvice(state, { routeOk: true, exitLabel: exit.name, meters: exit.distance }) : null
+  const answer = (choice) => {
+    const next = answerQuestion(state, question.id, choice)
+    setState(next)
+    if (next.done) saveUserStatus(summarizeForRescue(next, { id: 'user-demo', floor: 3, spot: 'C' }))
+  }
+  const reset = () => setState(createDialogueState())
+  return (
+    <section className="usr-card usr-trapped">
+      <div className="usr-card-head"><div><strong>被困者自救问答</strong><small>是/否回答，生成自救指引并同步救援端</small></div><AlertTriangle size={18} /></div>
+      {!state.done && question && (
+        <>
+          <div className="usr-trapped-progress"><i style={{ width: `${Math.round(progress.ratio * 100)}%` }} /></div>
+          <p className="usr-trapped-q">{question.text}</p>
+          <p className="usr-trapped-hint">{question.hint}</p>
+          <div className="usr-trapped-actions">
+            <button type="button" className="yes" onClick={() => answer('yes')}>是 · {question.yes}</button>
+            <button type="button" className="no" onClick={() => answer('no')}>否 · {question.no}</button>
+          </div>
+        </>
+      )}
+      {state.done && advice && (
+        <div className={`usr-trapped-advice ${advice.tone}`}><strong>自救指引</strong><p>{advice.text}</p><small>已同步给救援端{advice.needsHelp ? ' · 标记为需要帮助' : ''}</small></div>
+      )}
+      {state.done && <button type="button" className="usr-trapped-reset" onClick={reset}>重新问答</button>}
+    </section>
   )
 }
 
