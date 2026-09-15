@@ -71,7 +71,7 @@ SwiftUI 原生 App，支持模拟热像仪、ESP32 USB 串口、Wi-Fi WebSocket�
 - **AI 消防知识助手**（本地知识库）、**隐患随手拍上报**（存 localStorage）。
 - **AI 火警精灵**：悬浮按钮常驻右下角，可本地知识库问答，也可在设置里填入 OpenAI 兼容 API（endpoint/key/model，存 localStorage）接入联网大模型，任意问题联网回答。
 - **后端 LLM 代理**：`gateway/llm-proxy/`（Cloudflare Worker），Key 放服务端，前端填「代理地址」即可使用，无需用户提供 Key。
-- **三路证据融合判定（合并自队友）**：`src/mobile/sensorFusion.js` + `PreventionPanel.jsx`。视觉火焰 + 烟雾 + 热像三路联合，单路不报警、两路或完整热像证据链才确认，输出判据得分与判定结果（正常/关注/火警），可一键触发全屏报警。入口：数据看板。
+- **三路证据融合判定（合并自队友）**：`src/mobile/sensorFusion.js` + `PreventionPanel.jsx`（系统端）+ 用户端 `src/user/UserApp.jsx` 内嵌 FusionPanel（复用同一 `fusePreventionSignals`）。视觉火焰 + 烟雾 + 热像三路联合，单路不报警、两路或完整热像证据链才确认，输出判据得分与判定结果（正常/关注/火警），可一键触发全屏报警。入口：数据看板。
 - **火警报警中心（合并自队友 zhenghaotiansky666-dot）**：`src/mobile/alarm.js` + `AlarmOverlay.jsx` + `AlarmCenterView.jsx`。全屏警报（警笛+语音+震动+升级）、布防/手动触发/火警演练（指定楼层与起火点）、报警设置（阈值/未确认升级）、报警记录与处理、报警链路说明。入口：顶部铃铛「报警中心」。
 - **首页快捷功能网格**：8 个快捷入口（应急指挥/疏散导航/数字演练/GPS/数据看板/扫码巡检/AI精灵/隐患上报）一键直达。
 - **离线 PWA 缓存**：`public/sw.js`（v17）预缓存应用外壳 + 离线导航回退。

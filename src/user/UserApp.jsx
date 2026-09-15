@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { fusePreventionSignals } from '../mobile/sensorFusion.js'
 import jsQR from 'jsqr'
 import {
   Camera, CheckCircle2, Flame, Navigation, Phone, ScanLine, ShieldAlert, ShieldCheck,
   Thermometer, Upload, Volume2, VolumeX, X, MapPin, AlertTriangle, LoaderCircle, RotateCcw,
-  QrCode, LocateFixed, Info, Send,
+  QrCode, LocateFixed, Info, Send, Waves, Eye, BellRing,
 } from 'lucide-react'
 
 const DEMO = `${import.meta.env.BASE_URL}demo-thermal.jpg`
@@ -84,7 +85,53 @@ function useHeading() {
   return heading
 }
 
-function DetectionHome() {
+function FusionPanel({ maxTemp, hotspots, onEvacuate }) {
+  const [flame, setFlame] = useState(0)
+  const [smoke, setSmoke] = useState(0)
+  const [history, setHistory] = useState([])
+
+  useEffect(() => {
+    const id = setInterval(() => setHistory((cur) => [...cur.slice(-29), { t: Date.now(), temp: maxTemp }]), 1000)
+    return () => clearInterval(id)
+  }, [maxTemp])
+
+  const derived = useMemo(() => {
+    if (history.length < 2) return { ror: 0, sustainedSec: 0 }
+    const first = history[0]
+    const last = history[history.length - 1]
+    const minutes = Math.max((last.t - first.t) / 60000, 0.02)
+    const ror = Math.max(0, (last.temp - first.temp) / minutes)
+    let sustained = 0
+    for (let i = history.length - 1; i >= 0; i -= 1) { if (history[i].temp >= 65) sustained += 1; else break }
+    return { ror, sustainedSec: sustained }
+  }, [history])
+
+  const result = useMemo(() => fusePreventionSignals({
+    thermal: { maxTemp, ror: derived.ror, sustainedSec: derived.sustainedSec, multiNode: hotspots >= 2 },
+    visual: { flame, smoke },
+    thresholds: { high: 65, medium: 45 },
+  }), [maxTemp, derived, flame, smoke, hotspots])
+
+  const meta = result.level === 'alarm' ? { label: '判定火警', cls: 'alarm' } : result.level === 'watch' ? { label: '关注复核', cls: 'watch' } : { label: '监测正常', cls: 'normal' }
+
+  return (
+    <section className="usr-card usr-fusion">
+      <div className="usr-card-head"><div><strong>三路证据融合判定</strong><small>视觉 + 烟雾 + 热像，单路不报警</small></div><Waves size={18} /></div>
+      <div className={`usr-fusion-level ${meta.cls}`}><ShieldAlert size={17} /><strong>{meta.label}</strong><span>判据得分 {(result.score * 100).toFixed(0)}% · 证据 {result.evidenceCount} 路</span></div>
+      <div className="usr-fusion-bar"><i style={{ width: `${Math.round(result.score * 100)}%` }} /></div>
+      <div className="usr-fusion-rows">
+        <div className={`usr-fusion-row ${result.flags.thermalStrong || result.flags.tempHit ? 'on' : ''}`}><span><Thermometer size={15} /></span><div><strong>热像证据</strong><small>{maxTemp.toFixed(1)}°C · 升温 {derived.ror.toFixed(1)}°C/分</small></div><em>{result.flags.thermalStrong ? '强' : result.flags.tempHit ? '超阈' : '正常'}</em></div>
+        <div className={`usr-fusion-row ${result.flags.flameSeen ? 'on' : ''}`}><span><Flame size={15} /></span><div><strong>视觉火焰</strong><small>演示滑杆</small></div><input type="range" min="0" max="100" value={Math.round(flame * 100)} onChange={(e) => setFlame(Number(e.target.value) / 100)} /></div>
+        <div className={`usr-fusion-row ${result.flags.smokeSeen ? 'on' : ''}`}><span><Eye size={15} /></span><div><strong>烟雾证据</strong><small>演示滑杆</small></div><input type="range" min="0" max="100" value={Math.round(smoke * 100)} onChange={(e) => setSmoke(Number(e.target.value) / 100)} /></div>
+      </div>
+      <div className="usr-fusion-reasons">{result.reasons.map((reason) => <span key={reason}>{reason}</span>)}</div>
+      {result.level === 'alarm' && <button type="button" className="usr-fusion-alarm" onClick={onEvacuate}><BellRing size={15} />立即疏散逃生</button>}
+      <p className="usr-fusion-note"><ShieldAlert size={12} />单路证据不报警，两路或完整热像证据链才确认，降低误报。</p>
+    </section>
+  )
+}
+
+function DetectionHome({ onEvacuate }) {
   const inputRef = useRef(null)
   const [image, setImage] = useState('')
   const [fileName, setFileName] = useState('')
@@ -154,6 +201,8 @@ function DetectionHome() {
           <div className="usr-explain"><span><ShieldAlert size={16} /></span><p>基于温度轮廓与扩散梯度分析，区分正常热源与火灾隐患，有效降低误报率。</p></div>
         </section>
       )}
+
+      {result && <FusionPanel maxTemp={result.maxTemp} hotspots={result.hotspots.length} onEvacuate={onEvacuate} />}
     </div>
   )
 }
@@ -398,7 +447,7 @@ export default function UserApp() {
       </header>
 
       <main className="usr-main">
-        {tab === 'home' ? <DetectionHome /> : tab === 'ar' ? <ArEscape exit={exit} onPickExit={setExitId} siren={siren} /> : <MorePage />}
+        {tab === 'home' ? <DetectionHome onEvacuate={() => setTab('ar')} /> : tab === 'ar' ? <ArEscape exit={exit} onPickExit={setExitId} siren={siren} /> : <MorePage />}
       </main>
 
       <nav className="usr-tabs">
