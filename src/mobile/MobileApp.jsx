@@ -72,10 +72,10 @@ const DEMO_LIVE = `${import.meta.env.BASE_URL}demo-live.gif`
 
 const tabs = [
   { id: 'home', label: '首页检测', icon: ScanLine },
+  { id: 'guide', label: '疏散导航', icon: Compass },
   { id: 'camera', label: '现场监控', icon: Video },
   { id: 'alerts', label: '预警记录', icon: BellRing },
   { id: 'dashboard', label: '数据看板', icon: BarChart3 },
-  { id: 'guide', label: '疏散导航', icon: Compass },
   { id: 'about', label: '关于项目', icon: Layers3 },
 ]
 
