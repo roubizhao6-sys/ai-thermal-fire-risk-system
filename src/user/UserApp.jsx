@@ -385,7 +385,7 @@ function MorePage() {
 }
 
 export default function UserApp() {
-  const [tab, setTab] = useState('home')
+  const [tab, setTab] = useState('ar')
   const [exitId, setExitId] = useState('library')
   const siren = useSiren()
   const exit = EXITS.find((e) => e.id === exitId) || EXITS[0]
@@ -402,8 +402,8 @@ export default function UserApp() {
       </main>
 
       <nav className="usr-tabs">
-        <button type="button" className={tab === 'home' ? 'active' : ''} onClick={() => setTab('home')}><ScanLine size={19} /><span>首页检测</span></button>
         <button type="button" className={tab === 'ar' ? 'active' : ''} onClick={() => setTab('ar')}><Navigation size={19} /><span>AR实景逃生</span></button>
+        <button type="button" className={tab === 'home' ? 'active' : ''} onClick={() => setTab('home')}><ScanLine size={19} /><span>首页检测</span></button>
         <button type="button" className={tab === 'more' ? 'active' : ''} onClick={() => setTab('more')}><QrCode size={19} /><span>更多功能</span></button>
       </nav>
     </div>
