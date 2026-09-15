@@ -39,6 +39,18 @@ GitHub Pages 自动部署：`git push origin main` 后会自动跑 `Deploy to Gi
 - 手机安装中心：.../mobile-install.html
 - Mac 安装包：https://github.com/roubizhao6-sys/ai-thermal-fire-risk-system/releases/latest
 
+## 提供「App 下载链接」的固定格式（用户明确要求，必须遵守）
+当用户要「App 下载链接 / 下载链接 / 手机下载链接」时，**一律按下面这种格式输出**：两端分开 + 描述文件链接 + 安装步骤，不要只丢一个网址。
+
+- 🧯 用户端（热感哨兵）：https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/user/
+  - 描述文件：https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/thermal-guard.mobileconfig
+- 🏢 系统端（燧瞳智感）：https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/system/
+  - 描述文件：https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/thermal-guard-system.mobileconfig
+- 📲 安装中心：https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/mobile-install.html
+
+安装步骤（iPhone/iPad，用 Safari）：打开对应描述文件链接 → 允许 → 设置 → 通用 → VPN 与设备管理 → 已下载的描述文件 → 安装。
+Android：Chrome 打开对应链接 → ⋮ → 安装应用 / 添加到主屏幕。
+
 ## 手机 App 页面结构（底部 6 个 tab）
 首页检测 / 现场监控 / 预警记录 / 数据看板 / 疏散导航 / 关于项目
 另有：数字消防演练、AR 实景导航、本机摄像头、手机 GPS 实时定位（GpsPanel）、AI 火警网警指挥中心、科大校园 3D、指南针疏散等。
