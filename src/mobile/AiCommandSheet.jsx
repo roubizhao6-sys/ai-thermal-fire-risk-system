@@ -61,6 +61,10 @@ export default function AiCommandSheet({ onClose, onSaved }) {
           </select>
         </label>
         <p className="ai-sheet-hint">{AI_PROVIDERS[form.provider]?.hint}</p>
+        <p className="ai-sheet-hint">
+          现场部署：在本机跑 <b>node tools/local-ai-server.mjs</b>，改用 http://127.0.0.1:4173 打开系统端，
+          端点填相对路径 <b>/ai/v1</b>。这样站点与模型同在 http 源内，断网也能指挥；公网 HTTPS 页面会拦截 http 端点。
+        </p>
 
         <label className="ai-sheet-field">
           端点地址

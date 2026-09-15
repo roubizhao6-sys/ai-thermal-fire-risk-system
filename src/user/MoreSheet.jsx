@@ -348,6 +348,10 @@ export default function MoreSheet({
               </select>
             </label>
             <p className="ai-preset-hint">{AI_PROVIDERS[aiSettings.provider]?.hint}</p>
+            <p className="ai-preset-hint">
+              现场用法：在本机跑 <b>node tools/local-ai-server.mjs</b>，用 http://127.0.0.1:4173 打开本页，
+              端点就能填相对路径 <b>/ai/v1</b>（同源转发到本地模型）。公网 HTTPS 页面会拦截 http 端点，所以别在演示站上填 127.0.0.1。
+            </p>
             <label className="ai-field">
               端点地址
               <input
