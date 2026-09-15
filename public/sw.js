@@ -1,5 +1,5 @@
-const CACHE = 'thermal-guard-v16'
-const CORE = ['./', './index.html', './mobile-app.html', './mobile-install.html', './app-access.html', './thermal-guard.mobileconfig', './demo-live.gif', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png']
+const CACHE = 'thermal-guard-v17'
+const CORE = ['./', './index.html', './mobile-app.html', './mobile-install.html', './app-access.html', './privacy.html', './support.html', './thermal-guard.mobileconfig', './demo-live.gif', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png']
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()))
@@ -39,6 +39,6 @@ self.addEventListener('fetch', event => {
         }
         return response
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request).then((cached) => cached || (event.request.mode === 'navigate' ? caches.match('./index.html') : undefined)))
   )
 })

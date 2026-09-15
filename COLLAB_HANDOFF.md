@@ -55,6 +55,16 @@
 ### 3.3 macOS 原生 App（`macos/AIThermalFireGuard/`）
 SwiftUI 原生 App，支持模拟热像仪、ESP32 USB 串口、Wi-Fi WebSocket、32×24 热成像矩阵、风险分级、SceneKit 3D 热源重建、指南针疏散。构建：`cd macos/AIThermalFireGuard && ./script/build_and_run.sh`。
 
+附加能力（近期新增）：
+- **自动处置联动**：声光报警、应急广播、非消防电源断电、电梯迫降、消防泵启动（WebAudio 警报音 + 一键全部启动）。
+- **疏散人员清点**：撤离后逐一点名，统计已确认/未确认人员。
+- **热力历史回放**：拖动时间轴回放「常温 → 升温 → 触发预警」。
+- **校园全域态势图**：各楼栋实时风险热力 + 告警点。
+- **一键导出 PDF 报告**：`openPdfReport()` 打开打印友好页面。
+- **告警通知**：Notification API 推送（Chrome/Android）。
+- **消防设施扫码巡检**、**AI 消防知识助手**（本地知识库）、**隐患随手拍上报**（存 localStorage）。
+- **离线 PWA 缓存**：`public/sw.js`（v17）预缓存应用外壳 + 离线导航回退。
+
 ### 3.4 教学视频（`thermal-video/`）
 Remotion 生成的「硬件安装与手机 App 联动 3D 教学视频」，成品在 `output/`。
 

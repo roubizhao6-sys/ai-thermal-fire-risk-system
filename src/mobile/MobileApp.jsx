@@ -63,6 +63,16 @@ import {
   Upload,
   Wifi,
   WifiOff,
+  Volume2,
+  VolumeX,
+  Power,
+  Plug,
+  MessageCircle,
+  Send,
+  FileText,
+  QrCode,
+  Users,
+  UserX,
   X,
   Zap,
 } from 'lucide-react'
@@ -1526,10 +1536,12 @@ function DashboardPage({ frame, inference, onOpenCommand }) {
         </div>
         <button type="button" className="command-open" onClick={onOpenCommand}><Siren size={16} />进入指挥中心</button>
       </section>
+      <SituationMap frame={frame} />
       <div className="dashboard-grid">{stats.map(([label, value, unit, change, Icon, tone]) => <article className={`dashboard-stat tone-${tone}`} key={label}><span><Icon size={16} /></span><p>{label}</p><strong>{value}<small>{unit}</small></strong><em>{change}</em></article>)}</div>
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>风险趋势</strong><small>近30日最高温度预警指数</small></div><TrendingUp size={18} /></div><LineChart /></section>
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>隐患类型分布</strong><small>高频隐患分类统计</small></div><BarChart3 size={18} /></div><div className="bar-chart">{[['电气过热', 72], ['设备异常', 58], ['环境温升', 44], ['线路老化', 31], ['其他', 26]].map(([label, value], index) => <div className="bar-row" key={label}><span>{label}</span><div><i style={{ width: `${value}%`, '--bar-delay': `${index * 90}ms` }} /></div><b>{value}</b></div>)}</div></section>
-      <div className="dashboard-note"><Activity size={16} />数据用于隐患识别、巡检优先级排序和风险治理优化。</div>
+      <HeatReplay frame={frame} />
+            <div className="dashboard-note"><Activity size={16} />数据用于隐患识别、巡检优先级排序和风险治理优化。</div>
     </div>
   )
 }
@@ -1542,7 +1554,10 @@ function AboutPage({ onStartDrill }) {
       <section className="mobile-card innovation-card"><div className="card-head"><div><strong>十大核心创新</strong><small>AI火警网警的完整创新链</small></div><Sparkles size={18} /></div>{[['灾前预警', '在明火和烟雾出现前识别温度异常'], ['精准定位', '红橙热区标注高温隐患位置'], ['AI时序推理', '温度轮廓、扩散梯度与持续特征融合'], ['低误报率', '多维度证据区分正常热源与真实隐患'], ['数字孪生', '楼层热区与监控设备三维联动'], ['动态疏散', '根据热区与封控实时重规划路线'], ['3D热感重建', '将热成像板数据映射到空间热源场景'], ['数字演练', '模拟火情、计时撤离与自动评分'], ['证据链', '自动留存检测与处置全过程'], ['边缘部署', '老旧楼宇无需大规模重新布线']].map(([title, text], index) => <div className="innovation-row" key={title}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{title}</strong><p>{text}</p></div></div>)}</section>
       <section className="mobile-card drill-entry-card"><div className="drill-entry-icon"><ShieldCheck size={21} /></div><div><strong>数字消防演练</strong><p>模拟火情、计时撤离、自动评分并生成证据记录。</p></div><button type="button" onClick={onStartDrill}>进入演练</button></section>
       <section className="mobile-card advantage-card"><div><ShieldCheck size={19} /><strong>复杂场景适配</strong></div><p>适配老旧楼宇、仓库、配电房和人员密集楼道，无需大规模重新布线，硬件成本可控，适合民用普及。</p></section>
-      <div className="disclaimer"><ShieldAlert size={17} /><p>本系统为科研演示原型，不替代专业消防检测设备与灭火系统。</p></div>
+      <InspectionPanel />
+      <FireAssistant />
+      <HazardReport />
+            <div className="disclaimer"><ShieldAlert size={17} /><p>本系统为科研演示原型，不替代专业消防检测设备与灭火系统。</p></div>
     </div>
   )
 }
@@ -1582,6 +1597,16 @@ function CommandCenter({ frame, inference, onClose, onStartDrill }) {
     } catch {}
     window.setTimeout(() => setBroadcast(false), 4200)
   }
+  const sendNotification = async () => {
+    if (typeof Notification === 'undefined') return
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        new Notification('AI火警告警', { body: `检测到${riskTitle(frame?.risk || 'low')}热源，最高温度 ${maxTemp.toFixed(1)}°C，请立即疏散。` })
+      }
+    } catch {}
+  }
+
   const downloadReport = () => {
     const report = {
       system: '燧瞳智感 AI火警网警系统',
@@ -1595,6 +1620,8 @@ function CommandCenter({ frame, inference, onClose, onStartDrill }) {
       evacuationEta: route?.eta,
       forecast: buildingForecast,
       exits,
+      risk: frame?.risk || 'low',
+      riskLabel: riskTitle(frame?.risk || 'low'),
     }
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -1623,14 +1650,363 @@ function CommandCenter({ frame, inference, onClose, onStartDrill }) {
           <div className="command-card-head"><div><Waves size={16} /><strong>动态疏散路径</strong></div><span>{route?.distance} 米 · {route?.eta} 秒</span></div>
           <div className="command-route-steps">{route?.steps?.map((step) => <span key={step}>{step}</span>)}</div>
         </section>
+        <LinkagePanel risk={frame?.risk || 'low'} />
+        <RollcallPanel />
         <div className="command-actions">
           <button type="button" className={broadcast ? 'active' : ''} onClick={speak}><Megaphone size={16} />{broadcast ? '正在广播' : '语音疏散广播'}</button>
           <button type="button" onClick={onStartDrill}><ClipboardCheck size={16} />启动数字演练</button>
-          <button type="button" onClick={downloadReport}><Download size={16} />生成处置单</button>
+          <button type="button" onClick={sendNotification}><BellRing size={16} />告警通知</button>
+          <button type="button" onClick={downloadReport}><Download size={16} />处置单JSON</button>
+          <button type="button" onClick={() => openPdfReport({ system: '燧瞳智感 AI火警网警系统', generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }), location: '澳门科技大学校园数字孪生', risk: frame?.risk || 'low', riskLabel: riskTitle(frame?.risk || 'low'), riskIndex, maxTemp, hotspotCount: hotspots, recommendedExit: exits[0].name, evacuationDistance: route?.distance, evacuationEta: route?.eta })}><FileText size={16} />导出PDF报告</button>
         </div>
       </section>
     </div>
   )
+}
+
+/* ===== 全域态势 + 处置联动 + 巡检 + 知识助手 + 隐患上报 ===== */
+
+function SituationMap({ frame }) {
+  const hotspots = frame?.hotspots?.length || 0
+  const maxTemp = Number(frame?.maxTemp || 0)
+  const buildings = [
+    { id: 'library', name: '图书馆', x: 52, y: 22, base: 0.18 },
+    { id: 'b', name: '教学楼B', x: 24, y: 38, base: 0.1 },
+    { id: 'o', name: '教学楼O', x: 42, y: 34, base: 0.14 },
+    { id: 'r', name: '综合大楼', x: 70, y: 36, base: 0.22 },
+    { id: 'h', name: '科技大楼', x: 80, y: 52, base: 0.28 },
+    { id: 'p', name: 'P座宿舍', x: 30, y: 62, base: 0.16 },
+  ]
+  const [selected, setSelected] = useState('library')
+  const scoreFor = (b) => Math.min(99, Math.round((maxTemp - 34) * 0.9 + hotspots * 5 + b.base * 100))
+  const selectedBuilding = buildings.find((b) => b.id === selected)
+  const alertCount = Math.max(1, hotspots)
+
+  return (
+    <section className="mobile-card situation-card">
+      <div className="card-head"><div><strong>校园全域态势图</strong><small>各楼栋实时风险热力与告警点位</small></div><MapPin size={18} /></div>
+      <div className="situation-map">
+        <svg viewBox="0 0 100 80" role="img" aria-label="校园全域风险态势图">
+          <rect x="4" y="4" width="92" height="72" rx="7" fill="#04101f" stroke="#2f6ba3" strokeOpacity=".4" />
+          <path d="M4 40 H96 M50 4 V76" stroke="#3b82f6" strokeOpacity=".1" />
+          <path d="M10 58 Q 30 52 50 58 T 92 56" fill="none" stroke="#1d5d8f" strokeOpacity=".5" />
+          {buildings.map((b) => {
+            const score = scoreFor(b)
+            const tone = score >= 65 ? '#ef4444' : score >= 45 ? '#f59e0b' : '#22c55e'
+            return (
+              <g key={b.id} onClick={() => setSelected(b.id)} className={selected === b.id ? 'selected' : ''}>
+                <rect x={b.x - 7} y={b.y - 5} width="14" height="10" rx="2.5" fill={tone} opacity={selected === b.id ? '.95' : '.75'} stroke="#eaf4ff" strokeOpacity=".35" strokeWidth=".5" />
+                <text x={b.x} y={b.y + 9} textAnchor="middle" fontSize="3.4" fill="#d7e8f8">{b.name}</text>
+                {score >= 45 && <circle cx={b.x + 7} cy={b.y - 5} r="2" fill="#ef4444"><animate attributeName="opacity" values="1;.2;1" dur="1.1s" repeatCount="indefinite" /></circle>}
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+      <div className="situation-meta">
+        <div><span>当前楼栋</span><strong>{selectedBuilding?.name}</strong></div>
+        <div><span>风险评分</span><strong>{scoreFor(selectedBuilding)}</strong><small>/100</small></div>
+        <div><span>告警点</span><strong>{alertCount}</strong></div>
+      </div>
+      <p className="situation-note"><Info size={12} />颜色代表风险等级：绿-正常 / 黄-关注 / 红-告警。点击楼栋查看详情。</p>
+    </section>
+  )
+}
+
+function HeatReplay({ frame }) {
+  const maxTemp = Number(frame?.maxTemp || 0)
+  const [index, setIndex] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const history = useMemo(() => Array.from({ length: 30 }, (_, i) => {
+    const t = i / 29
+    const value = Math.round(34 + (maxTemp - 34) * (0.35 * t + 0.65 * t * t))
+    return { t: i, value, risk: value >= 65 ? 'high' : value >= 45 ? 'medium' : 'low' }
+  }), [maxTemp])
+
+  useEffect(() => {
+    if (!playing) return undefined
+    const id = setInterval(() => setIndex((i) => {
+      if (i >= 29) { setPlaying(false); return 29 }
+      return i + 1
+    }), 180)
+    return () => clearInterval(id)
+  }, [playing])
+
+  const current = history[index]
+  const max = Math.max(...history.map((h) => h.value))
+  const min = Math.min(...history.map((h) => h.value))
+  const points = history.map((h) => `${4 + (h.t / 29) * 92},${72 - ((h.value - min) / Math.max(max - min, 1)) * 58}`).join(' ')
+
+  return (
+    <section className="mobile-card heat-replay-card">
+      <div className="card-head"><div><strong>热力历史回放</strong><small>拖动时间轴查看温度演变与风险触发</small></div><TrendingUp size={18} /></div>
+      <svg className="heat-replay-chart" viewBox="0 0 100 80" preserveAspectRatio="none">
+        <defs><linearGradient id="heat-replay-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f97316" stopOpacity=".3" /><stop offset="1" stopColor="#f97316" stopOpacity="0" /></linearGradient></defs>
+        <polyline points={points} fill="none" stroke="#f97316" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
+        <circle cx={4 + (index / 29) * 92} cy={72 - ((current.value - min) / Math.max(max - min, 1)) * 58} r="2.2" fill="#fff" stroke="#f97316" strokeWidth="1" />
+      </svg>
+      <div className="heat-replay-info">
+        <span className={`route-risk route-${current.risk}`}>{riskTitle(current.risk)}</span>
+        <strong>{current.value.toFixed(0)}°C</strong>
+        <small>{Math.round((index / 29) * 100)}% 时间轴</small>
+      </div>
+      <input type="range" min="0" max="29" value={index} onChange={(e) => setIndex(Number(e.target.value))} className="heat-replay-slider" />
+      <div className="heat-replay-controls">
+        <button type="button" onClick={() => setPlaying((p) => !p)}>{playing ? <Pause size={15} /> : <Play size={15} />}{playing ? '暂停' : '播放'}</button>
+        <button type="button" onClick={() => { setPlaying(false); setIndex(0) }}><RotateCcw size={15} />重置</button>
+      </div>
+      <p className="situation-note"><Info size={12} />回放为模拟数据，用于演示「常温 → 升温 → 触发预警」的灾前过程。</p>
+    </section>
+  )
+}
+
+const LINKAGE_DEVICES = [
+  { id: 'alarm', name: '声光报警器', desc: '启动声光警示', icon: BellRing },
+  { id: 'broadcast', name: '应急广播', desc: '播报疏散指令', icon: Megaphone },
+  { id: 'power', name: '非消防电源断电', desc: '切断普通电源', icon: Power },
+  { id: 'elevator', name: '电梯迫降', desc: '电梯归首层', icon: DoorOpen },
+  { id: 'pump', name: '消防泵启动', desc: '启动喷淋供水', icon: Plug },
+]
+
+function LinkagePanel({ risk }) {
+  const [done, setDone] = useState({})
+  const [siren, setSiren] = useState(false)
+  const audioRef = useRef(null)
+
+  useEffect(() => () => { try { audioRef.current?.ctx?.close() } catch {} }, [])
+
+  const toggleSiren = () => {
+    if (siren) {
+      try { audioRef.current?.ctx?.close() } catch {}
+      audioRef.current = null
+      setSiren(false)
+      return
+    }
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext
+      const ctx = new Ctx()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      const lfo = ctx.createOscillator()
+      const lfoGain = ctx.createGain()
+      osc.type = 'sawtooth'
+      osc.frequency.value = 760
+      lfo.type = 'sine'
+      lfo.frequency.value = 1.8
+      gain.gain.value = 0.0001
+      lfoGain.gain.value = 0.045
+      lfo.connect(lfoGain)
+      lfoGain.connect(gain.gain)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start()
+      lfo.start()
+      gain.gain.linearRampToValueAtTime(0.11, ctx.currentTime + 0.08)
+      audioRef.current = { ctx, osc, lfo, gain, lfoGain }
+      setSiren(true)
+      navigator.vibrate?.([280, 110, 280, 110, 280])
+    } catch {}
+  }
+
+  const arm = (id) => setDone((d) => ({ ...d, [id]: !d[id] }))
+  const armAll = () => setDone(Object.fromEntries(LINKAGE_DEVICES.map((d) => [d.id, true])))
+  const doneCount = LINKAGE_DEVICES.filter((d) => done[d.id]).length
+
+  return (
+    <section className="mobile-card linkage-card">
+      <div className="card-head"><div><strong>自动处置联动</strong><small>火警确认后自动执行设备联动</small></div><Zap size={18} /></div>
+      <div className={`linkage-banner risk-${risk || 'low'}`}>{siren ? <Volume2 size={18} /> : <VolumeX size={18} />}<span>{risk === 'high' ? '已触发高风险，建议立即启动联动' : '可手动演练联动流程'}</span><button type="button" className={siren ? 'active' : ''} onClick={toggleSiren}>{siren ? '停止警报' : '启动警报'}</button></div>
+      <div className="linkage-list">
+        {LINKAGE_DEVICES.map((d) => {
+          const Icon = d.icon
+          const on = Boolean(done[d.id])
+          return <div className={`linkage-row ${on ? 'on' : ''}`} key={d.id} onClick={() => arm(d.id)}><span className="linkage-icon"><Icon size={16} /></span><div><strong>{d.name}</strong><small>{d.desc}</small></div><em>{on ? '已执行' : '待执行'}</em></div>
+        })}
+      </div>
+      <div className="linkage-progress"><div><i style={{ width: `${(doneCount / LINKAGE_DEVICES.length) * 100}%` }} /></div><span>{doneCount}/{LINKAGE_DEVICES.length} 已执行</span></div>
+      <button type="button" className="linkage-arm-all" onClick={armAll}><Zap size={15} />一键启动全部联动</button>
+    </section>
+  )
+}
+
+const ROLLCALL_PEOPLE = [
+  { id: 'p1', name: '陈同学', zone: '图书馆 3F 阅览室' },
+  { id: 'p2', name: '林同学', zone: '教学楼 B 402' },
+  { id: 'p3', name: '王同学', zone: '综合大楼 2F 实验室' },
+  { id: 'p4', name: '黄同学', zone: 'P 座宿舍 5F' },
+  { id: 'p5', name: '李老师', zone: '科技大楼 1F 门厅' },
+  { id: 'p6', name: '郑同学', zone: '教学楼 O 305' },
+]
+
+function RollcallPanel() {
+  const [status, setStatus] = useState({})
+  const toggle = (id) => setStatus((s) => ({ ...s, [id]: s[id] === 'safe' ? 'missing' : 'safe' }))
+  const safeCount = ROLLCALL_PEOPLE.filter((p) => status[p.id] === 'safe').length
+  const allSafe = safeCount === ROLLCALL_PEOPLE.length
+
+  return (
+    <section className="mobile-card rollcall-card">
+      <div className="card-head"><div><strong>疏散人员清点</strong><small>撤离后逐一点名确认，快速定位未到位人员</small></div><Users size={18} /></div>
+      <div className="rollcall-summary">
+        <div><span>已确认安全</span><strong>{safeCount}</strong><small>/ {ROLLCALL_PEOPLE.length}</small></div>
+        <div><span>未确认</span><strong className={safeCount === ROLLCALL_PEOPLE.length ? 'ok' : 'warn'}>{ROLLCALL_PEOPLE.length - safeCount}</strong></div>
+      </div>
+      <div className="rollcall-progress"><div><i style={{ width: `${(safeCount / ROLLCALL_PEOPLE.length) * 100}%` }} /></div></div>
+      <div className="rollcall-list">
+        {ROLLCALL_PEOPLE.map((p) => {
+          const safe = status[p.id] === 'safe'
+          return <div className={`rollcall-row ${safe ? 'safe' : ''}`} key={p.id} onClick={() => toggle(p.id)}><span className="rollcall-state">{safe ? <ShieldCheck size={16} /> : <UserX size={16} />}</span><div><strong>{p.name}</strong><small>{p.zone}</small></div><em>{safe ? '已安全' : '未确认'}</em></div>
+        })}
+      </div>
+      {allSafe && <div className="rollcall-done"><CheckCircle2 size={16} />全员已确认安全撤离</div>}
+    </section>
+  )
+}
+
+const FACILITIES = [
+  { id: 'f1', name: '灭火器', code: 'A-01', location: '图书馆 1F 东侧', expire: '2027-06', status: '正常' },
+  { id: 'f2', name: '室内消火栓', code: 'B-03', location: '教学楼 B 3F 走廊', expire: '2027-01', status: '正常' },
+  { id: 'f3', name: '应急照明', code: 'C-12', location: '综合大楼 2F 楼梯间', expire: '2026-12', status: '临近到期' },
+  { id: 'f4', name: '疏散指示', code: 'D-07', location: 'P 座宿舍 5F 出口', expire: '2027-09', status: '正常' },
+]
+
+function InspectionPanel() {
+  const [records, setRecords] = useState(FACILITIES)
+  const [scanMsg, setScanMsg] = useState('')
+  const inspect = (id) => setRecords((r) => r.map((f) => (f.id === id ? { ...f, status: '正常', last: new Date().toLocaleDateString('zh-CN') } : f)))
+  const tryScan = async () => {
+    if (!('BarcodeDetector' in window)) { setScanMsg('当前浏览器不支持扫码识别，建议用 Chrome，或直接手动登记。'); return }
+    setScanMsg('已调用扫码识别（Chrome 支持），对准设施二维码即可。')
+  }
+  return (
+    <section className="mobile-card inspection-card">
+      <div className="card-head"><div><strong>消防设施扫码巡检</strong><small>灭火器、消火栓定期检查与到期提醒</small></div><QrCode size={18} /></div>
+      <button type="button" className="inspection-scan" onClick={tryScan}><ScanLine size={15} />扫码检查</button>
+      {scanMsg && <p className="inspection-scan-msg">{scanMsg}</p>}
+      <div className="inspection-list">
+        {records.map((f) => (
+          <div className={`inspection-row ${f.status === '临近到期' ? 'warn' : ''}`} key={f.id}>
+            <span className="inspection-icon"><QrCode size={15} /></span>
+            <div><strong>{f.name} · {f.code}</strong><small>{f.location}{f.last ? ` · 上次检查 ${f.last}` : ''}</small><em>有效期至 {f.expire}</em></div>
+            <button type="button" onClick={() => inspect(f.id)}><CheckCircle2 size={14} />登记</button>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+const FIRE_KB = [
+  { kw: ['灭火器', '怎么用', '使用'], answer: '干粉灭火器口诀「提拔握压」：提起灭火器 → 拔掉保险销 → 握住喷管对准火源根部 → 压下压把扫射。使用前先确认火势较小且疏散通道畅通。' },
+  { kw: ['温度', '多少度', '正常'], answer: '一般设备表面温度 40-60°C 需关注，超过 65°C 建议现场核查，超过 80°C 应视为高风险并立即处置。具体阈值需结合设备类型与环境。' },
+  { kw: ['报警', '119', '电话'], answer: '发现火情先保证自身安全，迅速拨打 119，说清地址、起火物、火势大小、是否有人被困，并到路口引导消防车。' },
+  { kw: ['疏散', '逃生', '撤离'], answer: '用湿毛巾捂住口鼻、低姿前行，沿疏散指示和绿色路线撤离，不乘坐电梯，不要返回取物，到安全集合点后向负责人报告。' },
+  { kw: ['电气', '火灾', '线路'], answer: '电气火灾先切断电源，切勿用水扑救带电设备，使用干粉或二氧化碳灭火器，并通知专业电工检查线路。' },
+  { kw: ['烟雾', '烟'], answer: '烟雾含有毒气且向上聚集，逃生时尽量贴近地面，用湿布捂住口鼻，避免吸入浓烟。' },
+]
+
+function FireAssistant() {
+  const [input, setInput] = useState('')
+  const [msgs, setMsgs] = useState([{ role: 'bot', text: '你好，我是消防知识助手。可以问我：灭火器怎么用、多少度算危险、如何疏散逃生、电气火灾怎么办等。' }])
+  const ask = () => {
+    const q = input.trim()
+    if (!q) return
+    const found = FIRE_KB.find((item) => item.kw.some((k) => q.includes(k)))
+    const answer = found ? found.answer : '我暂时只能回答消防常见问题。你可以尝试输入：灭火器使用、温度阈值、报警、疏散、电气火灾、烟雾。'
+    setMsgs((m) => [...m, { role: 'user', text: q }, { role: 'bot', text: answer }])
+    setInput('')
+  }
+  return (
+    <section className="mobile-card assistant-card">
+      <div className="card-head"><div><strong>AI 消防知识助手</strong><small>本地知识库问答，可扩展接入大模型</small></div><MessageCircle size={18} /></div>
+      <div className="assistant-log">
+        {msgs.map((m, i) => <div className={`assistant-msg ${m.role}`} key={i}>{m.text}</div>)}
+      </div>
+      <div className="assistant-input"><input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') ask() }} placeholder="输入问题，例如：灭火器怎么用" /><button type="button" onClick={ask}><Send size={15} /></button></div>
+      <p className="situation-note"><Info size={12} />当前为本地规则问答（不联网），可替换为 OpenAI 兼容接口实现真正大模型问答。</p>
+    </section>
+  )
+}
+
+function HazardReport() {
+  const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('thermalGuardHazards') || '[]') } catch { return [] } })
+  const [desc, setDesc] = useState('')
+  const [loc, setLoc] = useState('')
+  const [img, setImg] = useState('')
+  const fileRef = useRef(null)
+
+  const pickImage = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setImg(reader.result)
+    reader.readAsDataURL(file)
+  }
+  const submit = () => {
+    if (!desc.trim() && !loc.trim()) return
+    const next = [{ id: `hz-${Date.now()}`, desc: desc.trim() || '未描述', loc: loc.trim() || '未填写位置', img, time: new Date().toLocaleString('zh-CN', { hour12: false }) }, ...items].slice(0, 20)
+    setItems(next)
+    localStorage.setItem('thermalGuardHazards', JSON.stringify(next))
+    setDesc(''); setLoc(''); setImg('')
+  }
+  return (
+    <section className="mobile-card hazard-card">
+      <div className="card-head"><div><strong>隐患随手拍上报</strong><small>拍照记录隐患位置，纳入待处理清单</small></div><Camera size={18} /></div>
+      <div className="hazard-form">
+        <input value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="隐患位置，例如：三楼配电箱旁" />
+        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="隐患描述，例如：线路发热、堆放可燃物" rows={2} />
+        <div className="hazard-photo-row">
+          <button type="button" onClick={() => fileRef.current?.click()}><Camera size={14} />{img ? '更换照片' : '拍照/选图'}</button>
+          {img && <img className="hazard-thumb" src={img} alt="隐患照片" />}
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={pickImage} style={{ display: 'none' }} />
+        </div>
+        <button type="button" className="hazard-submit" onClick={submit}><Send size={14} />提交隐患</button>
+      </div>
+      {items.length > 0 && <div className="hazard-list">{items.map((h) => <div className="hazard-row" key={h.id}><span><AlertTriangle size={14} /></span><div><strong>{h.loc}</strong><p>{h.desc}</p><small>{h.time}</small></div>{h.img && <img src={h.img} alt="" />}</div>)}</div>}
+    </section>
+  )
+}
+
+function openPdfReport(report) {
+  const row = (label, value) => `<tr><td>${label}</td><td>${value}</td></tr>`
+  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>AI火警处置报告</title>
+  <style>
+    body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;color:#0f172a;margin:0;padding:32px}
+    h1{font-size:22px;margin:0 0 4px} .sub{color:#64748b;font-size:12px;margin-bottom:18px}
+    h2{font-size:15px;color:#1d4ed8;border-left:4px solid #3b82f6;padding-left:8px;margin:20px 0 10px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    td{padding:9px 10px;border:1px solid #e2e8f0} td:first-child{width:130px;background:#f8fafc;color:#475569}
+    .risk{display:inline-block;padding:2px 10px;border-radius:999px;color:#fff;font-weight:700}
+    .footer{margin-top:26px;color:#94a3b8;font-size:11px}
+    @media print{body{padding:10px}}
+  </style></head><body>
+  <h1>AI火警网警 · 应急处置报告</h1><div class="sub">${report.system} · 生成时间 ${report.generatedAt}</div>
+  <h2>一、风险概况</h2><table>
+  ${row('检测位置', report.location)}
+  ${row('风险等级', `<span class="risk" style="background:${report.risk === 'high' ? '#ef4444' : report.risk === 'medium' ? '#f59e0b' : '#22c55e'}">${report.riskLabel}</span>`)}
+  ${row('风险指数', `${report.riskIndex} / 100`)}
+  ${row('最高温度', `${report.maxTemp.toFixed(1)}°C`)}
+  ${row('高温区域', `${report.hotspotCount} 处`)}
+  </table>
+  <h2>二、疏散建议</h2><table>
+  ${row('推荐出口', report.recommendedExit)}
+  ${row('疏散距离', `${report.evacuationDistance} 米`)}
+  ${row('预计用时', `${report.evacuationEta} 秒`)}
+  </table>
+  <h2>三、处置建议</h2><p>立即核查高温区域电源与可燃物，启动声光报警与应急广播，按绿色路线组织疏散，并拨打 119。持续监测温度趋势，留存全过程证据链。</p>
+  <div class="footer">本报告由「燧瞳智感 AI火警网警系统」自动生成，仅用于科研演示，不替代专业消防检测与处置。</div>
+  </body></html>`
+  const w = window.open('', '_blank')
+  if (w) {
+    w.document.write(html)
+    w.document.close()
+    w.focus()
+    setTimeout(() => { try { w.print() } catch {} }, 350)
+  } else {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  }
 }
 
 export default function MobileApp() {
