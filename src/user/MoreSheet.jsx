@@ -1,7 +1,7 @@
 // 「更多」面板：逃生路线图（上传 / 识别 / 本地保存）、AI 指挥设置、端切换入口。
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Cpu, DoorOpen, Image as ImageIcon, Link2, Save, Sparkles, Trash2, Upload } from 'lucide-react'
+import { Cpu, DoorOpen, Image as ImageIcon, Link2, Radio, Save, Sparkles, Trash2, Upload } from 'lucide-react'
 import { aiReachable, listAiProviders, providerPreset } from '../shared/aiClient.js'
 import { integrationStatus } from '../shared/aiHooks.js'
 import {
@@ -14,16 +14,21 @@ import {
   listPlans,
   savePlan,
 } from './floorplan.js'
+import OfflineLink from './OfflineLink.jsx'
 
 export default function MoreSheet({
   onClose,
   floor,
+  spot = 'C',
   aiSettings,
   onAiSettingsChange,
   plans,
   onPlansChange,
   activePlanId,
   onActivePlanChange,
+  nearestExit,
+  onImportEvent,
+  onReport,
 }) {
   const [tab, setTab] = useState('plan')
   const [draft, setDraft] = useState(null)
@@ -194,6 +199,9 @@ export default function MoreSheet({
           </button>
           <button type="button" role="tab" aria-selected={tab === 'swap'} className={tab === 'swap' ? 'active' : ''} onClick={() => setTab('swap')}>
             <Link2 size={15} /> 端切换
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'link'} className={tab === 'link' ? 'active' : ''} onClick={() => setTab('link')}>
+            <Radio size={15} /> 离线联通
           </button>
         </div>
 
@@ -424,6 +432,16 @@ export default function MoreSheet({
             </a>
             <p className="more-hint">也可以把两个地址分别加入主屏图标，现场一人一机同时使用。</p>
           </div>
+        )}
+
+        {tab === 'link' && (
+          <OfflineLink
+            floor={floor}
+            spot={spot}
+            nearestExit={nearestExit}
+            onImportEvent={onImportEvent}
+            onReport={onReport}
+          />
         )}
 
         <button className="done-button" type="button" onClick={onClose}>完成</button>

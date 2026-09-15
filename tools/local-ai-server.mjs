@@ -10,9 +10,16 @@
 // 用法：
 //   node tools/local-ai-server.mjs                 # 默认转发到 http://127.0.0.1:11434/v1（Ollama）
 //   node tools/local-ai-server.mjs --upstream http://127.0.0.1:1234/v1 --port 4173
+//
+// 同时它还是「局域网事件中继」：手机/电脑只要连现场热点并打开这个站点，
+// 用户端与系统端就能通过 /sync/* 交换火情与求助事件 —— **不需要互联网**。
+//    POST /sync/publish          发布一条事件
+//    GET  /sync/events?since=N   取第 N 条之后的事件（长轮询，最多等 wait 毫秒）
+//    GET  /sync/health           中继状态（前端用它判断"局域网链路是否可用"）
 
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
+import { networkInterfaces } from 'node:os'
 import { extname, join, normalize, resolve } from 'node:path'
 
 const args = process.argv.slice(2)
@@ -24,6 +31,19 @@ const readArg = (name, fallback) => {
 const port = Number(readArg('--port', '4173'))
 const upstream = readArg('--upstream', 'http://127.0.0.1:11434/v1').replace(/\/$/, '')
 const dist = resolve(readArg('--dist', 'dist'))
+// 默认监听所有网卡：手机连现场热点后要能直接打开这个站点（断网也能用中继）
+const host = readArg('--host', '0.0.0.0')
+
+function lanAddresses() {
+  const result = []
+  const interfaces = networkInterfaces()
+  Object.values(interfaces).forEach((list) => {
+    (list ?? []).forEach((item) => {
+      if (item.family === 'IPv4' && !item.internal) result.push(item.address)
+    })
+  })
+  return result
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -88,6 +108,76 @@ async function proxyAi(request, response) {
   }
 }
 
+// ---------------------------------------------------------------- 局域网事件中继
+// 目的：火场里可能没有互联网；只要手机和指挥端连在同一个现场热点上，就能互通。
+const relay = { events: [], waiters: new Set(), clients: 0 }
+
+function pushEvent(event) {
+  if (!event || !event.id) return null
+  if (relay.events.some((item) => item.event?.id === event.id)) {
+    return relay.events.find((item) => item.event?.id === event.id)
+  }
+  const record = { seq: relay.events.length + 1, at: Date.now(), event }
+  relay.events.push(record)
+  if (relay.events.length > 200) relay.events.splice(0, relay.events.length - 200)
+  let seq = record.seq - 1
+  relay.waiters.forEach((waiter) => {
+    if (waiter.since >= seq) return
+    clearTimeout(waiter.timer)
+    relay.waiters.delete(waiter)
+    waiter.reply()
+  })
+  console.log(`[relay] 事件 ${event.kind} id=${event.id} 已广播（客户端 ${relay.clients}）`)
+  return record
+}
+
+async function handleRelay(request, response, url) {
+  const corsHeaders = { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
+  if (url.pathname === '/sync/health') {
+    response.writeHead(200, corsHeaders)
+    response.end(JSON.stringify({ ok: true, clients: relay.clients, events: relay.events.length, seq: relay.events.length, uptimeSec: Math.round(process.uptime()) }))
+    return
+  }
+  if (url.pathname === '/sync/publish' && request.method === 'POST') {
+    const chunks = []
+    for await (const chunk of request) chunks.push(chunk)
+    let event = null
+    try {
+      event = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+    } catch {
+      response.writeHead(400, corsHeaders)
+      response.end(JSON.stringify({ ok: false, error: 'bad-json' }))
+      return
+    }
+    const record = pushEvent(event)
+    response.writeHead(200, corsHeaders)
+    response.end(JSON.stringify({ ok: Boolean(record), seq: record?.seq ?? relay.events.length }))
+    return
+  }
+  if (url.pathname === '/sync/events' && request.method === 'GET') {
+    const since = Number(url.searchParams.get('since')) || 0
+    const wait = Math.max(0, Math.min(25000, Number(url.searchParams.get('wait')) || 0))
+    const reply = () => {
+      const events = relay.events.filter((item) => item.seq > since).map((item) => item.event)
+      response.writeHead(200, corsHeaders)
+      response.end(JSON.stringify({ ok: true, seq: relay.events.length, clients: relay.clients, events }))
+    }
+    if (relay.events.length > since || wait === 0) {
+      reply()
+      return
+    }
+    const waiter = { since, reply, timer: setTimeout(() => { relay.waiters.delete(waiter); reply() }, wait) }
+    relay.waiters.add(waiter)
+    request.on('close', () => {
+      clearTimeout(waiter.timer)
+      relay.waiters.delete(waiter)
+    })
+    return
+  }
+  response.writeHead(404, corsHeaders)
+  response.end(JSON.stringify({ ok: false, error: 'unknown-sync-endpoint' }))
+}
+
 createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`)
   if (request.method === 'OPTIONS') {
@@ -95,13 +185,21 @@ createServer(async (request, response) => {
     response.end()
     return
   }
+  if (url.pathname.startsWith('/sync/')) {
+    await handleRelay(request, response, url)
+    return
+  }
   if (url.pathname === '/ai' || url.pathname.startsWith('/ai/')) {
     await proxyAi(request, response)
     return
   }
   await serveStatic(request, response, url.pathname)
-}).listen(port, '127.0.0.1', () => {
+}).listen(port, host, () => {
   console.log(`热感哨兵本地站点：http://127.0.0.1:${port}/user-app.html （系统端 .../mobile-app.html）`)
+  lanAddresses().forEach((address) => {
+    console.log(`  手机端可访问：http://${address}:${port}/user-app.html`)
+  })
   console.log(`本地大模型代理：/ai/*  →  ${upstream}`)
+  console.log(`局域网事件中继：/sync/*  （手机连现场热点后打开 http://<本机局域网IP>:${port}/ 即可互通，不需要互联网）`)
   console.log('在页面「AI 指挥」里把端点填成 /ai/v1 即可，断网也能用。')
 })

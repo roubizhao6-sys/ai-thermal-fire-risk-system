@@ -1,0 +1,341 @@
+// 两端事件总线（离线优先）
+//
+// 问题：火场里网络设备可能被烧坏、Wi-Fi 被干扰，公网也未必通。
+// 所以这里把"用户端 ↔ 系统端"的消息做成三级链路，能用哪级用哪级，全部不可用时还能人工递码：
+//
+//   L1 同屏/同浏览器   ：BroadcastChannel + localStorage（同一台设备开两个页面时最稳，零依赖）
+//   L2 局域网中继      ：站点所在局域网内的 /sync/* 中继（本地服务器，不需要互联网）
+//                       配合 `node tools/local-ai-server.mjs` 使用；手机连现场热点即可互通
+//   L3 离线码（人工）  ：把事件编成一段短码，系统端显示成二维码，用户端扫码/粘贴导入
+//                       完全不需要任何网络，代价是需要人拿着手机扫一下
+//
+// 事件结构（也是离线码的内容）：
+//   { v:1, id, kind:'fire'|'clear'|'notice'|'status'|'report', at, ttl, from, payload }
+//
+// 本文件里纯函数（编解码、去重合并、链路判定）可以单测；运行时部分只在浏览器里有副作用。
+
+export const EVENT_VERSION = 1
+export const EVENT_LIMIT = 60
+export const DEFAULT_TTL_MS = 30 * 60 * 1000
+export const RELAY_BASE_KEY = 'thermalGuardRelayBase'
+export const STORAGE_KEY = 'thermalGuardFire' // 与旧版兼容：火情事件仍写入这个键
+export const BULK_STORAGE_KEY = 'thermalGuardEventLog'
+
+const KINDS = new Set(['fire', 'clear', 'notice', 'status', 'report'])
+
+// ---------------------------------------------------------------- 纯函数：事件
+export function createEvent(kind, payload = {}, options = {}) {
+  if (!KINDS.has(kind)) throw new Error(`unknown-event-kind:${kind}`)
+  const at = Number(options.at) || Date.now()
+  return {
+    v: EVENT_VERSION,
+    id: options.id ?? `${kind}-${at.toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    kind,
+    at,
+    ttl: Number(options.ttl) || DEFAULT_TTL_MS,
+    from: options.from ?? 'unknown',
+    payload,
+  }
+}
+
+export function isExpired(event, now = Date.now()) {
+  if (!event) return true
+  if (!Number.isFinite(Number(event.at))) return true
+  return now - Number(event.at) > (Number(event.ttl) || DEFAULT_TTL_MS)
+}
+
+// 去重（按 id）+ 丢弃过期 + 只留最近 N 条（按时间正序返回）
+export function mergeEvents(list = [], incoming = [], options = {}) {
+  const now = Number(options.now) || Date.now()
+  const limit = Number(options.limit) || EVENT_LIMIT
+  const map = new Map()
+  ;[...list, ...(Array.isArray(incoming) ? incoming : [incoming])].forEach((event) => {
+    if (!event?.id || isExpired(event, now)) return
+    const previous = map.get(event.id)
+    if (!previous || Number(event.at) >= Number(previous.at)) map.set(event.id, event)
+  })
+  return [...map.values()].sort((a, b) => a.at - b.at).slice(-limit)
+}
+
+// 火情事件 → 传感器层使用的旧结构（保持向后兼容，用户端不用改读取方式）
+export function fireFromEvent(event) {
+  if (!event || event.kind !== 'fire') return null
+  const payload = event.payload ?? {}
+  if (!payload.nodeId) return null
+  return {
+    nodeId: payload.nodeId,
+    floor: payload.floor ?? null,
+    startedAt: Number(payload.startedAt) || event.at,
+    mode: payload.mode ?? 'live',
+    ...(Array.isArray(payload.nodes) && payload.nodes.length > 1 ? { nodes: payload.nodes } : {}),
+  }
+}
+
+// ---------------------------------------------------------------- 纯函数：离线码
+// 离线码 = 版本前缀 + base64url(JSON)。做了字符替换，方便手机扫码与人工粘贴。
+function toBase64Url(text) {
+  const bytes = typeof TextEncoder !== 'undefined'
+    ? new TextEncoder().encode(text)
+    : Uint8Array.from(unescape(encodeURIComponent(text)).split('').map((char) => char.charCodeAt(0)))
+  let binary = ''
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte) })
+  const base64 = typeof btoa === 'function' ? btoa(binary) : Buffer.from(binary, 'binary').toString('base64')
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function fromBase64Url(code) {
+  const padded = code.replace(/-/g, '+').replace(/_/g, '/')
+  const withPad = padded + '='.repeat((4 - (padded.length % 4)) % 4)
+  const binary = typeof atob === 'function' ? atob(withPad) : Buffer.from(withPad, 'base64').toString('binary')
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+  return typeof TextDecoder !== 'undefined' ? new TextDecoder().decode(bytes) : decodeURIComponent(escape(binary))
+}
+
+export const EVENT_CODE_PREFIX = 'TGS1-'
+
+export function encodeEventCode(event) {
+  const compact = {
+    v: EVENT_VERSION,
+    i: event.id,
+    k: event.kind,
+    t: event.at,
+    p: event.payload,
+  }
+  return EVENT_CODE_PREFIX + toBase64Url(JSON.stringify(compact))
+}
+
+export function decodeEventCode(code) {
+  if (typeof code !== 'string') return null
+  const text = code.trim().replace(/\s+/g, '')
+  const body = text.startsWith(EVENT_CODE_PREFIX) ? text.slice(EVENT_CODE_PREFIX.length) : text
+  if (!body) return null
+  try {
+    const parsed = JSON.parse(fromBase64Url(body))
+    if (!parsed?.k || !parsed?.i) return null
+    return createEvent(parsed.k, parsed.p ?? {}, {
+      id: parsed.i,
+      at: parsed.t,
+      ttl: parsed.ttl,
+      from: parsed.f ?? 'code',
+    })
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------- 链路选择（纯函数）
+// 输入运行时可用的能力，输出应该使用哪一级链路
+export function chooseTransport({ hasLocal = true, relayOk = false, manualOnly = false } = {}) {
+  if (manualOnly) return 'code'
+  if (relayOk) return 'lan'
+  if (hasLocal) return 'local'
+  return 'code'
+}
+
+export function describeTransport(level) {
+  if (level === 'lan') return '局域网中继（不需要互联网）'
+  if (level === 'local') return '同机同浏览器（两个页面直接互通）'
+  if (level === 'code') return '离线码（二维码/粘贴，完全不需要网络）'
+  return '未联通'
+}
+
+// ---------------------------------------------------------------- 运行时：事件总线
+export function createEventBus(options = {}) {
+  const channelName = options.channelName ?? 'thermalGuard'
+  const relayBase = (options.relayBase ?? readRelayBase()).replace(/\/$/, '')
+  const pollMs = Number(options.pollMs) || 3000
+  const listeners = new Set()
+  const state = {
+    level: 'local',
+    relayOk: false,
+    lastSeq: 0,
+    peers: 0,
+    log: [],
+    started: false,
+  }
+
+  let channel = null
+  let timer = null
+  let probeTimer = null
+  let stopped = false
+
+  function emit(event) {
+    state.log = mergeEvents(state.log, event)
+    listeners.forEach((listener) => {
+      try {
+        listener(event, { level: state.level })
+      } catch {}
+    })
+  }
+
+  function onEvent(listener) {
+    if (typeof listener !== 'function') return () => {}
+    listeners.add(listener)
+    return () => listeners.delete(listener)
+  }
+
+  // 同机同浏览器：BroadcastChannel 优先，退化为 storage 事件
+  function publishLocal(event) {
+    try {
+      channel?.postMessage(event)
+    } catch {}
+    try {
+      localStorage.setItem(BULK_STORAGE_KEY, JSON.stringify(mergeEvents([], [...state.log, event])))
+    } catch {}
+  }
+
+  async function publishRelay(event) {
+    const response = await fetch(`${relayBase}/sync/publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    })
+    if (!response.ok) throw new Error(`relay-${response.status}`)
+    return response.json().catch(() => ({}))
+  }
+
+  async function probeRelay() {
+    try {
+      const response = await fetch(`${relayBase}/sync/health`, { cache: 'no-store' })
+      const data = await response.json().catch(() => ({}))
+      state.relayOk = response.ok && data?.ok === true
+      if (state.relayOk) state.peers = Number(data.clients) || state.peers
+    } catch {
+      state.relayOk = false
+    }
+    state.level = chooseTransport({ hasLocal: typeof BroadcastChannel !== 'undefined', relayOk: state.relayOk })
+    return state.relayOk
+  }
+
+  async function pollRelay() {
+    if (!state.relayOk) return
+    try {
+      const response = await fetch(`${relayBase}/sync/events?since=${state.lastSeq}&wait=15000`, { cache: 'no-store' })
+      if (!response.ok) return
+      const data = await response.json()
+      if (Number.isFinite(Number(data?.seq))) state.lastSeq = Number(data.seq)
+      if (Number.isFinite(Number(data?.clients))) state.peers = Number(data.clients)
+      ;(data?.events ?? []).forEach((event) => emit(event))
+    } catch {}
+  }
+
+  async function publish(event) {
+    const safe = event?.v && KINDS.has(event.kind)
+      ? event
+      : createEvent(event?.kind ?? 'notice', event?.payload ?? {}, event ?? {})
+    state.log = mergeEvents(state.log, safe)
+    publishLocal(safe)
+    if (state.relayOk) {
+      try {
+        await publishRelay(safe)
+      } catch {
+        state.relayOk = false
+        state.level = chooseTransport({ hasLocal: true, relayOk: false })
+      }
+    }
+    return safe
+  }
+
+  function start() {
+    if (state.started) return state
+    state.started = true
+    stopped = false
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        channel = new BroadcastChannel(channelName)
+        channel.onmessage = (message) => {
+          if (message?.data?.v) emit(message.data)
+        }
+      } catch {
+        channel = null
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event) => {
+        if (event.key !== BULK_STORAGE_KEY || !event.newValue) return
+        try {
+          const list = JSON.parse(event.newValue)
+          const latest = Array.isArray(list) ? list[list.length - 1] : null
+          if (latest?.v) emit(latest)
+        } catch {}
+      })
+    }
+    if (options.autoRelay !== false && typeof fetch === 'function') {
+      probeRelay().then((ok) => {
+        if (!ok || stopped || typeof window === 'undefined') return
+        const loop = async () => {
+          if (stopped) return
+          await pollRelay()
+          if (!stopped) timer = window.setTimeout(loop, 200)
+        }
+        loop()
+      })
+      if (typeof window !== 'undefined') {
+        probeTimer = window.setInterval(() => probeRelay(), 15000)
+      }
+    }
+    state.level = chooseTransport({ hasLocal: typeof BroadcastChannel !== 'undefined', relayOk: state.relayOk })
+    return state
+  }
+
+  function stop() {
+    stopped = true
+    if (timer && typeof window !== 'undefined') window.clearTimeout(timer)
+    if (probeTimer && typeof window !== 'undefined') window.clearInterval(probeTimer)
+    timer = null
+    probeTimer = null
+    try {
+      channel?.close()
+    } catch {}
+    channel = null
+    state.started = false
+  }
+
+  function status() {
+    return {
+      level: state.level,
+      label: describeTransport(state.level),
+      relayOk: state.relayOk,
+      relayBase,
+      peers: state.peers,
+      events: state.log.length,
+      lastAt: state.log.at(-1)?.at ?? null,
+    }
+  }
+
+  // 最近收到/发出的事件（用于面板打开时立刻显示历史，而不是等新事件）
+  function recent() {
+    return [...state.log]
+  }
+
+  return { start, stop, publish, onEvent, status, recent, probeRelay }
+}
+
+// ---------------------------------------------------------------- 中继地址（同源优先）
+let sharedBus = null
+
+// 两个页面各自调用一次，拿到同一个总线实例（页面内共享）
+export function sharedEventBus(options = {}) {
+  if (!sharedBus) sharedBus = createEventBus(options)
+  return sharedBus
+}
+
+export function resetSharedEventBus() {
+  sharedBus?.stop()
+  sharedBus = null
+}
+
+export function readRelayBase() {
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem(RELAY_BASE_KEY)
+    if (saved !== null) return saved
+  }
+  return '' // 空字符串 = 用当前站点同源（配合本地服务器）
+}
+
+export function saveRelayBase(base) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(RELAY_BASE_KEY, String(base ?? ''))
+  } catch {}
+}

@@ -64,6 +64,8 @@ import { HazardReport, InspectionPanel, ReportButton, exportIncidentPdf, openPdf
 import { PreventionPanel, RescueBriefPanel, VitalSignsPanel, copyNotice } from './PhasePanels.jsx'
 import { aiCommand, readAiSettings } from '../shared/aiClient.js'
 import { readUserStatuses } from '../user/binaryDialogue.js'
+import LinkSheet from './LinkSheet.jsx'
+import { createEvent, fireFromEvent, sharedEventBus } from '../shared/eventBus.js'
 import CityMap from './CityMap.jsx'
 import EvacuationView from './EvacuationView.jsx'
 import { SPOT_MAPPING_NOTE, campusLocationForNode } from './campus.js'
@@ -776,6 +778,9 @@ export default function MobileApp() {
   const [reportBusy, setReportBusy] = useState(false)
   const [frameHistory, setFrameHistory] = useState([])
   const [rescueBrief, setRescueBrief] = useState(null)
+  const [showLinkSheet, setShowLinkSheet] = useState(false)
+  const [peerEvents, setPeerEvents] = useState([])
+  const firePublishedRef = useRef(false)
   const [phase, setPhase] = useState(0)
   const [frame, setFrame] = useState(() => createFrame())
   const [image, setImage] = useState('')
@@ -864,7 +869,42 @@ export default function MobileApp() {
     } catch {
       /* 隐私模式下不可写，忽略 */
     }
+
+    // 同时走事件总线：同机同浏览器直接互通；用本地服务器打开时还会经 /sync 中继到别的设备
+    const bus = sharedEventBus()
+    bus.start()
+    if (fire) {
+      firePublishedRef.current = true
+      bus.publish(createEvent('fire', {
+        nodeId: fire.nodeId,
+        floor: fire.floor ?? position.floor,
+        startedAt: fire.startedAt,
+        mode: fire.mode,
+        ...(Array.isArray(fire.nodes) && fire.nodes.length > 1 ? { nodes: fire.nodes } : {}),
+        notice: fireLocationDetail ? `${fireLocationDetail} 发生火情，请按指引撤离` : '',
+      }, { from: 'system' }))
+    } else if (firePublishedRef.current) {
+      // 只有确实发布过火警才发解除，避免"系统端刷新页面"误清用户端的火警状态
+      firePublishedRef.current = false
+      bus.publish(createEvent('clear', {}, { from: 'system' }))
+    }
   }, [fire])
+
+  // 接收用户端上报（火源 / 求助）：局域网中继或同机广播送达后，弹提示并积累到链路面板
+  useEffect(() => {
+    const bus = sharedEventBus()
+    bus.start()
+    const unsubscribe = bus.onEvent((event) => {
+      if (event.from === 'system') return
+      if (event.kind === 'report' || event.kind === 'status') {
+        setPeerEvents((current) => [...current.filter((item) => item.id !== event.id), event].slice(-12))
+        if (event.kind === 'report') {
+          setToast(`用户端上报：${event.payload?.floor ?? '?'} 楼 ${event.payload?.spot ?? ''} · ${event.payload?.text ?? '火源/异常'}`)
+        }
+      }
+    })
+    return () => unsubscribe()
+  }, [])
 
   // 首次用户交互时解锁音频（浏览器自动播放策略）
   useEffect(() => {
@@ -1244,6 +1284,14 @@ export default function MobileApp() {
         hotspots: result.hotspots.length,
         location: `${activeDevice?.location || '手机端实时检测'} · ${floor} 楼`,
       })
+      // 真实检测判定为高风险时也要生成火源对象：用户端要靠它才知道"哪里起火"
+      setFire({
+        nodeId: positionNodeId(floor, position.spot),
+        floor,
+        startedAt,
+        mode: 'live',
+        peakTemp: result.maxTemp,
+      })
     }
   }, [detected, resultRisk, result.maxTemp])
 
@@ -1567,6 +1615,10 @@ export default function MobileApp() {
           <button type="button" className="ai-entry" title="AI 指挥 · 本地模型接口" onClick={() => setShowAiSheet(true)}>
             <Cpu size={15} /><span>AI 指挥</span>
           </button>
+          <button type="button" className="ai-entry link-entry" title="两端联通 · 局域网中继与离线码" onClick={() => setShowLinkSheet(true)}>
+            <Link2 size={15} /><span>链路</span>
+            {peerEvents.length > 0 && <em>{peerEvents.length}</em>}
+          </button>
           <a className="peer-link" href="./user-app.html" title="切换到用户端">用户端</a>
           <button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button>
         </div>
@@ -1620,6 +1672,13 @@ export default function MobileApp() {
       </nav>
       {showDevices && <DeviceSheet devices={devices} activeDevice={activeDevice} connection={connection} error={error} onClose={() => setShowDevices(false)} onConnect={connectDevice} onDisconnect={disconnect} onSave={saveDevice} onDelete={(id) => setDevices((current) => current.filter((device) => device.id !== id))} />}
       {showAiSheet && <AiCommandSheet onClose={() => setShowAiSheet(false)} onSaved={() => setToast('AI 指挥设置已保存')} />}
+      {showLinkSheet && (
+        <LinkSheet
+          onClose={() => setShowLinkSheet(false)}
+          latestFire={fire}
+          noticeText={fireLocationDetail ? `${fireLocationDetail} 发生火情，请按指引撤离` : ''}
+        />
+      )}
       {arOpen && (
         <ArNavigator
           route={route}
@@ -1664,6 +1723,12 @@ export default function MobileApp() {
               .finally(() => setReportBusy(false))
           }}
           reportBusy={reportBusy}
+          onOpenLink={() => {
+            setOverlayOpen(false)
+            setToast('正在打开链路面板…')
+            // 等浮层先卸载再开面板：否则同一次点击会"穿透"到新面板的遮罩上把它立刻关掉
+            window.setTimeout(() => setShowLinkSheet(true), 80)
+          }}
         />
       )}
     </div>

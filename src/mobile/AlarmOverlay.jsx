@@ -1,4 +1,4 @@
-import { AlertTriangle, BellRing, FileText, Flame, Route, ShieldCheck, Volume2, VolumeX, X } from 'lucide-react'
+import { AlertTriangle, BellRing, FileText, Flame, Link2, Route, ShieldCheck, Volume2, VolumeX, X } from 'lucide-react'
 
 function formatElapsed(startedAt, nowMs) {
   const seconds = Math.max(0, Math.round((nowMs - startedAt) / 1000))
@@ -21,6 +21,7 @@ export default function AlarmOverlay({
   locationDetail,
   onExportReport,
   reportBusy = false,
+  onOpenLink,
 }) {
   if (!alarm) return null
 
@@ -37,6 +38,11 @@ export default function AlarmOverlay({
             {isDrill ? '火警演练' : '真实警情'}
           </span>
           <span className="alarm-elapsed">已持续 {elapsed}</span>
+          {onOpenLink && (
+            <button className="alarm-linkchip" type="button" onClick={onOpenLink}>
+              <Link2 size={13} />离线码
+            </button>
+          )}
         </header>
 
         <div className="alarm-hero">

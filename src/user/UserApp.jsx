@@ -21,6 +21,8 @@ import {
   saveUserStatus,
   summarizeForRescue,
 } from './binaryDialogue.js'
+import { createEvent, fireFromEvent, sharedEventBus } from '../shared/eventBus.js'
+import OfflineLink from './OfflineLink.jsx'
 // 所有传感器输入（信标定位、火情、热像、朝向、设置）统一从这一层订阅
 import {
   KEYS,
@@ -111,6 +113,9 @@ export default function UserApp() {
   const [aiResult, setAiResult] = useState(null)
   // 起火阶段：二元问答（是 / 否），答案既改当前指引，也上传给救援端
   const [dialogue, setDialogue] = useState(() => createDialogueState())
+  // 收到的火警通报（来自系统端：局域网中继自动送达，或扫离线码人工导入）
+  const [linkNotice, setLinkNotice] = useState('')
+  const [linkReported, setLinkReported] = useState('')
   // 声音/播报/震动设置由系统端维护，用户端跟随，避免两边不一致
   const [settings, setSettings] = useState(() => readSettings())
   const [audioReady, setAudioReady] = useState(() => isAudioUnlocked())
@@ -138,6 +143,52 @@ export default function UserApp() {
     const timer = window.setInterval(() => setNowMs(Date.now()), fire ? 1000 : 2000)
     return () => window.clearInterval(timer)
   }, [fire])
+
+  // 收到系统端事件：火警 / 解除 / 通报。局域网中继自动送达；断网时由「离线联通」扫码导入。
+  const applyIncomingEvent = (event) => {
+    if (!event?.kind) return false
+    if (event.kind === 'clear') {
+      try {
+        localStorage.removeItem(KEYS.fire)
+      } catch {}
+      setFire(null)
+      setLinkNotice('系统端已解除警报')
+      return true
+    }
+    const nextFire = fireFromEvent(event)
+    if (nextFire) {
+      try {
+        localStorage.setItem(KEYS.fire, JSON.stringify(nextFire))
+      } catch {}
+      setFire(nextFire)
+    }
+    const notice = String(event.payload?.notice ?? event.payload?.text ?? '').slice(0, 160)
+    const floorText = event.payload?.floor ? `${event.payload.floor} 楼` : '本层'
+    setLinkNotice(notice || `${floorText}发生火情，按指引撤离`)
+    return true
+  }
+
+  useEffect(() => {
+    const bus = sharedEventBus()
+    bus.start()
+    const unsubscribe = bus.onEvent((event) => {
+      if (event.kind === 'fire' || event.kind === 'notice' || event.kind === 'clear') applyIncomingEvent(event)
+    })
+    return () => unsubscribe()
+    // applyIncomingEvent 依赖 setState，闭包安全；这里只需订阅一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 用户端上报（火源 / 求助）：同时写本机状态并发布到事件总线，系统端能收到
+  const publishUserReport = async (text) => {
+    const safeText = String(text ?? '').trim() || '用户上报火源或异常'
+    const payload = { floor: position.floor, spot: position.spot, text: safeText }
+    const finalEvent = createEvent('report', payload, { from: 'user' })
+    await sharedEventBus().publish(finalEvent)
+    setLinkReported(safeText)
+    window.setTimeout(() => setLinkReported(''), 3000)
+    return finalEvent
+  }
 
   // 手机朝向：订阅罗盘/IMU，方向指示随真实朝向实时更新
   useEffect(() => {
@@ -348,6 +399,8 @@ export default function UserApp() {
       meters: dialRemaining,
     })
     saveUserStatus(status)
+    // 同步给系统端：救援端据此知道"哪一层、哪个位置有人需要帮助"
+    sharedEventBus().publish(createEvent('status', status, { from: 'user' }))
   }, [dialogue, fire, position.floor, position.spot, route?.ok, planRoute, dialTargetLabel, dialRemaining])
 
   // AI 指挥：优先本地大模型，失败或未配置时回落到本机规则引擎（保证无网络也有指令）
@@ -558,6 +611,20 @@ export default function UserApp() {
 
           {sensorInfo && <div className="sensor-note">{sensorInfo}</div>}
 
+          {linkNotice && (
+            <div className="link-note">
+              <span className="link-tag">火警通报 · 来自系统端</span>
+              <span>{linkNotice}</span>
+            </div>
+          )}
+
+          {linkReported && (
+            <div className="link-note is-report">
+              <span className="link-tag">已上报系统端</span>
+              <span>{linkReported}</span>
+            </div>
+          )}
+
           {planRoute && (
             <div className="plan-note">
               <span className="plan-tag">按路线图撤离</span>
@@ -658,12 +725,16 @@ export default function UserApp() {
       {moreOpen && (
         <MoreSheet
           floor={position.floor}
+          spot={position.spot}
           aiSettings={aiSettings}
           onAiSettingsChange={(patch) => setAiSettings(saveAiSettings(patch))}
           plans={plans}
           onPlansChange={setPlans}
           activePlanId={activePlanId}
           onActivePlanChange={setActivePlanId}
+          nearestExit={dialTargetLabel}
+          onImportEvent={applyIncomingEvent}
+          onReport={publishUserReport}
           onClose={() => setMoreOpen(false)}
         />
       )}

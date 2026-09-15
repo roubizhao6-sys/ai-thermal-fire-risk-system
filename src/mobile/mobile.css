@@ -1045,6 +1045,20 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .alarm-overlay.is-active .alarm-flash { animation: alarmFlash 1.2s ease-in-out infinite; }
 .alarm-body { position: relative; width: 100%; max-width: 460px; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
 .alarm-head { display: flex; align-items: center; justify-content: space-between; }
+.alarm-head { gap: 8px; }
+.alarm-linkchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 5px 10px;
+  color: #dcecff;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .28);
+  font-size: 9px;
+  white-space: nowrap;
+}
 .alarm-chip { padding: 5px 12px; border-radius: var(--r-pill); font-size: var(--t-caption-2); font-weight: 600; letter-spacing: .04em; }
 .chip-live { color: #fff; background: var(--accent); }
 .chip-drill { color: #000; background: var(--warning); }
@@ -1858,6 +1872,48 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
   white-space: nowrap;
 }
 .ai-entry:hover { border-color: rgba(56, 189, 248, .45); color: #7dd3fc; }
+.link-entry { position: relative; }
+.link-entry em {
+  position: absolute;
+  top: -5px;
+  right: -4px;
+  min-width: 15px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 9px;
+  font-style: normal;
+  text-align: center;
+}
+
+/* ==== 两端联通（链路）面板 ==== */
+.link-sheet { display: flex; flex-direction: column; gap: 10px; }
+.link-status { display: flex; align-items: center; gap: 9px; padding: 11px 12px; border: 1px solid rgba(96,165,250,.18); border-radius: 12px; background: rgba(4,13,27,.55); }
+.link-status svg { color: #7dd3fc; flex: 0 0 auto; }
+.link-status > div { display: flex; flex-direction: column; gap: 3px; }
+.link-status strong { color: #e3eefb; font-size: 11px; }
+.link-status small { color: #7d97b3; font-size: 8px; line-height: 1.5; }
+.link-status.level-lan { border-color: rgba(34,197,94,.4); background: rgba(34,197,94,.1); }
+.link-status.level-lan svg { color: #8fe8b3; }
+.link-status.level-code { border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.1); }
+.link-status.level-code svg { color: #fbbf24; }
+.link-relay label { display: flex; flex-direction: column; gap: 5px; color: #8fa9c2; font-size: 9px; }
+.link-relay input { min-height: 40px; padding: 9px 11px; color: #e9f4ff; border: 1px solid rgba(96,165,250,.2); border-radius: 10px; background: rgba(4,13,27,.68); font-size: 10px; }
+.link-relay button { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; min-height: 36px; padding: 0 12px; color: #dcecff; border: 1px solid rgba(96,165,250,.22); border-radius: 10px; background: rgba(59,130,246,.12); font-size: 9px; }
+.link-qr { padding: 11px 12px; border: 1px solid rgba(96,165,250,.18); border-radius: 12px; background: rgba(4,13,27,.55); }
+.link-qr-head { display: flex; flex-direction: column; gap: 3px; }
+.link-qr-head strong { display: flex; align-items: center; gap: 5px; color: #dcecff; font-size: 10px; }
+.link-qr-head span { color: #7089a4; font-size: 8px; }
+.link-qr img { display: block; width: 180px; height: 180px; margin: 10px auto 6px; border-radius: 10px; background: #fff; padding: 6px; }
+.link-qr textarea { width: 100%; padding: 8px 10px; color: #9db6cf; border: 1px solid rgba(96,165,250,.18); border-radius: 9px; background: rgba(4,13,27,.7); font-size: 8px; resize: none; }
+.link-received { display: flex; flex-direction: column; gap: 6px; }
+.link-received > strong { display: flex; align-items: center; gap: 5px; color: #9db6cf; font-size: 9px; }
+.link-received-row { display: grid; grid-template-columns: 62px 1fr; gap: 9px; padding: 9px 10px; border: 1px solid rgba(96,165,250,.14); border-radius: 11px; background: rgba(5,15,29,.6); }
+.link-received-row > span { color: #8fb2d2; font-size: 8px; }
+.link-received-row > div { display: flex; flex-direction: column; gap: 3px; }
+.link-received-row strong { color: #d9ecfb; font-size: 9px; }
+.link-received-row small { color: #6f8aa5; font-size: 8px; }
 
 .ai-sheet { display: flex; flex-direction: column; gap: 10px; }
 .ai-sheet-field {

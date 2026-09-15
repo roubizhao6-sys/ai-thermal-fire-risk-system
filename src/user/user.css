@@ -623,6 +623,44 @@ p { margin: 0; }
 .ask-foot { display: flex; flex-direction: column; gap: 4px; color: var(--text-2); font-size: 12px; line-height: 1.55; }
 .ask-foot em { color: #ffd60a; font-style: normal; }
 
+/* ==== 火警通报（来自系统端 / 离线码） ==== */
+.link-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 179, 64, .45);
+  background: rgba(255, 179, 64, .14);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.link-note.is-report { border-color: rgba(48, 209, 88, .45); background: rgba(48, 209, 88, .14); }
+.link-tag { color: var(--text-2); font-size: 11px; letter-spacing: .3px; }
+
+/* ==== 离线联通面板 ==== */
+.link-title { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--text); font-size: 13px; }
+.link-code-input {
+  width: 100%;
+  padding: 10px 11px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 120, 128, .4);
+  background: rgba(120, 120, 128, .16);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.link-scan { position: relative; overflow: hidden; margin-top: 8px; aspect-ratio: 1 / 1; border-radius: 14px; border: 1px solid rgba(120, 120, 128, .4); background: #000; }
+.link-scan video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.link-status { display: flex; align-items: center; gap: 9px; padding: 11px 12px; border-radius: 14px; border: 1px solid rgba(120, 120, 128, .35); background: rgba(120, 120, 128, .12); }
+.link-status > div { display: flex; flex-direction: column; gap: 3px; }
+.link-status strong { font-size: 13px; }
+.link-status small { color: var(--text-3); font-size: 11px; }
+.link-status.level-lan { border-color: rgba(48, 209, 88, .45); background: rgba(48, 209, 88, .12); }
+.link-relay { display: flex; flex-direction: column; gap: 8px; }
+
 .plan-fields { display: flex; gap: 14px; flex-wrap: wrap; }
 .plan-fields label,
 .ai-field {
