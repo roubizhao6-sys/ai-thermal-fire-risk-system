@@ -1,5 +1,5 @@
-const CACHE = 'thermal-guard-v22'
-const CORE = ['./', './index.html', './mobile-app.html', './user-app.html', './mobile-install.html', './app-access.html', './privacy.html', './support.html', './thermal-guard.mobileconfig', './demo-live.gif', './manifest.webmanifest', './manifest-system.webmanifest', './manifest-user.webmanifest', './apple-touch-icon.png', './apple-touch-icon-user.png', './icon-192.png', './icon-512.png', './icon-user-192.png', './icon-user-512.png']
+const CACHE = 'thermal-guard-v23'
+const CORE = ['./', './index.html', './mobile-app.html', './user-app.html', './mobile-install.html', './app-access.html', './privacy.html', './support.html', './thermal-guard.mobileconfig', './thermal-guard-system.mobileconfig', './demo-live.gif', './manifest.webmanifest', './manifest-system.webmanifest', './manifest-user.webmanifest', './apple-touch-icon.png', './apple-touch-icon-user.png', './icon-192.png', './icon-512.png', './icon-user-192.png', './icon-user-512.png']
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()))
@@ -19,7 +19,7 @@ self.addEventListener('fetch', event => {
   } catch {}
 
   const requestUrl = new URL(event.request.url)
-  if (requestUrl.origin === self.location.origin && requestUrl.pathname.endsWith('/thermal-guard.mobileconfig')) {
+  if (requestUrl.origin === self.location.origin && requestUrl.pathname.endsWith('.mobileconfig')) {
     event.respondWith((async () => {
       const response = await fetch(event.request)
       const body = await response.blob()
@@ -28,7 +28,7 @@ self.addEventListener('fetch', event => {
         statusText: response.statusText,
         headers: {
           'Content-Type': 'application/x-apple-aspen-config; charset=utf-8',
-          'Content-Disposition': 'inline; filename="thermal-guard.mobileconfig"',
+          'Content-Disposition': `inline; filename="${requestUrl.pathname.split('/').pop() || 'profile.mobileconfig'}"`,
           'Cache-Control': 'no-store'
         }
       })

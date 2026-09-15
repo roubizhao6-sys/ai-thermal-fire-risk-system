@@ -55,15 +55,16 @@
 
   <section class="card featured" id="ios-card">
     <div class="card-head"><h2>iPhone / iPad 描述文件版</h2><span class="tag">设置安装</span></div>
-    <p>此版本通过苹果“描述文件”安装，适合希望在系统设置中确认安装的用户。必须使用 Safari 打开，并确保网页以 HTTPS 访问。</p>
-    <a class="button" id="profile-install-link" href="./thermal-guard.mobileconfig">打开手机描述文件</a>
+    <p>此版本通过苹果“描述文件”安装，适合希望两个 App 分开安装的用户。必须使用 <b>Safari</b> 打开，并确保以 HTTPS 访问。</p>
+    <a class="button profile-link" id="profile-install-link" href="./thermal-guard.mobileconfig">🧯 安装用户端描述文件（热感哨兵）</a>
+    <a class="button" href="./thermal-guard-system.mobileconfig">🏢 安装系统端描述文件（燧瞳智感）</a>
     <ol class="steps">
-      <li>点击上方按钮，选择“允许”。</li>
+      <li>点击上方对应按钮，选择“允许”。</li>
       <li>打开“设置 → 通用 → VPN与设备管理”。</li>
       <li>点击“已下载的描述文件”，选择“安装”。</li>
-      <li>返回主屏幕，点击“燧瞳智感”图标。</li>
+      <li>返回主屏幕，出现对应 App 图标（两个 App 各自独立）。</li>
     </ol>
-    <a class="button secondary" href="./mobile-app.html">改用免描述文件安装版</a>
+    <a class="button secondary" href="./mobile-install.html">改用免描述文件安装（添加到主屏幕）</a>
   </section>
 
   <section class="card" id="android-card">
@@ -116,11 +117,13 @@
     }
   }
 
-  profileLink.addEventListener('click', async (event) => {
-    if (!('serviceWorker' in navigator)) return;
-    event.preventDefault();
-    await ensureProfileMode();
-    window.location.href = profileLink.href;
+  document.querySelectorAll('.profile-link, a[href$=".mobileconfig"]').forEach((link) => {
+    link.addEventListener('click', async (event) => {
+      if (!('serviceWorker' in navigator)) return;
+      event.preventDefault();
+      await ensureProfileMode();
+      window.location.href = link.href;
+    });
   });
 
   const ua = navigator.userAgent || '';
