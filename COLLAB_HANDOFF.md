@@ -36,7 +36,7 @@
 
 ### 3.2 双端拆分（用户端 / 系统端）
 - **系统端 / 物业端**：`mobile-app.html` + `src/mobile/MobileApp.jsx`（完整管理：监控、看板、指挥中心、巡检、隐患、证据链等）。
-- **用户端 / 热感哨兵**：`user-app.html` + `src/user/UserApp.jsx`（三个 tab：首页检测 / AR实景逃生 / 更多功能；更多功能含 GPS定位、消防设施扫码巡检、隐患上报）。两端通过「切换到用户端 / 切换到系统端」互跳。
+- **用户端 / 热感哨兵**：`user-app.html` + `src/user/UserApp.jsx`（三个 tab：AR实景逃生 / 首页检测 / 更多功能）。AR 实景逃生合并了队友的 `ArNavigator`（全屏 AR + 表盘兜底 + 前后摄像头切换 + 手电筒 + 接近度），入口在 AR tab「开启 AR 实景导航」；首页检测含三路证据融合判定；更多功能含 GPS定位、消防设施扫码巡检、隐患上报。两端通过「切换到用户端 / 切换到系统端」互跳。
 - 桌面网站：`index.html` + `src/App.jsx`。
 
 ### 3.2 手机 App（`src/mobile/MobileApp.jsx`，重点迭代对象）

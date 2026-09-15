@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { fusePreventionSignals } from '../mobile/sensorFusion.js'
+import ArNavigator from './ArNavigator.jsx'
 import jsQR from 'jsqr'
 import {
   Camera, CheckCircle2, Flame, Navigation, Phone, ScanLine, ShieldAlert, ShieldCheck,
@@ -207,218 +208,31 @@ function DetectionHome({ onEvacuate }) {
   )
 }
 
-function ArEscape({ exit, onPickExit, siren }) {
-  const videoRef = useRef(null)
-  const streamRef = useRef(null)
-  const [status, setStatus] = useState('idle')
+function ArEscape({ exit, onPickExit, siren, onOpenAr }) {
   const heading = useHeading()
   const turn = shortestTurn(exit.bearing, heading)
-  const turnText = Math.abs(turn) < 15 ? '沿箭头方向直行' : turn > 0 ? `向右转 ${Math.round(Math.abs(turn))}°` : `向左转 ${Math.round(Math.abs(turn))}°`
-
-  useEffect(() => () => { streamRef.current?.getTracks().forEach((t) => t.stop()) }, [])
-
-  const start = async () => {
-    setStatus('requesting')
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) { setStatus('unsupported'); return }
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false })
-      streamRef.current = stream; setStatus('active'); navigator.vibrate?.(40)
-    } catch { setStatus('denied') }
-  }
-  const stop = () => { streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null; setStatus('idle') }
-
-  useEffect(() => {
-    if (status === 'active' && videoRef.current && streamRef.current) { videoRef.current.srcObject = streamRef.current; videoRef.current.play().catch(() => {}) }
-  }, [status])
-
+  const turnText = Math.abs(turn) < 15 ? '保持当前方向直行' : turn > 0 ? `向右转 ${Math.round(Math.abs(turn))}°` : `向左转 ${Math.round(Math.abs(turn))}°`
   return (
     <div className="usr-page usr-ar-page">
-      <header className="usr-page-head"><span>AR 实景逃生</span><h1>跟着箭头跑</h1><p>摄像头实景 + 方向箭头，带你到最近安全出口</p></header>
+      <header className="usr-page-head"><span>AR 实景逃生</span><h1>跟着箭头跑</h1><p>摄像头实景 + 方向箭头 + 表盘兜底</p></header>
 
       <div className="usr-exit-chips">{EXITS.map((e) => <button type="button" key={e.id} className={e.id === exit.id ? 'active' : ''} onClick={() => onPickExit(e.id)}>{e.name}</button>)}</div>
 
-      <section className="usr-ar-stage-card">
-        <div className="usr-ar-stage">
-          {status === 'active' && <video ref={videoRef} className="usr-ar-video" autoPlay playsInline muted />}
-          {status !== 'active' ? (
-            <div className="usr-ar-idle">
-              <div className="usr-ar-idle-badge"><i />实时逃生引导</div>
-              <h2>摄像头对准前方</h2>
-              <p>画面将叠加箭头，前往 <strong>{exit.name}</strong>（{exit.distance} 米）</p>
-              <button type="button" onClick={start}>{status === 'requesting' ? <><LoaderCircle className="spin" size={18} />正在打开摄像头…</> : <><Camera size={18} />开启 AR 实景逃生</>}</button>
-              {status === 'denied' && <small className="usr-warn">摄像头权限被拒绝，请在浏览器设置中允许后重试。</small>}
-              {status === 'unsupported' && <small className="usr-warn">当前浏览器不支持摄像头，请用 Safari 或 Chrome。</small>}
-            </div>
-          ) : (
-            <div className="usr-ar-overlay">
-              <div className="usr-ar-top"><span className="usr-ar-exit"><Navigation size={13} />{exit.name}</span><span className="usr-ar-dist">{exit.distance} m</span></div>
-              <div className="usr-ar-arrow-wrap" style={{ transform: `rotate(${turn}deg)` }}><Navigation size={60} className="usr-ar-arrow" /></div>
-              <div className="usr-ar-center"><strong>{turnText}</strong><p>{Math.round(heading)}° 当前朝向 · 出口方位 {exit.bearing}°</p></div>
-            </div>
-          )}
+      <section className="usr-card usr-ar-launch-card">
+        <div className="usr-ar-launch">
+          <div className="usr-ar-launch-badge"><i />实时逃生引导</div>
+          <h2>{turnText}</h2>
+          <p>前往 <strong>{exit.name}</strong> · {exit.distance} 米 · 方位 {exit.bearing}°</p>
+          <button type="button" className="usr-ar-launch-btn" onClick={onOpenAr}><Camera size={18} />开启 AR 实景导航</button>
+          <small>进入后可切换前后摄像头、开启手电筒；摄像头不可用时自动退回表盘模式。</small>
         </div>
         <div className="usr-ar-actions">
           <a href="tel:119"><Phone size={16} />一键报警 119</a>
           <button type="button" onClick={siren.toggle}>{siren.on ? <VolumeX size={16} /> : <Volume2 size={16} />}{siren.on ? '静音' : '警报'}</button>
-          {status === 'active' ? <button type="button" onClick={stop}><X size={16} />退出AR</button> : <button type="button" onClick={start}><Camera size={16} />开始</button>}
         </div>
       </section>
       <p className="usr-disclaimer"><ShieldAlert size={14} />本应用为科研演示原型，逃生路线仅供参考，请结合实际现场标识与工作人员指挥。</p>
     </div>
-  )
-}
-
-function GpsPanel() {
-  const [on, setOn] = useState(false)
-  const [gps, setGps] = useState(null)
-  useEffect(() => {
-    if (!on) return undefined
-    if (!navigator.geolocation) return undefined
-    const id = navigator.geolocation.watchPosition(
-      (pos) => setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
-      () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-    )
-    return () => navigator.geolocation.clearWatch(id)
-  }, [on])
-  return (
-    <section className="usr-card">
-      <div className="usr-card-head"><div><strong>GPS 我的位置</strong><small>手机实时定位</small></div><LocateFixed size={18} /></div>
-      <button type="button" className="usr-mini-btn" onClick={() => setOn((v) => !v)}>{on ? '关闭 GPS 定位' : '开启 GPS 定位'}</button>
-      {on && (gps ? (
-        <div className="usr-gps-grid">
-          <div><span>纬度</span><strong>{gps.lat.toFixed(6)}</strong></div>
-          <div><span>经度</span><strong>{gps.lng.toFixed(6)}</strong></div>
-          <div><span>精度</span><strong>±{Math.round(gps.accuracy)} m</strong></div>
-        </div>
-      ) : <p className="usr-gps-pending">正在获取定位… 请允许位置权限。</p>)}
-    </section>
-  )
-}
-
-function QrScanModal({ onClose, onDetected }) {
-  const videoRef = useRef(null)
-  const canvasRef = useRef(null)
-  const streamRef = useRef(null)
-  const rafRef = useRef(null)
-  const [msg, setMsg] = useState('正在打开摄像头…')
-
-  useEffect(() => {
-    let cancelled = false
-    const stop = () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); rafRef.current = null; streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null }
-    const tick = () => {
-      if (cancelled) return
-      const video = videoRef.current, canvas = canvasRef.current
-      if (video && canvas && video.readyState >= 2 && video.videoWidth && video.videoHeight) {
-        const scale = Math.min(1, 640 / video.videoWidth)
-        canvas.width = Math.round(video.videoWidth * scale)
-        canvas.height = Math.round(video.videoHeight * scale)
-        const ctx = canvas.getContext('2d', { willReadFrequently: true })
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-        try {
-          const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' })
-          if (code && code.data) { stop(); onDetected(code.data); return }
-        } catch {}
-      }
-      rafRef.current = requestAnimationFrame(tick)
-    }
-    const start = async () => {
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) { setMsg('当前浏览器不支持摄像头'); return }
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false })
-        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
-        streamRef.current = stream
-        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => {}) }
-        setMsg('请对准消防设施二维码')
-        tick()
-      } catch { if (!cancelled) setMsg('无法打开摄像头，请允许相机权限后重试') }
-    }
-    start()
-    return () => { cancelled = true; stop() }
-  }, [onDetected])
-
-  return (
-    <div className="usr-scan-backdrop" onClick={onClose}>
-      <section className="usr-scan-sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="usr-scan-head"><div><strong>扫码巡检</strong><small>对准二维码自动识别</small></div><button type="button" onClick={onClose}><X size={18} /></button></div>
-        <div className="usr-scan-stage">
-          <video ref={videoRef} className="usr-scan-video" autoPlay playsInline muted />
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
-          <div className="usr-scan-frame"><span /></div>
-        </div>
-        <p className="usr-scan-status">{msg}</p>
-        <button type="button" className="usr-scan-cancel" onClick={onClose}>取消</button>
-      </section>
-    </div>
-  )
-}
-
-const FACILITIES = [
-  { id: 'f1', name: '灭火器', code: 'A-01', location: '图书馆 1F 东侧', expire: '2027-06' },
-  { id: 'f2', name: '室内消火栓', code: 'B-03', location: '教学楼 B 3F 走廊', expire: '2027-01' },
-  { id: 'f3', name: '应急照明', code: 'C-12', location: '综合大楼 2F 楼梯间', expire: '2026-12' },
-  { id: 'f4', name: '疏散指示', code: 'D-07', location: 'P 座宿舍 5F 出口', expire: '2027-09' },
-]
-
-function InspectionPanel() {
-  const [records, setRecords] = useState(FACILITIES)
-  const [scanOpen, setScanOpen] = useState(false)
-  const [scanMsg, setScanMsg] = useState('')
-  const now = () => new Date().toLocaleString('zh-CN', { hour12: false })
-  const mark = (id) => setRecords((r) => r.map((f) => (f.id === id ? { ...f, last: now(), checks: (f.checks || 0) + 1 } : f)))
-  const detected = (data) => {
-    const code = String(data || '').trim()
-    const found = records.find((f) => f.code.toUpperCase() === code.toUpperCase() || code.includes(f.code.toUpperCase()) || code.includes(f.name))
-    if (found) { setRecords((r) => r.map((f) => (f.id === found.id ? { ...f, last: now(), checks: (f.checks || 0) + 1 } : f))); setScanMsg(`识别成功：${found.name} ${found.code}`) }
-    else setScanMsg(`未匹配到设施：${code || '空二维码'}`)
-    setScanOpen(false)
-  }
-  return (
-    <section className="usr-card">
-      <div className="usr-card-head"><div><strong>消防设施扫码巡检</strong><small>扫码识别 + 到期提醒</small></div><QrCode size={18} /></div>
-      <button type="button" className="usr-scan-btn" onClick={() => { setScanMsg(''); setScanOpen(true) }}><ScanLine size={15} />扫码检查</button>
-      {scanMsg && <p className="usr-scan-msg">{scanMsg}</p>}
-      <div className="usr-inspection-list">
-        {records.map((f) => (
-          <div className="usr-inspection-row" key={f.id}>
-            <span><QrCode size={14} /></span>
-            <div><strong>{f.name} · {f.code}</strong><small>{f.location}{f.last ? ` · 上次 ${f.last}` : ' · 尚未登记'}</small><em>有效期至 {f.expire}{f.checks ? ` · 已检 ${f.checks} 次` : ''}</em></div>
-            <button type="button" onClick={() => mark(f.id)}><CheckCircle2 size={13} />登记</button>
-          </div>
-        ))}
-      </div>
-      <p className="usr-note"><Info size={12} />二维码内容示例：设施编号 A-01。</p>
-      {scanOpen && <QrScanModal onClose={() => setScanOpen(false)} onDetected={detected} />}
-    </section>
-  )
-}
-
-function HazardReport() {
-  const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('thermalGuardHazards') || '[]') } catch { return [] } })
-  const [desc, setDesc] = useState('')
-  const [loc, setLoc] = useState('')
-  const [img, setImg] = useState('')
-  const fileRef = useRef(null)
-  const pick = (e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => setImg(r.result); r.readAsDataURL(f) }
-  const submit = () => {
-    if (!desc.trim() && !loc.trim()) return
-    const next = [{ id: `hz-${Date.now()}`, desc: desc.trim() || '未描述', loc: loc.trim() || '未填写位置', img, time: new Date().toLocaleString('zh-CN', { hour12: false }) }, ...items].slice(0, 20)
-    setItems(next); localStorage.setItem('thermalGuardHazards', JSON.stringify(next)); setDesc(''); setLoc(''); setImg('')
-  }
-  return (
-    <section className="usr-card">
-      <div className="usr-card-head"><div><strong>隐患上报</strong><small>拍照记录隐患位置</small></div><AlertTriangle size={18} /></div>
-      <div className="usr-hazard-form">
-        <input value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="隐患位置，如：三楼配电箱旁" />
-        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="隐患描述，如：线路发热" rows={2} />
-        <div className="usr-hazard-row">
-          <button type="button" onClick={() => fileRef.current?.click()}><Camera size={14} />{img ? '更换照片' : '拍照/选图'}</button>
-          {img && <img src={img} alt="" />}
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={pick} style={{ display: 'none' }} />
-        </div>
-        <button type="button" className="usr-hazard-submit" onClick={submit}><Send size={14} />提交隐患</button>
-      </div>
-      {items.length > 0 && <div className="usr-hazard-list">{items.map((h) => <div key={h.id}><span><AlertTriangle size={13} /></span><div><strong>{h.loc}</strong><p>{h.desc}</p><small>{h.time}</small></div>{h.img && <img src={h.img} alt="" />}</div>)}</div>}
-    </section>
   )
 }
 
@@ -435,6 +249,7 @@ function MorePage() {
 
 export default function UserApp() {
   const [tab, setTab] = useState('ar')
+  const [arOpen, setArOpen] = useState(false)
   const [exitId, setExitId] = useState('library')
   const siren = useSiren()
   const exit = EXITS.find((e) => e.id === exitId) || EXITS[0]
@@ -447,7 +262,7 @@ export default function UserApp() {
       </header>
 
       <main className="usr-main">
-        {tab === 'home' ? <DetectionHome onEvacuate={() => setTab('ar')} /> : tab === 'ar' ? <ArEscape exit={exit} onPickExit={setExitId} siren={siren} /> : <MorePage />}
+        {tab === 'home' ? <DetectionHome onEvacuate={() => setTab('ar')} /> : tab === 'ar' ? <ArEscape exit={exit} onPickExit={setExitId} siren={siren} onOpenAr={() => setArOpen(true)} /> : <MorePage />}
       </main>
 
       <nav className="usr-tabs">
@@ -455,6 +270,20 @@ export default function UserApp() {
         <button type="button" className={tab === 'home' ? 'active' : ''} onClick={() => setTab('home')}><ScanLine size={19} /><span>首页检测</span></button>
         <button type="button" className={tab === 'more' ? 'active' : ''} onClick={() => setTab('more')}><QrCode size={19} /><span>更多功能</span></button>
       </nav>
+
+      {arOpen && (
+        <ArNavigator
+          route={{ ok: true, meters: exit.distance }}
+          bearing={exit.bearing}
+          targetLabel={exit.name}
+          proximity={Math.max(0, Math.min(1, 1 - exit.distance / 300))}
+          atExit={exit.distance <= 20}
+          proximityText={exit.distance <= 30 ? '就在附近' : exit.distance <= 80 ? '接近中' : '按箭头前进'}
+          remainingFloors="—"
+          positionSource="演示定位 · 校园出口"
+          onClose={() => setArOpen(false)}
+        />
+      )}
     </div>
   )
 }
