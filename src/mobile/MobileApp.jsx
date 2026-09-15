@@ -79,6 +79,7 @@ import {
 } from 'lucide-react'
 import AlarmOverlay from './AlarmOverlay.jsx'
 import AlarmCenterView from './AlarmCenterView.jsx'
+import PreventionPanel from './PreventionPanel.jsx'
 import { unlockAudio, isAudioUnlocked, startSiren, stopSiren, setSirenIntensity, speak, stopSpeak, vibrateAlarm, stopVibrate, ALARM_VIBRATION_INTERVAL } from './alarm.js'
 
 const DEMO_THERMAL = `${import.meta.env.BASE_URL}demo-thermal.jpg`
@@ -1537,7 +1538,7 @@ function CameraPage({ cameras, selectedCamera, onSelect, onAdd, onEdit, onDelete
   )
 }
 
-function DashboardPage({ frame, inference, onOpenCommand }) {
+function DashboardPage({ frame, inference, onOpenCommand, onAlarm }) {
   const riskIndex = Math.round(Math.min(99, 42 + Number(frame?.maxTemp || 0) / 2 + (frame?.hotspots?.length || 0) * 6 + (inference?.confidence || 0) * 12))
   const spreadMinutes = Math.max(2, Math.round(12 - (frame?.hotspots?.length || 0) * 1.4 - Math.max(0, Number(frame?.maxTemp || 0) - 45) / 8))
   const stats = [
@@ -1558,7 +1559,8 @@ function DashboardPage({ frame, inference, onOpenCommand }) {
         </div>
         <button type="button" className="command-open" onClick={onOpenCommand}><Siren size={16} />进入指挥中心</button>
       </section>
-      <SituationMap frame={frame} />
+      <PreventionPanel frame={frame} onAlarm={onAlarm} />
+            <SituationMap frame={frame} />
       <div className="dashboard-grid">{stats.map(([label, value, unit, change, Icon, tone]) => <article className={`dashboard-stat tone-${tone}`} key={label}><span><Icon size={16} /></span><p>{label}</p><strong>{value}<small>{unit}</small></strong><em>{change}</em></article>)}</div>
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>风险趋势</strong><small>近30日最高温度预警指数</small></div><TrendingUp size={18} /></div><LineChart /></section>
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>隐患类型分布</strong><small>高频隐患分类统计</small></div><BarChart3 size={18} /></div><div className="bar-chart">{[['电气过热', 72], ['设备异常', 58], ['环境温升', 44], ['线路老化', 31], ['其他', 26]].map(([label, value], index) => <div className="bar-row" key={label}><span>{label}</span><div><i style={{ width: `${value}%`, '--bar-delay': `${index * 90}ms` }} /></div><b>{value}</b></div>)}</div></section>
@@ -2701,7 +2703,7 @@ export default function MobileApp() {
   const page = useMemo(() => {
     if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} inference={inference} aiGatewayUrl={aiGatewayUrl} onAIUrlChange={setAiGatewayUrl} aiConnection={aiConnection} aiDetections={aiDetections} onConnectAI={connectAIGateway} onDisconnectAI={disconnectAIGateway} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
     if (activeTab === 'alerts') return <AlertsPage alerts={alerts} onExportEvidence={exportEvidence} />
-    if (activeTab === 'dashboard') return <DashboardPage frame={frame} inference={inference} onOpenCommand={() => setShowCommandCenter(true)} />
+    if (activeTab === 'dashboard') return <DashboardPage frame={frame} inference={inference} onOpenCommand={() => setShowCommandCenter(true)} onAlarm={(temp) => triggerAlarm({ mode: 'live', temp, risk: 'high', location: '三路证据融合判定', sourceLabel: '传感器' })} />
     if (activeTab === 'guide') return <CompassPage frame={frame} />
     if (activeTab === 'about') return <AboutPage onStartDrill={() => setShowDrill(true)} />
     return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} inference={inference} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} onQuickNav={handleQuickNav} />
