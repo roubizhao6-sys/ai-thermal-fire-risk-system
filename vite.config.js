@@ -14,7 +14,9 @@ export default defineConfig({
       input: {
         main: entry('index.html'),
         mobile: entry('mobile-app.html'),
-        user: entry('user-app.html')
+        userApp: entry('user-app.html'),
+        user: entry('user/index.html'),
+        system: entry('system/index.html')
       }
     }
   }
