@@ -1,0 +1,17 @@
+{
+  "name": "燧瞳智感 · 物业端",
+  "short_name": "燧瞳智感",
+  "description": "AI 火警网警系统 · 系统端（物业/管理）",
+  "lang": "zh-CN",
+  "id": "/ai-thermal-fire-risk-system/mobile-app.html",
+  "start_url": "./mobile-app.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070d18",
+  "theme_color": "#0f172a",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
