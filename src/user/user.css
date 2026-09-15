@@ -648,6 +648,7 @@ p { margin: 0; }
 .ai-field input,
 .ai-field select { width: 100%; }
 .ai-preset-hint { color: var(--text-3); font-size: 11px; }
+.ai-integration-status { margin: 0; color: var(--text-3); font-size: 11px; line-height: 1.6; }
 .ai-probe { color: var(--text-2); font-size: 12px; }
 .ai-probe.is-ok { color: var(--safe); }
 .ai-probe.is-fail { color: #ffb340; }

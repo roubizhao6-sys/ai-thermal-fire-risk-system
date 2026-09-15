@@ -11,6 +11,18 @@
 
 import { buildNeighborNotice, buildPhaseMessages, fusePreventionSignals } from './aiPhases.js'
 import { describeVitalSigns } from './vitalSigns.js'
+import {
+  getVitalSensor,
+  getVisionDetector,
+  integrationStatus,
+  listExtraProviders,
+  readVitalFrame,
+  registerProvider,
+  registerVitalSensor,
+  registerVisionDetector,
+  runVisionDetector,
+  subscribeIntegrations,
+} from './aiHooks.js'
 
 export const AI_SETTINGS_KEY = 'thermalGuardAiSettings'
 
@@ -43,6 +55,23 @@ export const AI_PROVIDERS = {
     baseUrl: 'http://127.0.0.1:8000/v1',
     model: '',
   },
+  custom: {
+    id: 'custom',
+    label: '自定义端点（云端或自建网关）',
+    hint: '任何兼容 OpenAI /chat/completions 的服务：豆包（火山方舟）、DeepSeek、自建网关等，地址与模型名自己填',
+    baseUrl: '',
+    model: '',
+  },
+}
+
+// 界面里下拉框用的完整列表：内置预设 + 队友用 registerProvider 注册进来的
+export function listAiProviders() {
+  return { ...AI_PROVIDERS, ...listExtraProviders() }
+}
+
+export function providerPreset(id) {
+  const all = listAiProviders()
+  return all[id] ?? all.custom ?? AI_PROVIDERS.custom
 }
 
 export const DEFAULT_AI_SETTINGS = {
@@ -66,15 +95,40 @@ function safeParse(raw) {
   }
 }
 
+// 队友可以在不改界面的情况下批量配置：把 ai-config.json 放到站点根目录，
+// 或在页面里先设置 window.THERMAL_GUARD_AI = {...}。界面里保存过的设置优先级最高。
+let externalConfig = null
+
+export function setExternalAiConfig(config) {
+  if (!config || typeof config !== 'object') {
+    externalConfig = null
+    return null
+  }
+  // 只取认识的字段，配置文件里的注释字段（_readme / _fields 等）不参与合并
+  const allowed = ['provider', 'baseUrl', 'model', 'apiKey', 'vision', 'timeoutMs']
+  const next = {}
+  allowed.forEach((key) => {
+    if (config[key] !== undefined) next[key] = config[key]
+  })
+  externalConfig = Object.keys(next).length ? next : null
+  return externalConfig
+}
+
+export function getExternalAiConfig() {
+  return externalConfig ? { ...externalConfig } : null
+}
+
 export function readAiSettings() {
-  if (typeof localStorage === 'undefined') return { ...DEFAULT_AI_SETTINGS }
-  const stored = safeParse(localStorage.getItem(AI_SETTINGS_KEY)) ?? {}
-  const preset = AI_PROVIDERS[stored.provider] ?? AI_PROVIDERS.offline
+  const stored = typeof localStorage === 'undefined' ? {} : (safeParse(localStorage.getItem(AI_SETTINGS_KEY)) ?? {})
+  const config = { ...(externalConfig ?? {}), ...stored }
+  const preset = providerPreset(config.provider)
   return {
     ...DEFAULT_AI_SETTINGS,
+    ...externalConfig,
     ...stored,
-    baseUrl: stored.baseUrl ?? preset.baseUrl,
-    model: stored.model ?? preset.model,
+    provider: config.provider ?? DEFAULT_AI_SETTINGS.provider,
+    baseUrl: config.baseUrl ?? preset.baseUrl,
+    model: config.model ?? preset.model,
   }
 }
 
@@ -83,6 +137,64 @@ export function saveAiSettings(patch) {
   const next = { ...readAiSettings(), ...patch }
   localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(next))
   return next
+}
+
+// ---------------------------------------------------------------- 启动引导 / 对外接口
+//
+// 两个页面（用户端、系统端）启动时都会调用一次：
+//   1. 读 window.THERMAL_GUARD_AI（脚本注入）；
+//   2. 读站点根目录的 ai-config.json（队友可以直接改文件部署）；
+//   3. 把 window.ThermalGuardAI 暴露出去，队友可以在控制台或自己的脚本里注册能力。
+export async function bootstrapAiConfig() {
+  if (typeof window !== 'undefined' && window.THERMAL_GUARD_AI && typeof window.THERMAL_GUARD_AI === 'object') {
+    setExternalAiConfig(window.THERMAL_GUARD_AI)
+  } else if (typeof fetch === 'function') {
+    try {
+      const response = await fetch('./ai-config.json', { cache: 'no-store' })
+      if (response.ok) {
+        const config = await response.json()
+        if (config && typeof config === 'object') setExternalAiConfig(config)
+      }
+    } catch {}
+  }
+  installGlobalAiApi()
+  return readAiSettings()
+}
+
+// 队友的接入面板：控制台里执行 window.ThermalGuardAI.help() 会打印用法
+export function installGlobalAiApi() {
+  if (typeof window === 'undefined') return null
+  const api = {
+    version: 1,
+    phases: ['prevention', 'response', 'aftermath'],
+    providers: listAiProviders,
+    registerProvider,
+    registerVisionDetector,
+    registerVitalSensor,
+    getVisionDetector,
+    getVitalSensor,
+    runVisionDetector,
+    readVitalFrame,
+    integrationStatus,
+    subscribeIntegrations,
+    readSettings: readAiSettings,
+    saveSettings: saveAiSettings,
+    setExternalConfig: setExternalAiConfig,
+    command: aiCommand,
+    help() {
+      console.log([
+        '热感哨兵 · AI 接入接口（v1）',
+        '1) 加推理端点：ThermalGuardAI.registerProvider({ id, label, baseUrl, model, hint })',
+        '2) 接视觉通道：ThermalGuardAI.registerVisionDetector(async ({ frame, image }) => ({ flame: 0.9, smoke: 0.4 }))',
+        '3) 接红外设备：ThermalGuardAI.registerVitalSensor(async () => ({ width: 32, height: 24, temperatures: [...768 个数] }))',
+        '4) 看当前状态：ThermalGuardAI.integrationStatus()',
+        '5) 写入端点配置：ThermalGuardAI.saveSettings({ provider: "ollama", baseUrl: "/ai/v1", model: "qwen2.5:7b" })',
+      ].join('\n'))
+      return integrationStatus()
+    },
+  }
+  window.ThermalGuardAI = api
+  return api
 }
 
 // 端点可用性探测：不抛异常，只返回布尔值（默认 1.2 秒，避免拖慢现场操作）

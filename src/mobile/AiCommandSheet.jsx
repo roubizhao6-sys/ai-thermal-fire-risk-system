@@ -6,14 +6,19 @@
 //
 // 设置存在 localStorage（键在 src/shared/aiClient.js 里统一定义），密钥不出本机。
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Cpu, RefreshCw, Save, Server, TriangleAlert, X } from 'lucide-react'
-import { AI_PROVIDERS, aiReachable, readAiSettings, saveAiSettings } from '../shared/aiClient.js'
+import { aiReachable, listAiProviders, providerPreset, readAiSettings, saveAiSettings } from '../shared/aiClient.js'
+import { integrationStatus, subscribeIntegrations } from '../shared/aiHooks.js'
 
 export default function AiCommandSheet({ onClose, onSaved }) {
   const [form, setForm] = useState(() => readAiSettings())
   const [probe, setProbe] = useState('')
   const [saved, setSaved] = useState('')
+  const [status, setStatus] = useState(() => integrationStatus())
+
+  // 队友在控制台里注册能力后，这个面板会立刻反映"已接入"
+  useEffect(() => subscribeIntegrations(() => setStatus(integrationStatus())), [])
 
   const patch = (next) => setForm((current) => ({ ...current, ...next }))
   const offline = form.provider === 'offline'
@@ -55,12 +60,12 @@ export default function AiCommandSheet({ onClose, onSaved }) {
               patch({ provider: preset.id, baseUrl: preset.baseUrl, model: preset.model })
             }}
           >
-            {Object.values(AI_PROVIDERS).map((preset) => (
+            {Object.values(listAiProviders()).map((preset) => (
               <option key={preset.id} value={preset.id}>{preset.label}</option>
             ))}
           </select>
         </label>
-        <p className="ai-sheet-hint">{AI_PROVIDERS[form.provider]?.hint}</p>
+        <p className="ai-sheet-hint">{providerPreset(form.provider)?.hint}</p>
         <p className="ai-sheet-hint">
           现场部署：在本机跑 <b>node tools/local-ai-server.mjs</b>，改用 http://127.0.0.1:4173 打开系统端，
           端点填相对路径 <b>/ai/v1</b>。这样站点与模型同在 http 源内，断网也能指挥；公网 HTTPS 页面会拦截 http 端点。
@@ -118,6 +123,17 @@ export default function AiCommandSheet({ onClose, onSaved }) {
         </div>
 
         {saved && <div className="ai-sheet-saved">{saved}</div>}
+
+        <div className="ai-sheet-status">
+          <strong>接入状态（队友在这里对接，界面会自动生效）</strong>
+          <ul>
+            <li>推理端点：{form.baseUrl ? `已填 ${form.baseUrl}` : '未填（用本机规则引擎）'}</li>
+            <li>视觉通道（阶段一火焰/烟雾）：{status.vision ? '已接入' : '未接入（界面用演示滑杆）'}</li>
+            <li>红外设备（阶段三热像源）：{status.vital ? '已接入' : '未接入（用模拟灾后帧）'}</li>
+            <li>额外端点预设：{status.providers.length ? status.providers.join('、') : '无'}</li>
+          </ul>
+          <span>在控制台执行 <code>ThermalGuardAI.help()</code> 可以看到接入写法；也可以直接改站点根目录的 <code>ai-config.json</code>。</span>
+        </div>
 
         <div className="sheet-tip protocol-tip">
           <Cpu size={14} />

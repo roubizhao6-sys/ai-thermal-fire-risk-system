@@ -23,6 +23,7 @@ import {
 import { aiCommand, readAiSettings } from '../shared/aiClient.js'
 import { buildNeighborNotice, fusePreventionSignals, summarizeRescueBrief } from '../shared/aiPhases.js'
 import { createAfterFireFrame, describeVitalSigns, scanVitalSigns } from '../shared/vitalSigns.js'
+import { getVitalSensor, getVisionDetector, readVitalFrame, runVisionDetector, subscribeIntegrations } from '../shared/aiHooks.js'
 import { readUserStatuses } from '../user/binaryDialogue.js'
 import { temperatureColor } from './thermal.js'
 
@@ -30,8 +31,30 @@ import { temperatureColor } from './thermal.js'
 export function PreventionPanel({ result, thresholds, history = [], floor = 4, onAlarm, onNotify }) {
   const [visionFlame, setVisionFlame] = useState(0)
   const [visionSmoke, setVisionSmoke] = useState(0)
+  const [visionChannel, setVisionChannel] = useState(() => ({ attached: Boolean(getVisionDetector()), note: '' }))
   const [aiReview, setAiReview] = useState(null)
   const [busy, setBusy] = useState(false)
+
+  // 队友注册了视觉通道就不用滑杆：每来一帧就调用一次他们的检测函数
+  useEffect(() => subscribeIntegrations(({ status }) => setVisionChannel((current) => ({ ...current, attached: status.vision }))), [])
+  useEffect(() => {
+    if (!getVisionDetector()) return undefined
+    let cancelled = false
+    const run = async () => {
+      const outcome = await runVisionDetector({ frame: result, floor })
+      if (cancelled) return
+      if (outcome.flame !== null) setVisionFlame(outcome.flame)
+      if (outcome.smoke !== null) setVisionSmoke(outcome.smoke)
+      setVisionChannel({ attached: true, note: outcome.note })
+    }
+    run()
+    const timer = window.setInterval(run, 3000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+    // 队友可能在页面运行中途才注册视觉通道：attached 变化时重新拉起轮询
+  }, [result?.maxTemp, result?.timestamp, floor, visionChannel.attached])
 
   // 温升速率用最近一段历史估计（有真实设备时由采样帧提供）
   const ror = useMemo(() => {
@@ -88,19 +111,25 @@ export function PreventionPanel({ result, thresholds, history = [], floor = 4, o
         <p className="situation-note"><Info size={12} />{decision.missing.join('；')}（单路证据不触发报警，避免误报）</p>
       )}
 
-      <div className="prevention-demo">
+      <div className={`prevention-demo ${visionChannel.attached ? 'is-attached' : ''}`}>
+        {visionChannel.attached && (
+          <p className="prevention-channel"><Activity size={12} />视觉通道已接入：火焰 {Math.round(visionFlame * 100)}% · 烟雾 {Math.round(visionSmoke * 100)}%{visionChannel.note ? ` · ${visionChannel.note}` : ''}</p>
+        )}
         <label>
-          <span>视觉火焰（演示输入）</span>
-          <input type="range" min="0" max="1" step="0.05" value={visionFlame} onChange={(event) => setVisionFlame(Number(event.target.value))} />
+          <span>视觉火焰{visionChannel.attached ? '（来自接入通道）' : '（演示输入）'}</span>
+          <input type="range" min="0" max="1" step="0.05" value={visionFlame} disabled={visionChannel.attached} onChange={(event) => setVisionFlame(Number(event.target.value))} />
           <b>{Math.round(visionFlame * 100)}%</b>
         </label>
         <label>
-          <span>烟雾（演示输入）</span>
-          <input type="range" min="0" max="1" step="0.05" value={visionSmoke} onChange={(event) => setVisionSmoke(Number(event.target.value))} />
+          <span>烟雾{visionChannel.attached ? '（来自接入通道）' : '（演示输入）'}</span>
+          <input type="range" min="0" max="1" step="0.05" value={visionSmoke} disabled={visionChannel.attached} onChange={(event) => setVisionSmoke(Number(event.target.value))} />
           <b>{Math.round(visionSmoke * 100)}%</b>
         </label>
         <p className="situation-note">
-          <Info size={12} />热像来自当前检测帧；火焰与烟雾置信度在真实部署里由摄像头视觉模型给出，这里用滑杆代替，便于演示"单路不报警、三路才确认"。
+          <Info size={12} />
+          {visionChannel.attached
+            ? '火焰与烟雾置信度来自队友接入的视觉通道。'
+            : '火焰与烟雾置信度在真实部署里由摄像头视觉模型给出：队友可调用 ThermalGuardAI.registerVisionDetector() 接入，未接入时用滑杆演示"单路不报警、三路才确认"。'}
         </p>
       </div>
 
@@ -184,11 +213,19 @@ export function VitalSignsPanel({ floor = 4, aiSettings }) {
   const [scan, setScan] = useState(null)
   const [aiReview, setAiReview] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [sensorNote, setSensorNote] = useState('')
+  const [sensorAttached, setSensorAttached] = useState(() => Boolean(getVitalSensor()))
+
+  useEffect(() => subscribeIntegrations(({ status }) => setSensorAttached(status.vital)), [])
 
   const runScan = async (rescan = false) => {
     setBusy(true)
-    const nextFrame = createAfterFireFrame({ seed: rescan ? Date.now() % 100000 : 20260915 })
+    // 队友接入了真实红外设备就用真实帧，否则用模拟灾后帧
+    const simulated = createAfterFireFrame({ seed: rescan ? Date.now() % 100000 : 20260915 })
+    const { frame: nextFrame, attached, note } = await readVitalFrame(simulated)
     setFrame(nextFrame)
+    setSensorNote(attached ? (note || '热像来自接入的红外设备') : note)
+    setSensorAttached(attached)
     const result = scanVitalSigns(nextFrame)
     setScan(result)
     const described = describeVitalSigns(result, { floor })
@@ -239,10 +276,12 @@ export function VitalSignsPanel({ floor = 4, aiSettings }) {
             ))}
           </svg>
           <div className="vital-meta">
+            <span>{sensorAttached ? '红外设备' : '模拟灾后帧'}</span>
             <span>环境基准 {scan?.ambient}°C</span>
             <span>已排除余温格 {scan?.burnedCells}</span>
             <span>人体温度带 {scan?.band?.min}–{scan?.band?.max}°C</span>
           </div>
+          {sensorNote && <p className="situation-note"><Info size={12} />{sensorNote}</p>}
         </div>
       )}
 
@@ -273,7 +312,11 @@ export function VitalSignsPanel({ floor = 4, aiSettings }) {
         </p>
       )}
       <p className="situation-note">
-        <Info size={12} />红外只能看到表面温度：被遮挡、被掩埋的人员看不到，算法结果只作为搜救辅助，必须人工复核。
+        <Info size={12} />
+        {sensorAttached
+          ? '热像来自接入的红外设备。'
+          : '当前用模拟灾后帧演示：队友可调用 ThermalGuardAI.registerVitalSensor() 接入真实红外设备。'}
+        红外只能看到表面温度：被遮挡、被掩埋的人员看不到，算法结果只作为搜救辅助，必须人工复核。
       </p>
     </section>
   )

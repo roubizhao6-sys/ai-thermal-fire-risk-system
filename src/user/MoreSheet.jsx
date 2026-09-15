@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Cpu, DoorOpen, Image as ImageIcon, Link2, Save, Sparkles, Trash2, Upload } from 'lucide-react'
-import { AI_PROVIDERS, aiReachable } from '../shared/aiClient.js'
+import { aiReachable, listAiProviders, providerPreset } from '../shared/aiClient.js'
+import { integrationStatus } from '../shared/aiHooks.js'
 import {
   aiReviewPlan,
   analyzePlanImage,
@@ -338,16 +339,21 @@ export default function MoreSheet({
               <select
                 value={aiSettings.provider}
                 onChange={(event) => {
-                  const preset = AI_PROVIDERS[event.target.value]
+                  const preset = providerPreset(event.target.value)
                   onAiSettingsChange({ provider: preset.id, baseUrl: preset.baseUrl, model: preset.model })
                 }}
               >
-                {Object.values(AI_PROVIDERS).map((preset) => (
+                {Object.values(listAiProviders()).map((preset) => (
                   <option key={preset.id} value={preset.id}>{preset.label}</option>
                 ))}
               </select>
             </label>
-            <p className="ai-preset-hint">{AI_PROVIDERS[aiSettings.provider]?.hint}</p>
+            <p className="ai-preset-hint">{providerPreset(aiSettings.provider)?.hint}</p>
+            <p className="ai-integration-status">
+              接入状态：视觉通道{integrationStatus().vision ? '已接入' : '未接入（用演示输入）'} ·
+              红外设备{integrationStatus().vital ? '已接入' : '未接入（用模拟帧）'} ·
+              推理端点 {aiSettings.baseUrl ? aiSettings.baseUrl : '未配置'}
+            </p>
             <p className="ai-preset-hint">
               现场用法：在本机跑 <b>node tools/local-ai-server.mjs</b>，用 http://127.0.0.1:4173 打开本页，
               端点就能填相对路径 <b>/ai/v1</b>（同源转发到本地模型）。公网 HTTPS 页面会拦截 http 端点，所以别在演示站上填 127.0.0.1。
