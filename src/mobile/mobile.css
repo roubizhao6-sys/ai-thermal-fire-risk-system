@@ -1986,3 +1986,69 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .ar-entry-button svg { grid-row: span 2; color: #7dd3fc; }
 .ar-entry-button span { font-size: 12px; font-weight: 700; }
 .ar-entry-button small { color: #9fc0dd; font-size: 8px; line-height: 1.5; }
+
+/* ==== AI 三阶段：预防判定 / 救援现况 / 灾后生命体征搜索 ==== */
+.prevention-card, .rescue-card, .vital-card { margin-top: 10px; padding: 14px; border-radius: 16px; }
+.prevention-card .card-head > svg { color: #facc15; }
+.rescue-card .card-head > svg { color: #6fd3ff; }
+.vital-card .card-head > svg { color: #4ade80; }
+
+.prevention-card.level-alarm { border: 1px solid rgba(239,68,68,.45); background: rgba(239,68,68,.08); }
+.prevention-card.level-watch { border: 1px solid rgba(245,158,11,.35); }
+
+.prevention-verdict { display: flex; align-items: baseline; gap: 8px; margin-top: 10px; }
+.prevention-verdict strong { color: #f8fafc; font-size: 22px; }
+.prevention-verdict small { color: #7d97b3; font-size: 8px; }
+.prevention-badge { padding: 3px 10px; border-radius: 999px; font-size: 9px; font-weight: 700; }
+.prevention-badge.tone-normal { color: #bff3d2; background: rgba(34,197,94,.18); }
+.prevention-badge.tone-watch { color: #ffe1a8; background: rgba(245,158,11,.2); }
+.prevention-badge.tone-alarm { color: #ffd3d3; background: rgba(239,68,68,.28); }
+
+.prevention-reasons { margin: 9px 0 0; padding-left: 16px; color: #b9d3ea; font-size: 9px; line-height: 1.7; }
+.prevention-demo { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+.prevention-demo label { display: grid; grid-template-columns: 96px 1fr 36px; align-items: center; gap: 8px; color: #8fa9c2; font-size: 8px; }
+.prevention-demo input[type=range] { accent-color: #f97316; }
+.prevention-demo b { color: #e6f1ff; font-size: 9px; text-align: right; }
+
+.prevention-notice { margin-top: 10px; padding: 10px 11px; border: 1px solid rgba(96,165,250,.16); border-radius: 11px; background: rgba(4,13,27,.55); }
+.prevention-notice span { display: flex; align-items: center; gap: 5px; color: #8fb2d2; font-size: 8px; }
+.prevention-notice p { margin: 6px 0 0; color: #dcecff; font-size: 10px; line-height: 1.6; }
+.prevention-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.prevention-actions button {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 36px; padding: 0 12px;
+  color: #dcecff; border: 1px solid rgba(96,165,250,.22); border-radius: 10px;
+  background: rgba(59,130,246,.12); font-size: 9px;
+}
+.prevention-actions button.is-danger { color: #fff; border-color: transparent; background: linear-gradient(110deg, #b91c1c, #ef4444); font-weight: 700; }
+.prevention-actions button:disabled { opacity: .55; }
+.prevention-ai { display: flex; align-items: flex-start; gap: 6px; margin: 9px 0 0; padding: 8px 10px; color: #cfe4f6; border-radius: 10px; background: rgba(37,99,235,.12); font-size: 9px; line-height: 1.6; }
+.prevention-ai.is-model { background: rgba(124,58,237,.16); }
+
+.rescue-lines { margin: 10px 0 0; padding-left: 16px; color: #b9d3ea; font-size: 9px; line-height: 1.7; }
+.rescue-ai { display: flex; align-items: flex-start; gap: 6px; margin: 9px 0 0; padding: 8px 10px; color: #cfe4f6; border-radius: 10px; background: rgba(37,99,235,.12); font-size: 9px; line-height: 1.6; }
+.rescue-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.rescue-list > strong { display: flex; align-items: center; gap: 5px; color: #9db6cf; font-size: 9px; }
+.rescue-row { display: grid; grid-template-columns: 62px 1fr; gap: 9px; padding: 9px 10px; border: 1px solid rgba(96,165,250,.13); border-radius: 11px; background: rgba(5,15,29,.6); }
+.rescue-row > span { color: #8fb2d2; font-size: 8px; }
+.rescue-row.needs-help { border-color: rgba(239,68,68,.4); background: rgba(239,68,68,.1); }
+.rescue-row.needs-help > span { color: #ffb4a8; }
+.rescue-row > div { display: flex; flex-direction: column; gap: 3px; }
+.rescue-row strong { color: #d9ecfb; font-size: 10px; }
+.rescue-row small { color: #9db2c7; font-size: 8px; line-height: 1.5; }
+.rescue-row em { color: #7c94af; font-size: 8px; font-style: normal; }
+.rescue-alert { display: flex; align-items: center; gap: 6px; margin: 9px 0 0; padding: 9px 11px; color: #ffd3d3; border: 1px solid rgba(239,68,68,.3); border-radius: 10px; background: rgba(239,68,68,.1); font-size: 9px; }
+
+.vital-actions { display: flex; gap: 7px; margin-top: 10px; }
+.vital-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 12px; color: #dcecff; border: 1px solid rgba(96,165,250,.2); border-radius: 10px; background: rgba(59,130,246,.1); font-size: 9px; }
+.vital-actions .vital-scan { flex: 1; color: #fff; border-color: transparent; background: linear-gradient(110deg, #16a34a, #22c55e); font-weight: 700; }
+.vital-stage { margin-top: 10px; }
+.vital-grid { width: 100%; height: 190px; border: 1px solid rgba(96,165,250,.18); border-radius: 12px; background: #020617; }
+.vital-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 7px; color: #7d97b3; font-size: 8px; }
+.vital-result { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.vital-row { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 9px; padding: 9px 10px; border: 1px solid rgba(34,197,94,.25); border-radius: 11px; background: rgba(34,197,94,.08); }
+.vital-index { display: grid; place-items: center; width: 20px; height: 20px; color: #06210f; border-radius: 999px; background: #4ade80; font-size: 9px; font-weight: 700; }
+.vital-row > div { display: flex; flex-direction: column; gap: 3px; }
+.vital-row strong { color: #d9ecfb; font-size: 10px; }
+.vital-row small { color: #8fb2d2; font-size: 8px; }
+.vital-row em { color: #fbbf24; font-size: 8px; font-style: normal; }

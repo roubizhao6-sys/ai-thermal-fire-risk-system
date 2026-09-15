@@ -9,6 +9,9 @@
 //   · 请求带超时，任何失败都不抛异常，调用方永远拿到结构化结果（带 source 字段）；
 //   · 密钥只存在本机 localStorage，不随任何埋点上报。
 
+import { buildNeighborNotice, buildPhaseMessages, fusePreventionSignals } from './aiPhases.js'
+import { describeVitalSigns } from './vitalSigns.js'
+
 export const AI_SETTINGS_KEY = 'thermalGuardAiSettings'
 
 export const AI_PROVIDERS = {
@@ -189,7 +192,61 @@ export function localDecision(context = {}) {
     position = null,
     gps = null,
     plan = null,
+    phase = 'response',
+    prevention = null,
+    vital = null,
   } = context
+
+  // 阶段一：预防判定——该不该报警 + 给周边居民的通知
+  if (phase === 'prevention') {
+    const decision = prevention?.decision ?? fusePreventionSignals(prevention?.signals ?? {})
+    const notice = prevention?.notice ?? buildNeighborNotice(decision, { floor: position?.floor, location: prevention?.location })
+    if (decision.level === 'alarm') {
+      return {
+        source: 'offline-rules',
+        phase,
+        urgency: 'immediate',
+        level: 'alarm',
+        summary: `判定火警：${decision.reasons.slice(0, 2).join('；')}`,
+        action: '立即触发全屏报警与应急广播，通知周边居民按指引撤离',
+        instruction: notice,
+      }
+    }
+    if (decision.level === 'watch') {
+      return {
+        source: 'offline-rules',
+        phase,
+        urgency: 'prepare',
+        level: 'watch',
+        summary: `关注：${decision.reasons.slice(0, 2).join('；')}`,
+        action: '保持监测并派人现场核查，暂不触发全楼报警',
+        instruction: notice,
+      }
+    }
+    return {
+      source: 'offline-rules',
+      phase,
+      urgency: 'info',
+      level: 'normal',
+      summary: '三路证据（热像 / 视觉 / 烟雾）均未达到报警条件',
+      action: '维持值守，记录本次数据',
+      instruction: notice,
+    }
+  }
+
+  // 阶段三：灾后生命体征搜索——只给搜救建议，不做火警判断
+  if (phase === 'aftermath') {
+    const described = describeVitalSigns(vital?.result, { floor: position?.floor })
+    return {
+      source: 'offline-rules',
+      phase,
+      urgency: vital?.result?.candidates?.length ? 'immediate' : 'info',
+      level: vital?.result?.candidates?.length ? 'candidates' : 'clear',
+      summary: described.summary,
+      action: described.action,
+      instruction: described.priority.length ? described.priority.join(' / ') : '按房间逐间复扫',
+    }
+  }
 
   if (!fire) {
     return {
@@ -240,6 +297,7 @@ export function localDecision(context = {}) {
 
   return {
     source: 'offline-rules',
+    phase: 'response',
     urgency: route?.ok ? 'immediate' : 'prepare',
     summary,
     action,
@@ -248,17 +306,8 @@ export function localDecision(context = {}) {
 }
 
 export function buildCommanderMessages(context) {
-  return [
-    {
-      role: 'system',
-      content: [
-        '你是校园火灾疏散指挥助手，只能依据给出的结构化现场数据回答。',
-        '输出严格的 JSON：{"summary":"一句话现场态势","action":"一句话撤离决策","instruction":"给现场人员的一步动作"}',
-        '不要编造未提供的信息；数据不足时在 instruction 里明确让人员等待下一次更新。',
-      ].join('\n'),
-    },
-    { role: 'user', content: JSON.stringify(context) },
-  ]
+  // 按阶段选提示词：预防阶段看证据、起火阶段看路线、灾后阶段看生命体征候选
+  return buildPhaseMessages(context?.phase ?? 'response', context)
 }
 
 function parseModelReply(text) {
@@ -270,23 +319,28 @@ function parseModelReply(text) {
   return {
     source: 'local-model',
     urgency: parsed.urgency ?? 'immediate',
+    level: parsed.level ?? null,
     summary: String(parsed.summary ?? '').slice(0, 120),
     action: String(parsed.action).slice(0, 120),
-    instruction: String(parsed.instruction ?? '').slice(0, 160),
+    instruction: String(parsed.instruction ?? parsed.notice ?? '').slice(0, 160),
+    rescue: parsed.rescue ? String(parsed.rescue).slice(0, 160) : null,
+    priority: parsed.priority ? String(parsed.priority).slice(0, 160) : null,
+    caution: parsed.caution ? String(parsed.caution).slice(0, 160) : null,
   }
 }
 
 // 统一入口：优先本地模型，失败或未配置时用规则引擎
 export async function aiCommand(context, settings = readAiSettings()) {
   const fallback = localDecision(context)
+  const phase = context?.phase ?? 'response'
   if (settings.provider === 'offline' || !settings.baseUrl) {
-    return { ...fallback, attempted: false }
+    return { ...fallback, phase, attempted: false }
   }
   try {
     const text = await aiChat(buildCommanderMessages(context), settings)
     const parsed = parseModelReply(text)
-    return parsed ? { ...parsed, attempted: true } : { ...fallback, attempted: true, modelReplyInvalid: true }
+    return parsed ? { ...parsed, phase, attempted: true } : { ...fallback, phase, attempted: true, modelReplyInvalid: true }
   } catch (error) {
-    return { ...fallback, attempted: true, error: String(error?.message ?? error) }
+    return { ...fallback, phase, attempted: true, error: String(error?.message ?? error) }
   }
 }

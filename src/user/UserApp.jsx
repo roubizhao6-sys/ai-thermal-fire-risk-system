@@ -12,6 +12,15 @@ import useGeoLocation from './useGeoLocation.js'
 import { formatMeters } from './geo.js'
 import { aiCommand, readAiSettings, saveAiSettings } from '../shared/aiClient.js'
 import { buildPlanRoute, currentStep, listPlans } from './floorplan.js'
+import {
+  answerQuestion,
+  buildAdvice,
+  createDialogueState,
+  nextQuestion,
+  progressOf,
+  saveUserStatus,
+  summarizeForRescue,
+} from './binaryDialogue.js'
 // 所有传感器输入（信标定位、火情、热像、朝向、设置）统一从这一层订阅
 import {
   KEYS,
@@ -100,6 +109,8 @@ export default function UserApp() {
   const [activePlanId, setActivePlanId] = useState(null)
   const [aiSettings, setAiSettings] = useState(() => readAiSettings())
   const [aiResult, setAiResult] = useState(null)
+  // 起火阶段：二元问答（是 / 否），答案既改当前指引，也上传给救援端
+  const [dialogue, setDialogue] = useState(() => createDialogueState())
   // 声音/播报/震动设置由系统端维护，用户端跟随，避免两边不一致
   const [settings, setSettings] = useState(() => readSettings())
   const [audioReady, setAudioReady] = useState(() => isAudioUnlocked())
@@ -308,6 +319,36 @@ export default function UserApp() {
   const dialBearing = planStep ? planStep.compassBearing : bearing
   const dialTargetLabel = planRoute ? planRoute.exitLabel : (route?.ok ? route.exitLabel : '最近安全出口')
   const dialRemaining = planRoute ? planRemaining : (route?.ok ? route.meters : null)
+
+  // 二元问答：当前问题、进度、由答案推出的指引
+  const dialogueQuestion = fire && !dialogue.done ? nextQuestion(dialogue) : null
+  const dialogueProgress = progressOf(dialogue)
+  const dialogueAdvice = fire ? buildAdvice(dialogue, {
+    routeOk: Boolean(route?.ok || planRoute),
+    exitLabel: dialTargetLabel,
+    meters: dialRemaining,
+  }) : null
+
+  // 起火时重置问答；一旦开始回答就把现况同步给系统端（同一浏览器里救援端能立刻看到）
+  useEffect(() => {
+    if (!fire) {
+      setDialogue(createDialogueState())
+      return
+    }
+    setDialogue(createDialogueState())
+  }, [fire?.startedAt, fire?.nodeId])
+
+  useEffect(() => {
+    if (!fire || !dialogue.order?.length) return
+    const status = summarizeForRescue(dialogue, {
+      floor: position.floor,
+      spot: position.spot,
+      routeOk: Boolean(route?.ok || planRoute),
+      exitLabel: dialTargetLabel,
+      meters: dialRemaining,
+    })
+    saveUserStatus(status)
+  }, [dialogue, fire, position.floor, position.spot, route?.ok, planRoute, dialTargetLabel, dialRemaining])
 
   // AI 指挥：优先本地大模型，失败或未配置时回落到本机规则引擎（保证无网络也有指令）
   useEffect(() => {
@@ -537,6 +578,46 @@ export default function UserApp() {
               <span>{aiResult.summary}</span>
               <strong>{aiResult.action}</strong>
               {aiResult.instruction && <em>{aiResult.instruction}</em>}
+            </div>
+          )}
+
+          {fire && (
+            <div className={`ask-card tone-${dialogueAdvice?.tone ?? 'caution'}`}>
+              <div className="ask-head">
+                <span className="ask-tag">AI 现场问答</span>
+                <small>{dialogueProgress.answered}/{dialogueProgress.total} 已回答</small>
+              </div>
+              <div className="ask-bar"><i style={{ width: `${dialogueProgress.ratio * 100}%` }} /></div>
+              {dialogueQuestion ? (
+                <>
+                  <p className="ask-question">{dialogueQuestion.text}</p>
+                  <p className="ask-hint">{dialogueQuestion.hint}</p>
+                  <div className="ask-buttons">
+                    <button
+                      type="button"
+                      className="ask-yes"
+                      onClick={() => setDialogue((current) => answerQuestion(current, dialogueQuestion.id, 'yes'))}
+                    >
+                      是 · {dialogueQuestion.yes}
+                    </button>
+                    <button
+                      type="button"
+                      className="ask-no"
+                      onClick={() => setDialogue((current) => answerQuestion(current, dialogueQuestion.id, 'no'))}
+                    >
+                      否 · {dialogueQuestion.no}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="ask-advice">{dialogueAdvice?.text}</p>
+              )}
+              {dialogue.order?.length > 0 && (
+                <div className="ask-foot">
+                  <span>{dialogueAdvice?.text}</span>
+                  {dialogueAdvice?.needsHelp && <em>已把你的位置与情况同步给救援端</em>}
+                </div>
+              )}
             </div>
           )}
         </div>

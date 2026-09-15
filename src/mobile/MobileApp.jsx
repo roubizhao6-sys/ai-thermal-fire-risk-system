@@ -61,6 +61,9 @@ import AlarmCenterView from './AlarmCenterView.jsx'
 import AlarmOverlay from './AlarmOverlay.jsx'
 import AiCommandSheet from './AiCommandSheet.jsx'
 import { HazardReport, InspectionPanel, ReportButton, exportIncidentPdf, openPdfReport } from './EmergencyPanels.jsx'
+import { PreventionPanel, RescueBriefPanel, VitalSignsPanel, copyNotice } from './PhasePanels.jsx'
+import { aiCommand, readAiSettings } from '../shared/aiClient.js'
+import { readUserStatuses } from '../user/binaryDialogue.js'
 import CityMap from './CityMap.jsx'
 import EvacuationView from './EvacuationView.jsx'
 import { SPOT_MAPPING_NOTE, campusLocationForNode } from './campus.js'
@@ -771,6 +774,8 @@ export default function MobileApp() {
   const [showAiSheet, setShowAiSheet] = useState(false)
   const [arOpen, setArOpen] = useState(false)
   const [reportBusy, setReportBusy] = useState(false)
+  const [frameHistory, setFrameHistory] = useState([])
+  const [rescueBrief, setRescueBrief] = useState(null)
   const [phase, setPhase] = useState(0)
   const [frame, setFrame] = useState(() => createFrame())
   const [image, setImage] = useState('')
@@ -832,6 +837,13 @@ export default function MobileApp() {
     const timer = setInterval(() => setNowMs(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [alarm, fire])
+
+  // 阶段一需要"温升速率"，这里留最近若干帧的最高温做趋势（真实设备由采样帧提供）
+  useEffect(() => {
+    if (!Number.isFinite(result?.maxTemp)) return
+    setFrameHistory((current) => [...current, { at: Date.now(), maxTemp: result.maxTemp }].slice(-12))
+  }, [result?.maxTemp, result?.timestamp])
+
 
   // 把火情同步给用户端：同一浏览器里打开 user-app.html 的标签页会收到 storage 事件，
   // 于是「系统端触发报警 → 用户端表盘立刻转向撤离方向」可以在一台设备上演示。
@@ -1058,6 +1070,32 @@ export default function MobileApp() {
       blockedNodes?.length ? `已封锁通道：${blockedNodes.join('、')}` : null,
     ].filter(Boolean).join('；'),
   })
+
+  // 阶段二：起火时给救援端生成一段简报（配了本地模型就由模型写，否则用本机规则）
+  useEffect(() => {
+    if (!fire) {
+      setRescueBrief(null)
+      return undefined
+    }
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      const outcome = await aiCommand({
+        phase: 'response',
+        fire,
+        route: route?.ok ? { ok: true, meters: Math.round(route.meters), exitLabel: route.exitLabel } : { ok: false, reason: route?.reason },
+        crowd: crowd?.totals ? { totals: crowd.totals, stairs: crowd.stairs } : null,
+        position,
+        blocked: blockedNodes,
+        userStatus: readUserStatuses(),
+      }, readAiSettings())
+      if (!cancelled) setRescueBrief(outcome)
+    }, 900)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [fire, route?.ok, route?.meters, route?.exitLabel, crowd?.totals?.remaining, position.floor, position.spot, blockedNodes])
+
   // ?demo=1 一键演示模式（人流节奏放快、并高亮人流监看面板）
   const demoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1'
   useEffect(() => {
@@ -1458,6 +1496,7 @@ export default function MobileApp() {
     if (activeTab === 'alerts') return <AlertsPage alerts={alerts} onToast={setToast} />
     if (activeTab === 'evacuation') {
       return (
+        <>
         <EvacuationView
           route={route}
           fire={fire}
@@ -1474,11 +1513,35 @@ export default function MobileApp() {
           onClearFire={() => setFire(null)}
           onOpenAr={() => setArOpen(true)}
         />
+        <RescueBriefPanel
+          fire={fire}
+          position={position}
+          crowd={crowd}
+          blocked={blockedNodes}
+          rescueBrief={rescueBrief}
+        />
+        <VitalSignsPanel floor={position.floor} />
+        </>
       )
     }
     if (activeTab === 'dashboard') return dashView === 'about' ? <AboutPage onBack={() => setDashView('dashboard')} /> : <DashboardPage onOpenAbout={() => setDashView('about')} />
-    return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={riskAdjustedResult} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
-  }, [activeTab, alertSection, dashView, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, riskAdjustedResult, phase, alarm, fire, settings, audioReady, route, position, blockedNodes, nowMs, activeDevice])
+    return (
+      <>
+        <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={riskAdjustedResult} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
+        <PreventionPanel
+          result={riskAdjustedResult}
+          thresholds={{ high: settings.highThreshold, medium: settings.mediumThreshold }}
+          history={frameHistory}
+          floor={position.floor}
+          onAlarm={() => pushAlarm({ mode: 'auto', startedAt: Date.now(), temp: result.maxTemp, hotspots: result.hotspots?.length ?? 0, location: `AI 预防判定 · ${position.floor} 楼`, sourceLabel: 'AI 判定' })}
+          onNotify={async (notice) => {
+            const ok = await copyNotice(notice)
+            setToast(ok ? '周边通知已复制，可粘贴到广播或群消息' : notice.slice(0, 40))
+          }}
+        />
+      </>
+    )
+  }, [activeTab, alertSection, dashView, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, riskAdjustedResult, phase, alarm, fire, settings, audioReady, route, position, blockedNodes, nowMs, activeDevice, frameHistory, rescueBrief, crowd])
 
   return (
     <div className={`mobile-app-shell ${alarm ? 'has-alarm' : ''}`}>

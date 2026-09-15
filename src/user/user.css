@@ -587,6 +587,42 @@ p { margin: 0; }
 }
 .ai-check input { width: 18px; height: 18px; }
 
+/* ==== 起火阶段的二元问答卡片 ==== */
+.ask-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(120, 120, 128, .38);
+  background: rgba(28, 28, 32, .72);
+}
+.ask-card.tone-danger { border-color: rgba(255, 69, 58, .55); background: rgba(255, 69, 58, .14); }
+.ask-card.tone-caution { border-color: rgba(255, 179, 64, .45); background: rgba(255, 179, 64, .12); }
+.ask-card.tone-safe { border-color: rgba(48, 209, 88, .45); background: rgba(48, 209, 88, .12); }
+.ask-head { display: flex; align-items: center; justify-content: space-between; }
+.ask-tag { font-size: 12px; font-weight: 600; letter-spacing: .3px; }
+.ask-head small { color: var(--text-3); font-size: 11px; }
+.ask-bar { height: 4px; border-radius: 999px; background: rgba(255, 255, 255, .16); overflow: hidden; }
+.ask-bar i { display: block; height: 100%; background: #fff; transition: width .25s ease; }
+.ask-question { margin: 2px 0 0; font-size: 16px; font-weight: 600; line-height: 1.5; }
+.ask-hint { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.5; }
+.ask-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ask-buttons button {
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.ask-yes { background: rgba(255, 69, 58, .26); color: #fff; }
+.ask-no { background: rgba(120, 120, 128, .3); color: #fff; }
+.ask-advice { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.6; }
+.ask-foot { display: flex; flex-direction: column; gap: 4px; color: var(--text-2); font-size: 12px; line-height: 1.55; }
+.ask-foot em { color: #ffd60a; font-style: normal; }
+
 .plan-fields { display: flex; gap: 14px; flex-wrap: wrap; }
 .plan-fields label,
 .ai-field {
