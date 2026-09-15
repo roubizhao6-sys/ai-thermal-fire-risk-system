@@ -1985,6 +1985,14 @@ function HazardReport() {
   )
 }
 
+const LLM_PRESETS = [
+  { id: 'deepseek', name: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+  { id: 'moonshot', name: 'Kimi', endpoint: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+  { id: 'openai', name: 'OpenAI', endpoint: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+  { id: 'zhipu', name: '智谱GLM', endpoint: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+  { id: 'qwen', name: '通义千问', endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+]
+
 function localFireAnswer(q) {
   const found = FIRE_KB.find((item) => item.kw.some((k) => q.includes(k)))
   return found ? found.answer : '这个问题建议联网回答：点右上角「设置」填入大模型 API 地址即可接入。内置知识库可回答：灭火器使用、温度阈值、报警、疏散、电气火灾、烟雾等。'
@@ -2072,7 +2080,10 @@ function AiSprite({ frame, open, onOpenChange }) {
 
             {showSettings ? (
               <div className="sprite-settings">
-                <div className="sprite-settings-head"><strong>接入联网大模型</strong><small>支持 OpenAI 兼容接口</small></div>
+                <div className="sprite-settings-head"><strong>接入联网大模型</strong><small>一键选择服务商，填入密钥即可</small></div>
+                <div className="sprite-presets">
+                  {LLM_PRESETS.map((p) => <button type="button" key={p.id} className={config.endpoint === p.endpoint ? 'active' : ''} onClick={() => setConfig((c) => ({ ...c, endpoint: p.endpoint, model: p.model }))}>{p.name}</button>)}
+                </div>
                 <label>API 地址<input value={config.endpoint} onChange={(e) => setConfig((c) => ({ ...c, endpoint: e.target.value }))} placeholder="https://api.openai.com/v1" inputMode="url" autoCapitalize="none" /></label>
                 <label>API 密钥<input type="password" value={config.apiKey} onChange={(e) => setConfig((c) => ({ ...c, apiKey: e.target.value }))} placeholder="sk-..." autoCapitalize="none" /></label>
                 <label>模型<input value={config.model} onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))} placeholder="gpt-4o-mini / deepseek-chat" /></label>

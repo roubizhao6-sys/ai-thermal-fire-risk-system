@@ -994,3 +994,8 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .sprite-test-state { margin: 0; color: #f3d28c; font-size: 8px; line-height: 1.5; }
 .sprite-settings-note { display: flex; align-items: flex-start; gap: 5px; margin: 0; color: #7089a4; font-size: 8px; line-height: 1.5; }
 .sprite-settings-note svg { flex: 0 0 auto; margin-top: 1px; color: #60a5fa; }
+
+/* ==== 大模型服务商预设 ==== */
+.sprite-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.sprite-presets button { min-height: 32px; padding: 0 11px; color: #a9c6e6; border: 1px solid rgba(96,165,250,.16); border-radius: 999px; background: rgba(59,130,246,.07); font-size: 9px; font-weight: 600; }
+.sprite-presets button.active { color: #fff; border-color: transparent; background: linear-gradient(110deg, #7c3aed, #2563eb); }
