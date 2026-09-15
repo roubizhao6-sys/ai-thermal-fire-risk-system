@@ -137,3 +137,82 @@ button { border: none; background: transparent; color: inherit; }
 .usr-evac-actions a { background: linear-gradient(110deg, #dc2626, #ef4444); }
 .usr-evac-actions button { color: #dcecff; border: 1px solid rgba(96,165,250,.2); background: rgba(59,130,246,.1); }
 .usr-evac-note { margin: 12px 0 0; color: #8ba5be; font-size: 9px; text-align: center; }
+
+/* ===== 全屏 AR 逃生主界面 ===== */
+.usr-escape { position: fixed; z-index: 10; inset: 0; display: flex; flex-direction: column; background: #070b12; }
+.usr-escape-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(7,11,18,.86); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(108,155,218,.14); }
+.usr-escape-top-actions { display: flex; gap: 8px; }
+.usr-escape-top-actions button { width: 40px; height: 40px; display: grid; place-items: center; color: #9db6cf; border: 1px solid rgba(96,165,250,.16); border-radius: 12px; background: rgba(59,130,246,.08); }
+.usr-escape-top-actions button.on { color: #fff; border-color: transparent; background: #dc2626; animation: usrPulse 1.2s infinite; }
+.usr-escape-stage { position: relative; flex: 1; overflow: hidden; }
+.usr-escape-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.usr-escape-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 16px; background: linear-gradient(180deg, rgba(2,8,18,.66), transparent 30%, transparent 58%, rgba(2,8,18,.72)); }
+.usr-escape-top-line { display: flex; align-items: center; justify-content: space-between; }
+.usr-escape-hero { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
+.usr-escape-hero-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; color: #8fe8b3; border: 1px solid rgba(34,197,94,.3); border-radius: 999px; background: rgba(34,197,94,.1); font-size: 9px; }
+.usr-escape-hero-badge i { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; animation: usrPulse 1.4s infinite; }
+.usr-escape-hero h1 { margin: 0; font-size: 26px; }
+.usr-escape-hero p { margin: 0; color: #8ba5be; font-size: 11px; line-height: 1.6; }
+.usr-escape-hero p strong { color: #ffb07a; }
+.usr-escape-start { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; padding: 0 24px; color: #fff; border-radius: 15px; background: linear-gradient(110deg, #dc2626, #f97316); font-size: 15px; font-weight: 800; box-shadow: 0 14px 32px rgba(220,38,38,.35); }
+.usr-escape-warn { margin: 0; color: #ffc9a3; font-size: 10px; line-height: 1.5; }
+.usr-escape-bottom { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; padding: 12px 16px calc(12px + var(--m-safe-bottom)); border-top: 1px solid rgba(108,155,218,.14); background: rgba(7,11,18,.9); }
+.usr-escape-bottom a, .usr-escape-bottom button { min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 7px; color: #fff; border-radius: 13px; font-size: 13px; font-weight: 800; text-decoration: none; }
+.usr-escape-bottom a { background: linear-gradient(110deg, #dc2626, #ef4444); }
+.usr-escape-bottom button { color: #dcecff; border: 1px solid rgba(96,165,250,.22); background: rgba(59,130,246,.1); }
+
+/* 更多功能页头 */
+.usr-more-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.usr-more-head button { display: inline-flex; align-items: center; gap: 4px; min-height: 38px; padding: 0 11px; color: #dcecff; border: 1px solid rgba(96,165,250,.2); border-radius: 10px; background: rgba(59,130,246,.08); font-size: 10px; }
+.usr-more-head button svg { transform: rotate(180deg); }
+.usr-more-head > div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.usr-more-head strong { font-size: 14px; }
+.usr-more-head small { color: #7d97b3; font-size: 8px; }
+.usr-more-head > span { width: 38px; }
+
+/* 隐患上报 */
+.usr-hazard-form { display: flex; flex-direction: column; gap: 7px; }
+.usr-hazard-form input, .usr-hazard-form textarea { padding: 9px 11px; color: #e9f4ff; border: 1px solid rgba(96,165,250,.17); border-radius: 10px; background: rgba(4,13,27,.68); font-size: 9px; outline: none; resize: none; }
+.usr-hazard-row { display: flex; align-items: center; gap: 8px; }
+.usr-hazard-row button { display: flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 11px; color: #dcecff; border: 1px solid rgba(96,165,250,.18); border-radius: 9px; background: rgba(59,130,246,.08); font-size: 9px; }
+.usr-hazard-row img { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(96,165,250,.2); }
+.usr-hazard-submit { min-height: 40px; color: #fff; border-radius: 10px; background: linear-gradient(110deg, #f97316, #ef4444); font-size: 10px; font-weight: 700; }
+.usr-hazard-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.usr-hazard-list > div { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid rgba(96,165,250,.13); border-radius: 11px; background: rgba(5,15,29,.6); }
+.usr-hazard-list span { color: #f97316; }
+.usr-hazard-list strong { color: #d9ecfb; font-size: 9px; }
+.usr-hazard-list p { margin: 2px 0 0; color: #9db2c7; font-size: 8px; }
+.usr-hazard-list small { color: #6f89a4; font-size: 7px; }
+.usr-hazard-list img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
+
+/* AI 精灵悬浮 */
+.usr-sprite-fab { position: fixed; z-index: 70; right: 16px; bottom: calc(20px + var(--m-safe-bottom)); width: 50px; height: 50px; display: grid; place-items: center; color: #fff; border: 1px solid rgba(168,130,255,.55); border-radius: 50%; background: linear-gradient(145deg, #7c3aed, #2563eb); box-shadow: 0 14px 30px rgba(0,0,0,.4); animation: usrSpritePulse 2.2s infinite; }
+.usr-sprite-fab i { position: absolute; top: 3px; right: 3px; width: 10px; height: 10px; border: 2px solid #0d192b; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+@keyframes usrSpritePulse { 0% { box-shadow: 0 0 0 0 rgba(124,58,237,.5), 0 14px 30px rgba(0,0,0,.4); } 70% { box-shadow: 0 0 0 13px rgba(124,58,237,0), 0 14px 30px rgba(0,0,0,.4); } 100% { box-shadow: 0 0 0 0 rgba(124,58,237,0), 0 14px 30px rgba(0,0,0,.4); } }
+.usr-sprite-backdrop { position: fixed; z-index: 90; inset: 0; display: flex; align-items: flex-end; background: rgba(1,5,12,.68); backdrop-filter: blur(8px); }
+.usr-sprite-sheet { width: 100%; max-height: 82dvh; display: flex; flex-direction: column; padding: 8px 17px calc(20px + var(--m-safe-bottom)); border-top-left-radius: 24px; border-top-right-radius: 24px; background: #0d192b; box-shadow: 0 -20px 60px rgba(0,0,0,.45); animation: usrSheetIn .28s ease both; }
+.usr-sprite-head { display: flex; align-items: center; gap: 11px; padding: 6px 0 12px; }
+.usr-sprite-avatar { width: 40px; height: 40px; display: grid; place-items: center; color: #fff; border-radius: 13px; background: linear-gradient(145deg, #7c3aed, #2563eb); }
+.usr-sprite-head > div:nth-child(2) { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.usr-sprite-head strong { font-size: 14px; }
+.usr-sprite-head small { color: #7d97b3; font-size: 8px; }
+.usr-sprite-head-actions { display: flex; gap: 7px; }
+.usr-sprite-head-actions button { width: 34px; height: 34px; display: grid; place-items: center; color: #91a5bf; border-radius: 10px; background: rgba(100,116,139,.12); }
+.usr-sprite-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 0 10px; }
+.usr-sprite-msg { max-width: 84%; padding: 10px 12px; border-radius: 13px; font-size: 10px; line-height: 1.6; white-space: pre-wrap; }
+.usr-sprite-msg.assistant { align-self: flex-start; color: #d6e7fb; border: 1px solid rgba(124,58,237,.28); background: rgba(124,58,237,.12); }
+.usr-sprite-msg.user { align-self: flex-end; color: #fff; border: 1px solid rgba(59,130,246,.3); background: rgba(59,130,246,.2); }
+.usr-sprite-input { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(108,155,218,.14); }
+.usr-sprite-input input { height: 44px; padding: 0 12px; color: #e9f4ff; border: 1px solid rgba(96,165,250,.18); border-radius: 12px; background: rgba(4,13,27,.68); font-size: 10px; outline: none; }
+.usr-sprite-input button { width: 44px; display: grid; place-items: center; color: #fff; border: none; border-radius: 12px; background: linear-gradient(110deg, #7c3aed, #2563eb); }
+.usr-sprite-settings { display: flex; flex-direction: column; gap: 9px; padding: 4px 0 10px; }
+.usr-sprite-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.usr-sprite-presets button { min-height: 32px; padding: 0 11px; color: #a9c6e6; border: 1px solid rgba(96,165,250,.16); border-radius: 999px; background: rgba(59,130,246,.07); font-size: 9px; font-weight: 600; }
+.usr-sprite-presets button.active { color: #fff; border-color: transparent; background: linear-gradient(110deg, #7c3aed, #2563eb); }
+.usr-sprite-settings label { display: flex; flex-direction: column; gap: 5px; color: #7d95b0; font-size: 8px; }
+.usr-sprite-settings input { height: 40px; padding: 0 10px; color: #e9f4ff; border: 1px solid rgba(96,165,250,.17); border-radius: 10px; background: rgba(4,13,27,.68); font-size: 9px; outline: none; }
+.usr-sprite-note { display: flex; align-items: flex-start; gap: 5px; margin: 0; color: #7089a4; font-size: 8px; line-height: 1.5; }
+.usr-sprite-note svg { flex: 0 0 auto; margin-top: 1px; color: #60a5fa; }
+
+.spin { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
