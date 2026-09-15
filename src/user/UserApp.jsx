@@ -4,6 +4,7 @@ import ArNavigator from './ArNavigator.jsx'
 import useGeoLocation from './useGeoLocation.js'
 import { formatMeters } from './geo.js'
 import { answerQuestion, buildAdvice, createDialogueState, nextQuestion, progressOf, saveUserStatus, summarizeForRescue } from './binaryDialogue.js'
+import { resolvePosition, saveManualPosition } from './sensors.js'
 import jsQR from 'jsqr'
 import {
   Camera, CheckCircle2, Flame, Navigation, Phone, ScanLine, ShieldAlert, ShieldCheck,
@@ -12,6 +13,10 @@ import {
 } from 'lucide-react'
 
 const DEMO = `${import.meta.env.BASE_URL}demo-thermal.jpg`
+
+const SPOT_LABEL = { A: 'A 楼梯', C: '走廊中段', B: 'B 楼梯' }
+const SPOT_IDS = ['A', 'C', 'B']
+const FLOORS_8 = [1, 2, 3, 4, 5, 6, 7, 8]
 
 const EXITS = [
   { id: 'library', name: '图书馆', bearing: 300, distance: 88 },
@@ -238,7 +243,7 @@ function CompassDial({ heading, bearing, distance, exitName, seconds }) {
   )
 }
 
-function ArEscape({ exit, onPickExit, siren, onOpenAr }) {
+function ArEscape({ exit, onPickExit, siren, onOpenAr, position, onOpenPos }) {
   const heading = useHeading()
   const turn = shortestTurn(exit.bearing, heading)
   const turnText = Math.abs(turn) < 15 ? '保持直行' : turn > 0 ? `右转 ${Math.round(Math.abs(turn))}°` : `左转 ${Math.round(Math.abs(turn))}°`
@@ -252,8 +257,9 @@ function ArEscape({ exit, onPickExit, siren, onOpenAr }) {
         <div className="usr-readouts">
           <div><span>方向指引</span><strong>{turnText}</strong></div>
           <div><span>出口方位</span><strong>{exit.bearing}° {directionLabel(exit.bearing)}</strong></div>
-          <div><span>当前朝向</span><strong>{Math.round(heading)}° {directionLabel(heading)}</strong></div>
+          <div><span>剩余楼层</span><strong>{Math.max(1, position.floor)} 层</strong></div>
         </div>
+        <button type="button" className="usr-pos-line" onClick={onOpenPos}><MapPin size={14} />当前位置 · {position.floor} 楼 {SPOT_LABEL[position.spot] || ''}<em>点击修改</em></button>
         <div className="usr-tools">
           <button type="button" className="usr-tool-ar" onClick={onOpenAr}><Camera size={17} />AR 实景导航</button>
           <a href="tel:119" className="usr-tool-119"><Phone size={16} />119</a>
@@ -560,6 +566,8 @@ function MorePage() {
 export default function UserApp() {
   const [tab, setTab] = useState('ar')
   const [arOpen, setArOpen] = useState(false)
+  const [position, setPosition] = useState(() => resolvePosition())
+  const [posSheet, setPosSheet] = useState(false)
   const [exitId, setExitId] = useState('library')
   const siren = useSiren()
   const exit = EXITS.find((e) => e.id === exitId) || EXITS[0]
@@ -572,7 +580,7 @@ export default function UserApp() {
       </header>
 
       <main className="usr-main">
-        {tab === 'home' ? <DetectionHome onEvacuate={() => setTab('ar')} /> : tab === 'ar' ? <ArEscape exit={exit} onPickExit={setExitId} siren={siren} onOpenAr={() => setArOpen(true)} /> : <MorePage />}
+        {tab === 'home' ? <DetectionHome onEvacuate={() => setTab('ar')} /> : tab === 'ar' ? <ArEscape exit={exit} onPickExit={setExitId} siren={siren} onOpenAr={() => setArOpen(true)} position={position} onOpenPos={() => setPosSheet(true)} /> : <MorePage />}
       </main>
 
       <nav className="usr-tabs">
@@ -581,6 +589,18 @@ export default function UserApp() {
         <button type="button" className={tab === 'more' ? 'active' : ''} onClick={() => setTab('more')}><QrCode size={19} /><span>更多功能</span></button>
       </nav>
 
+      {posSheet && (
+        <div className="usr-scan-backdrop" onClick={() => setPosSheet(false)}>
+          <section className="usr-pos-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="usr-pos-head"><div><strong>当前位置</strong><small>选择所在楼层与位置，用于逃生指引</small></div><button type="button" onClick={() => setPosSheet(false)}><X size={18} /></button></div>
+            <p className="usr-pos-label">楼层</p>
+            <div className="usr-pos-grid">{FLOORS_8.map((f) => <button type="button" key={f} className={position.floor === f ? 'active' : ''} onClick={() => { const next = { ...position, floor: f }; setPosition(next); saveManualPosition(next) }}>{f} 楼</button>)}</div>
+            <p className="usr-pos-label">位置</p>
+            <div className="usr-pos-grid">{SPOT_IDS.map((id) => <button type="button" key={id} className={position.spot === id ? 'active' : ''} onClick={() => { const next = { ...position, spot: id }; setPosition(next); saveManualPosition(next) }}>{SPOT_LABEL[id]}</button>)}</div>
+            <button type="button" className="usr-pos-done" onClick={() => setPosSheet(false)}>完成</button>
+          </section>
+        </div>
+      )}
       {arOpen && (
         <ArNavigator
           route={{ ok: true, meters: exit.distance }}

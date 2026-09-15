@@ -36,7 +36,8 @@
 
 ### 3.2 双端拆分（用户端 / 系统端）
 - **系统端 / 物业端**：`mobile-app.html` + `src/mobile/MobileApp.jsx`（完整管理：监控、看板、指挥中心、巡检、隐患、证据链等）。
-- **用户端 / 热感哨兵**：`user-app.html` + `src/user/UserApp.jsx`（三个 tab：AR实景逃生 / 首页检测 / 更多功能）。AR tab 含队友 `ArNavigator`（全屏 AR + 表盘兜底 + 切摄像头 + 手电筒）+ **被困者自救问答**（`binaryDialogue.js` 是/否问答，生成指引并写 `thermalGuardUserStatus` 供系统端读取）。更多功能的 GPS 已升级为 `useGeoLocation` + `geo.js`（校园坐标 + 最近安全出口）；并新增「本次升级亮点」总览卡与「我的楼层平面图」（本机保存 + AI 识别疏散通道/出口，复用系统端 `thermalGuardLlm` 配置）。AR tab 排版已向队友版「单屏大表盘」靠拢（大表盘 + 距离读数 + 方向/方位读数 + AR/119/警报工具条）。AR 实景逃生合并了队友的 `ArNavigator`（全屏 AR + 表盘兜底 + 前后摄像头切换 + 手电筒 + 接近度），入口在 AR tab「开启 AR 实景导航」；首页检测含三路证据融合判定；更多功能含 GPS定位、消防设施扫码巡检、隐患上报。两端通过「切换到用户端 / 切换到系统端」互跳。
+- **用户端 / 热感哨兵**：`user-app.html` + `src/user/UserApp.jsx`（三个 tab：AR实景逃生 / 首页检测 / 更多功能）。AR tab 含队友 `ArNavigator`（全屏 AR + 表盘兜底 + 切摄像头 + 手电筒）+ **被困者自救问答**（`binaryDialogue.js` 是/否问答，生成指引并写 `thermalGuardUserStatus` 供系统端读取）。更多功能的 GPS 已升级为 `useGeoLocation` + `geo.js`（校园坐标 + 最近安全出口）；并新增「本次升级亮点」总览卡与「我的楼层平面图」（本机保存 + AI 识别疏散通道/出口，复用系统端 `thermalGuardLlm` 配置）。AR tab 排版已向队友版「单屏大表盘」靠拢（大表盘 + 距离读数 + 方向/方位读数 + AR/119/警报工具条）。
+- **深度结合队友用户端**：已把队友的 `sensors.js` + `building.js`（8 层楼拓扑）+ `sensorFusion.fuseReadings` 并入，表盘新增「剩余楼层 / 当前位置」并在位置面板里可选楼层(1-8)与位置(A楼梯/走廊/B楼梯)。队友其余源码（`EscapeApp.jsx / MoreSheet.jsx / aiClient.js / aiPhases.js / vitalSigns.js / aiHooks.js / floorplan.js / evacuation.js / thermal.js`）已入库备用。AR 实景逃生合并了队友的 `ArNavigator`（全屏 AR + 表盘兜底 + 前后摄像头切换 + 手电筒 + 接近度），入口在 AR tab「开启 AR 实景导航」；首页检测含三路证据融合判定；更多功能含 GPS定位、消防设施扫码巡检、隐患上报。两端通过「切换到用户端 / 切换到系统端」互跳。
 - 桌面网站：`index.html` + `src/App.jsx`。
 
 ### 3.2 手机 App（`src/mobile/MobileApp.jsx`，重点迭代对象）
