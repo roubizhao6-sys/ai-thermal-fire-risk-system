@@ -289,6 +289,51 @@ export default function UserApp() {
   const bearing = startNode && targetNode ? normalize(bearingBetween(startNode, targetNode)) : 0
   const cardinal = cardinalOf(bearing)
   const dialRotation = dialMode === 'device' && deviceHeading != null ? -deviceHeading : 0
+  // 逃生路线图：本层有图且处于火警时优先按图指引（图上方朝向可在保存时校正）
+  const activePlan = useMemo(
+    () => plans.find((plan) => plan.id === activePlanId)
+      ?? plans.find((plan) => plan.floor === position.floor)
+      ?? null,
+    [plans, activePlanId, position.floor],
+  )
+  const planRoute = useMemo(
+    () => (fire && activePlan ? buildPlanRoute(activePlan) : null),
+    [fire, activePlan],
+  )
+  const planStep = planRoute ? currentStep(planRoute, null) : null
+  const planRemaining = planRoute
+    ? planRoute.instructions.reduce((sum, step) => sum + step.meters, 0)
+    : 0
+  const dialBearing = planStep ? planStep.compassBearing : bearing
+  const dialTargetLabel = planRoute ? planRoute.exitLabel : (route?.ok ? route.exitLabel : '最近安全出口')
+  const dialRemaining = planRoute ? planRemaining : (route?.ok ? route.meters : null)
+
+  // AI 指挥：优先本地大模型，失败或未配置时回落到本机规则引擎（保证无网络也有指令）
+  useEffect(() => {
+    if (!fire) {
+      setAiResult(null)
+      return undefined
+    }
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      aiCommand({
+        fire,
+        route: route ? { ok: route.ok, meters: route.meters, exitLabel: route.exitLabel, reason: route.reason } : null,
+        hazard: hazard ? { estimates: hazard.estimates ?? [] } : null,
+        crowd: null,
+        position,
+        gps: { status: gps.status, location: gps.location ?? null },
+        plan: planRoute ? { name: activePlan?.name, route: planRoute } : null,
+      }, aiSettings).then((result) => {
+        if (!cancelled) setAiResult(result)
+      })
+    }, 700)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [fire, route?.ok, route?.meters, route?.exitLabel, gps.status, planRoute, aiSettings, position.floor, position.spot, hazard])
+
   const needleRotation = dialBearing - dialRotation
   // 接近度（0 远 → 1 就在跟前），用于放大箭头与提示状态；参考 Apple「查找附近」的距离+方向表达
   const proximity = route?.ok ? Math.max(0, Math.min(1, 1 - route.meters / 120)) : 0
@@ -338,50 +383,7 @@ export default function UserApp() {
     return gps.error || '定位暂不可用'
   }, [gps.status, gps.location, gps.accuracy, gps.error, gps.supported])
 
-  // 逃生路线图：本层有图且处于火警时优先按图指引（图上方朝向可在保存时校正）
-  const activePlan = useMemo(
-    () => plans.find((plan) => plan.id === activePlanId)
-      ?? plans.find((plan) => plan.floor === position.floor)
-      ?? null,
-    [plans, activePlanId, position.floor],
-  )
-  const planRoute = useMemo(
-    () => (fire && activePlan ? buildPlanRoute(activePlan) : null),
-    [fire, activePlan],
-  )
-  const planStep = planRoute ? currentStep(planRoute, null) : null
-  const planRemaining = planRoute
-    ? planRoute.instructions.reduce((sum, step) => sum + step.meters, 0)
-    : 0
-  const dialBearing = planStep ? planStep.compassBearing : bearing
-  const dialTargetLabel = planRoute ? planRoute.exitLabel : (route?.ok ? route.exitLabel : '最近安全出口')
-  const dialRemaining = planRoute ? planRemaining : (route?.ok ? route.meters : null)
 
-  // AI 指挥：优先本地大模型，失败或未配置时回落到本机规则引擎（保证无网络也有指令）
-  useEffect(() => {
-    if (!fire) {
-      setAiResult(null)
-      return undefined
-    }
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      aiCommand({
-        fire,
-        route: route ? { ok: route.ok, meters: route.meters, exitLabel: route.exitLabel, reason: route.reason } : null,
-        hazard: hazard ? { estimates: hazard.estimates ?? [] } : null,
-        crowd: null,
-        position,
-        gps: { status: gps.status, location: gps.location ?? null },
-        plan: planRoute ? { name: activePlan?.name, route: planRoute } : null,
-      }, aiSettings).then((result) => {
-        if (!cancelled) setAiResult(result)
-      })
-    }, 700)
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [fire, route?.ok, route?.meters, route?.exitLabel, gps.status, planRoute, aiSettings, position.floor, position.spot, hazard])
 
   const requestCompass = async () => {
     if (dialMode === 'device') {
