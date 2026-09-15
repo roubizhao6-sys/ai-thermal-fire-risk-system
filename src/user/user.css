@@ -601,3 +601,221 @@ p { margin: 0; }
   .ar-nav-aim { width: min(46vh, 220px); height: min(46vh, 220px); top: 40%; }
   .ar-nav-hud { bottom: calc(84px + env(safe-area-inset-bottom)); }
 }
+
+/* ============================================================
+   逃生路线图提示 + AI 指挥
+   ============================================================ */
+
+.plan-note,
+.ai-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(120, 120, 128, .14);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.plan-note { border: 1px solid rgba(56, 189, 248, .28); }
+.plan-tag,
+.ai-tag {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: .3px;
+  background: rgba(56, 189, 248, .18);
+  color: #7dd3fc;
+}
+
+.ai-note { border: 1px solid rgba(255, 255, 255, .14); }
+.ai-note.is-model { border-color: rgba(48, 209, 88, .35); }
+.ai-note.is-model .ai-tag { background: rgba(48, 209, 88, .18); color: var(--safe); }
+.ai-note strong { color: var(--text); font-size: 14px; font-weight: 600; }
+.ai-note em { color: var(--text-2); font-style: normal; }
+.compass-app.is-alert .plan-note,
+.compass-app.is-alert .ai-note { background: rgba(255, 255, 255, .16); color: rgba(255, 255, 255, .9); }
+.compass-app.is-alert .ai-note strong { color: #fff; }
+
+/* ============================================================
+   「更多」面板：逃生路线图 / AI 指挥 / 端切换
+   ============================================================ */
+
+.more-sheet {
+  max-height: 88vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.more-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 14px;
+}
+
+.more-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  justify-content: center;
+  padding: 10px 8px;
+  border-radius: 12px;
+  background: rgba(120, 120, 128, .16);
+  font-size: 13px;
+  min-height: 44px;
+}
+
+.more-tabs button.active { background: rgba(56, 189, 248, .22); color: #7dd3fc; font-weight: 600; }
+.more-body { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.more-hint { color: var(--text-2); font-size: 12px; line-height: 1.7; }
+.more-notice {
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, .14);
+  color: #7dd3fc;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.more-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.more-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: rgba(120, 120, 128, .2);
+  font-size: 14px;
+  min-height: 44px;
+}
+.more-actions .more-primary { background: #fff; color: #000; font-weight: 600; }
+.more-actions button:disabled { opacity: .5; }
+
+.more-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 16px;
+  border-radius: 14px;
+  background: rgba(56, 189, 248, .18);
+  color: #7dd3fc;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 600;
+  min-height: 48px;
+}
+
+.plan-editor { display: flex; flex-direction: column; gap: 10px; }
+
+.plan-canvas {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #111;
+  touch-action: manipulation;
+}
+
+.plan-canvas img { display: block; width: 100%; height: auto; }
+
+.plan-exit {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 999px;
+  border: 2px solid rgba(48, 209, 88, .9);
+  background: rgba(48, 209, 88, .25);
+}
+.plan-exit.is-active { background: rgba(48, 209, 88, .8); box-shadow: 0 0 12px rgba(48, 209, 88, .8); }
+
+.plan-start {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid #0a84ff;
+  box-shadow: 0 0 10px rgba(10, 132, 255, .8);
+}
+
+.plan-route {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.plan-route polyline {
+  fill: none;
+  stroke: #ff3b30;
+  stroke-width: 0.6;
+  stroke-dasharray: 2 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.plan-tip { color: var(--text-2); font-size: 12px; line-height: 1.65; }
+.plan-tip b { color: var(--text); }
+
+.plan-fields { display: flex; gap: 14px; flex-wrap: wrap; }
+.plan-fields label,
+.ai-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.plan-fields input,
+.ai-field input,
+.ai-field select {
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 120, 128, .4);
+  background: rgba(120, 120, 128, .16);
+  color: var(--text);
+  font-size: 14px;
+  min-height: 40px;
+}
+.plan-fields input { width: 84px; }
+.ai-field { flex-direction: column; align-items: stretch; gap: 5px; }
+.ai-field input,
+.ai-field select { width: 100%; }
+.ai-preset-hint { color: var(--text-3); font-size: 11px; }
+.ai-probe { color: var(--text-2); font-size: 12px; }
+.ai-probe.is-ok { color: var(--safe); }
+.ai-probe.is-fail { color: #ffb340; }
+
+.plan-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.plan-list > strong { font-size: 13px; }
+.plan-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(120, 120, 128, .12);
+}
+.plan-row.is-active { border: 1px solid rgba(48, 209, 88, .4); }
+.plan-row strong { display: block; font-size: 13px; }
+.plan-row small { display: block; color: var(--text-2); font-size: 11px; margin-top: 2px; }
+.plan-row button {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(120, 120, 128, .22);
+  font-size: 12px;
+  min-height: 38px;
+}
+
+.compass-app.is-alert .more-sheet { background: #1c0403; }
+.compass-app.is-alert .more-hint,
+.compass-app.is-alert .plan-tip,
+.compass-app.is-alert .ai-probe,
+.compass-app.is-alert .plan-row small { color: rgba(255, 255, 255, .82); }

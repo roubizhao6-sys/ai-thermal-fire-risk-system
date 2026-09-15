@@ -1829,3 +1829,18 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .crowd-row.is-fire .crowd-spark.tone-floor .spark-line { stroke: #ff3b30; }
 .crowd-row.is-fire .crowd-spark.tone-floor .spark-area { fill: rgba(255,59,48,.16); }
 .crowd-spark-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; color: var(--text-3); font-size: 8px; }
+
+
+/* 系统端 → 用户端的小入口：常驻顶栏，一键切到逃生视角 */
+.peer-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, .35);
+  background: rgba(56, 189, 248, .12);
+  color: #7dd3fc;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}

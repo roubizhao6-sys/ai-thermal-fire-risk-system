@@ -1423,7 +1423,11 @@ export default function MobileApp() {
               ? (dashView === 'about' ? '关于项目' : '数据看板')
               : tabs.find((item) => item.id === activeTab)?.navLabel || ''}
         </span>
-        <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
+        <div className="top-actions">
+          <ConnectionBadge state={connection} />
+          <a className="peer-link" href="./user-app.html" title="切换到用户端">用户端</a>
+          <button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button>
+        </div>
       </header>
 
       {alarm && !overlayOpen && (

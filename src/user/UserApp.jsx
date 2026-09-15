@@ -6,8 +6,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BUILDING, positionNodeId } from '../mobile/building.js'
 import { planRoute } from '../mobile/evacuation.js'
 import ArNavigator from './ArNavigator.jsx'
+import MoreSheet from './MoreSheet.jsx'
 import useGeoLocation from './useGeoLocation.js'
 import { formatMeters } from './geo.js'
+import { aiCommand, readAiSettings, saveAiSettings } from '../shared/aiClient.js'
+import { buildPlanRoute, currentStep, listPlans } from './floorplan.js'
 // 所有传感器输入（信标定位、火情、热像、朝向、设置）统一从这一层订阅
 import {
   KEYS,
@@ -88,8 +91,14 @@ export default function UserApp() {
   const [deviceHeading, setDeviceHeading] = useState(null)
   const [hint, setHint] = useState('')
   const [arOpen, setArOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   // GPS：按需开启，只在本机使用；室内楼层仍以信标或手动选点为准
   const gps = useGeoLocation()
+  // 逃生路线图与 AI 指挥（路线图存在手机本地，AI 接口可插拔，无网络时用规则引擎）
+  const [plans, setPlans] = useState([])
+  const [activePlanId, setActivePlanId] = useState(null)
+  const [aiSettings, setAiSettings] = useState(() => readAiSettings())
+  const [aiResult, setAiResult] = useState(null)
   // 声音/播报/震动设置由系统端维护，用户端跟随，避免两边不一致
   const [settings, setSettings] = useState(() => readSettings())
   const [audioReady, setAudioReady] = useState(() => isAudioUnlocked())
@@ -198,6 +207,21 @@ export default function UserApp() {
     if (sheetOpen) sheetTitleRef.current?.focus()
   }, [sheetOpen])
 
+  // 载入本机保存的逃生路线图（IndexedDB）
+  useEffect(() => {
+    let cancelled = false
+    listPlans()
+      .then((records) => {
+        if (cancelled) return
+        setPlans(records)
+        setActivePlanId((current) => current ?? records.find((plan) => plan.floor === position.floor)?.id ?? records[0]?.id ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [position.floor])
+
   useEffect(() => {
     if (!sheetOpen) return undefined
     const onKeyDown = (event) => {
@@ -265,7 +289,7 @@ export default function UserApp() {
   const bearing = startNode && targetNode ? normalize(bearingBetween(startNode, targetNode)) : 0
   const cardinal = cardinalOf(bearing)
   const dialRotation = dialMode === 'device' && deviceHeading != null ? -deviceHeading : 0
-  const needleRotation = bearing - dialRotation
+  const needleRotation = dialBearing - dialRotation
   // 接近度（0 远 → 1 就在跟前），用于放大箭头与提示状态；参考 Apple「查找附近」的距离+方向表达
   const proximity = route?.ok ? Math.max(0, Math.min(1, 1 - route.meters / 120)) : 0
   const atExit = Boolean(route?.ok && route.meters <= 6)
@@ -313,6 +337,51 @@ export default function UserApp() {
     if (gps.status === 'idle') return gps.supported ? 'GPS 未开启，可在「我的位置」里打开' : '本机不支持 GPS 定位'
     return gps.error || '定位暂不可用'
   }, [gps.status, gps.location, gps.accuracy, gps.error, gps.supported])
+
+  // 逃生路线图：本层有图且处于火警时优先按图指引（图上方朝向可在保存时校正）
+  const activePlan = useMemo(
+    () => plans.find((plan) => plan.id === activePlanId)
+      ?? plans.find((plan) => plan.floor === position.floor)
+      ?? null,
+    [plans, activePlanId, position.floor],
+  )
+  const planRoute = useMemo(
+    () => (fire && activePlan ? buildPlanRoute(activePlan) : null),
+    [fire, activePlan],
+  )
+  const planStep = planRoute ? currentStep(planRoute, null) : null
+  const planRemaining = planRoute
+    ? planRoute.instructions.reduce((sum, step) => sum + step.meters, 0)
+    : 0
+  const dialBearing = planStep ? planStep.compassBearing : bearing
+  const dialTargetLabel = planRoute ? planRoute.exitLabel : (route?.ok ? route.exitLabel : '最近安全出口')
+  const dialRemaining = planRoute ? planRemaining : (route?.ok ? route.meters : null)
+
+  // AI 指挥：优先本地大模型，失败或未配置时回落到本机规则引擎（保证无网络也有指令）
+  useEffect(() => {
+    if (!fire) {
+      setAiResult(null)
+      return undefined
+    }
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      aiCommand({
+        fire,
+        route: route ? { ok: route.ok, meters: route.meters, exitLabel: route.exitLabel, reason: route.reason } : null,
+        hazard: hazard ? { estimates: hazard.estimates ?? [] } : null,
+        crowd: null,
+        position,
+        gps: { status: gps.status, location: gps.location ?? null },
+        plan: planRoute ? { name: activePlan?.name, route: planRoute } : null,
+      }, aiSettings).then((result) => {
+        if (!cancelled) setAiResult(result)
+      })
+    }, 700)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [fire, route?.ok, route?.meters, route?.exitLabel, gps.status, planRoute, aiSettings, position.floor, position.spot, hazard])
 
   const requestCompass = async () => {
     if (dialMode === 'device') {
@@ -392,13 +461,13 @@ export default function UserApp() {
 
           <div className="dial-center">
             <div className="dial-caption">
-              {route?.ok ? `${cardinal.label} · ${Math.round(bearing)}°` : '通道受阻'}
+              {route?.ok || planRoute ? `${cardinalOf(dialBearing).label} · ${Math.round(dialBearing)}°` : '通道受阻'}
             </div>
 
             {route?.ok ? (
               <>
                 <div className={`dial-distance ${fire ? 'is-alert' : ''}`}>
-                  <span className="distance-value">{Math.round(route.meters)}</span>
+                  <span className="distance-value">{Math.round(dialRemaining ?? 0)}</span>
                   <span className="distance-unit">米</span>
                 </div>
                 <div className="dial-time">约 {formatDuration(route.seconds)}</div>
@@ -444,6 +513,27 @@ export default function UserApp() {
           </div>
 
           {sensorInfo && <div className="sensor-note">{sensorInfo}</div>}
+
+          {planRoute && (
+            <div className="plan-note">
+              <span className="plan-tag">按路线图撤离</span>
+              <span>
+                {activePlan?.name ?? '本层路线图'} · {planStep?.text ?? '等待路线'}
+                {' · '}全程约 {Math.round(planRoute.totalMeters)} 米
+              </span>
+            </div>
+          )}
+
+          {aiResult && (
+            <div className={`ai-note ${aiResult.source === 'local-model' ? 'is-model' : ''}`}>
+              <span className="ai-tag">
+                AI 指挥 · {aiResult.source === 'local-model' ? '本地模型' : '本机规则'}
+              </span>
+              <span>{aiResult.summary}</span>
+              <strong>{aiResult.action}</strong>
+              {aiResult.instruction && <em>{aiResult.instruction}</em>}
+            </div>
+          )}
         </div>
       </main>
 
@@ -451,6 +541,7 @@ export default function UserApp() {
         <button type="button" onClick={toggleDrill} aria-pressed={Boolean(fire)}>{fire ? '结束演练' : '演练'}</button>
         <button type="button" onClick={() => setSheetOpen(true)}>我的位置</button>
         <button type="button" className="tool-ar" onClick={() => setArOpen(true)}>AR</button>
+        <button type="button" onClick={() => setMoreOpen(true)}>更多</button>
         <button
           type="button"
           onClick={requestCompass}
@@ -469,12 +560,25 @@ export default function UserApp() {
           proximity={proximity}
           atExit={atExit}
           proximityText={proximityText}
-          bearing={bearing}
-          targetLabel={route?.ok ? route.exitLabel : '最近安全出口'}
+          bearing={dialBearing}
+          targetLabel={dialTargetLabel}
           remainingFloors={remainingFloors}
           positionSource={positionSource}
           gps={gps}
           onClose={() => setArOpen(false)}
+        />
+      )}
+
+      {moreOpen && (
+        <MoreSheet
+          floor={position.floor}
+          aiSettings={aiSettings}
+          onAiSettingsChange={(patch) => setAiSettings(saveAiSettings(patch))}
+          plans={plans}
+          onPlansChange={setPlans}
+          activePlanId={activePlanId}
+          onActivePlanChange={setActivePlanId}
+          onClose={() => setMoreOpen(false)}
         />
       )}
 
