@@ -1282,3 +1282,23 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .detail-rows { margin-top: 8px; }
 .detail-rows span { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; color: #9db2c7; font-size: 9px; }
 .detail-rows b { color: #e6f0fb; }
+
+/* 用户端联动 */
+.linked-card { margin-top: 10px; padding: 14px; border-radius: 16px; border-color: rgba(56,189,248,.22); }
+.linked-card .card-head > svg { color: #6fd3ff; }
+.linked-badge { display: flex; align-items: center; gap: 6px; margin: 4px 0 10px; padding: 8px 10px; border-radius: 9px; background: rgba(5,15,29,.58); color: #8ca5bd; font-size: 9px; }
+.linked-badge i { width: 7px; height: 7px; border-radius: 50%; background: #64748b; }
+.linked-badge i.online { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+.linked-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; margin-bottom: 6px; padding: 9px 10px; border: 1px solid rgba(96,165,250,.13); border-radius: 11px; background: rgba(5,15,29,.6); }
+.linked-row.is-help { border-color: rgba(239,68,68,.32); background: rgba(239,68,68,.08); }
+.linked-icon { width: 32px; height: 32px; display: grid; place-items: center; color: #f0b96c; border-radius: 9px; background: rgba(245,158,11,.12); }
+.linked-row.is-help .linked-icon { color: #ff9b9b; background: rgba(239,68,68,.14); }
+.linked-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 9px; border: 1px solid rgba(96,165,250,.25); }
+.linked-row > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.linked-row strong { color: #d9ecfb; font-size: 10px; }
+.linked-row small { color: #6f8aa5; font-size: 8px; }
+.linked-row em { color: #7c94af; font-size: 8px; font-style: normal; }
+.linked-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px; color: #5d7590; text-align: center; }
+.linked-empty p { margin: 0; font-size: 9px; line-height: 1.5; }
+.linked-note { display: flex; align-items: flex-start; gap: 5px; margin: 9px 0 0; color: #7089a4; font-size: 8px; line-height: 1.5; }
+.linked-note svg { flex: 0 0 auto; margin-top: 1px; color: #60a5fa; }

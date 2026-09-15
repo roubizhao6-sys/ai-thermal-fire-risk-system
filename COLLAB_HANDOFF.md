@@ -35,6 +35,7 @@
 顶部导航、英雄区、核心功能三点介绍、在线检测（上传热成像图 → 模拟加载 → 风险等级/高温区/最高温/红橙标注框/处置建议）、数据统计看板、项目说明、页脚。
 
 ### 3.2 双端拆分（用户端 / 系统端）
+- **两端联动（同机）**：用户端「隐患上报（含照片）」写 `thermalGuardHazards`、「被困者问答」写 `thermalGuardUserStatus`，系统端数据看板新增「用户端联动」面板实时读取展示（同源共享 localStorage，storage 事件 + 3s 轮询）。跨设备同步需后端中转。
 - **完全独立的两端 App**：用户端 `user/`（`user/index.html` + `user/manifest.webmanifest` + `user/sw.js`，作用域 `/user/`）、系统端 `system/`（同样独立清单与 SW，作用域 `/system/`）。两端各自独立目录、独立 Service Worker 作用域、独立图标与启动页，互不影响。根目录 `user-app.html`/`mobile-app.html` 保留兼容旧链接。
 - **系统端 / 物业端**：`mobile-app.html` + `src/mobile/MobileApp.jsx`（完整管理：监控、看板、指挥中心、巡检、隐患、证据链等）。
 - **用户端 / 热感哨兵**：`user-app.html` + `src/user/UserApp.jsx`（三个 tab：AR实景逃生 / 首页检测 / 更多功能）。AR tab 含队友 `ArNavigator`（全屏 AR + 表盘兜底 + 切摄像头 + 手电筒）+ **被困者自救问答**（`binaryDialogue.js` 是/否问答，生成指引并写 `thermalGuardUserStatus` 供系统端读取）。更多功能的 GPS 已升级为 `useGeoLocation` + `geo.js`（校园坐标 + 最近安全出口）；并新增「本次升级亮点」总览卡与「我的楼层平面图」（本机保存 + AI 识别疏散通道/出口，复用系统端 `thermalGuardLlm` 配置）。AR tab 排版已向队友版「单屏大表盘」靠拢（大表盘 + 距离读数 + 方向/方位读数 + AR/119/警报工具条）。

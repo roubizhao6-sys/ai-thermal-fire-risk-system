@@ -1564,6 +1564,7 @@ function DashboardPage({ frame, inference, onOpenCommand, onAlarm, crowd, crowdH
         <button type="button" className="command-open" onClick={onOpenCommand}><Siren size={16} />进入指挥中心</button>
       </section>
       <PreventionPanel frame={frame} onAlarm={onAlarm} />
+      <LinkedReportsPanel />
             <SituationMap frame={frame} />
       <div className="dashboard-grid">{stats.map(([label, value, unit, change, Icon, tone]) => <article className={`dashboard-stat tone-${tone}`} key={label}><span><Icon size={16} /></span><p>{label}</p><strong>{value}<small>{unit}</small></strong><em>{change}</em></article>)}</div>
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>风险趋势</strong><small>近30日最高温度预警指数</small></div><TrendingUp size={18} /></div><LineChart /></section>
@@ -2321,6 +2322,53 @@ function openPdfReport(report) {
     const url = URL.createObjectURL(blob)
     window.open(url, '_blank')
   }
+}
+
+function LinkedReportsPanel() {
+  const [hazards, setHazards] = useState([])
+  const [statuses, setStatuses] = useState([])
+  const [flash, setFlash] = useState('')
+
+  useEffect(() => {
+    const read = () => {
+      try { setHazards(JSON.parse(localStorage.getItem('thermalGuardHazards') || '[]')) } catch { setHazards([]) }
+      try { setStatuses(JSON.parse(localStorage.getItem('thermalGuardUserStatus') || '[]')) } catch { setStatuses([]) }
+      try { setFlash(localStorage.getItem('thermalGuardUserStatus') || '') } catch { setFlash('') }
+    }
+    read()
+    const id = setInterval(read, 3000)
+    const onStorage = (e) => { if (['thermalGuardHazards', 'thermalGuardUserStatus'].includes(e.key)) read() }
+    window.addEventListener('storage', onStorage)
+    return () => { clearInterval(id); window.removeEventListener('storage', onStorage) }
+  }, [])
+
+  const total = hazards.length + statuses.length
+
+  return (
+    <section className="mobile-card linked-card">
+      <div className="card-head"><div><strong>用户端联动</strong><small>用户端上报的隐患与求助实时同步到此</small></div><Link2 size={18} /></div>
+      <div className="linked-badge"><i className={total ? 'online' : ''} />{total ? `已收到 ${total} 条用户端数据` : '暂无用户端上报（同一台设备上打开用户端上报后会出现在这里）'}</div>
+
+      {statuses.slice(0, 3).map((s) => (
+        <div className="linked-row is-help" key={s.id}>
+          <span className="linked-icon"><ShieldAlert size={16} /></span>
+          <div><strong>用户求助 · {s.floor ? `${s.floor} 楼` : '位置未知'} {s.needsHelp ? '（需要帮助）' : ''}</strong><small>{s.advice || '已提交自救问答'}</small></div>
+          <em>{new Date(s.updatedAt || Date.now()).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}</em>
+        </div>
+      ))}
+
+      {hazards.slice(0, 5).map((h) => (
+        <div className="linked-row" key={h.id}>
+          {h.img ? <img className="linked-thumb" src={h.img} alt="用户端上报照片" /> : <span className="linked-icon"><AlertTriangle size={16} /></span>}
+          <div><strong>用户上报隐患 · {h.loc}</strong><small>{h.desc} · {h.time}</small></div>
+          <em>照片</em>
+        </div>
+      ))}
+
+      {total === 0 && <div className="linked-empty"><ImageIcon size={26} /><p>在用户端「更多功能 → 隐患上报」拍照提交，这里会出现该照片与记录。</p></div>}
+      <p className="linked-note"><Info size={12} />同一手机/浏览器内两端共享数据（本机演示）。跨设备实时同步需要后端服务器中转。</p>
+    </section>
+  )
 }
 
 export default function MobileApp() {
