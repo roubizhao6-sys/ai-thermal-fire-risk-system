@@ -1,5 +1,5 @@
-const CACHE = 'thermal-guard-v17'
-const CORE = ['./', './index.html', './mobile-app.html', './mobile-install.html', './app-access.html', './privacy.html', './support.html', './thermal-guard.mobileconfig', './demo-live.gif', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png']
+const CACHE = 'thermal-guard-v18'
+const CORE = ['./', './index.html', './mobile-app.html', './user-app.html', './mobile-install.html', './app-access.html', './privacy.html', './support.html', './thermal-guard.mobileconfig', './demo-live.gif', './manifest.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png']
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()))

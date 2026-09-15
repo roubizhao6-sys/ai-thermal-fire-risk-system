@@ -16,6 +16,7 @@
 - 手机 App（核心，正在重点迭代）：`src/mobile/MobileApp.jsx` + `src/mobile/mobile.css`
 - 手机 3D 组件：`src/mobile/Building3DView.jsx`、`Campus3DView.jsx`、`CampusBuildingPanel.jsx`
 - 桌面网站：`src/App.jsx` + `src/styles.css`
+- 用户端（逃生指引）：`src/user/UserApp.jsx` + `src/user/user.css`（入口 `user-app.html`）
 - macOS 原生 App（SwiftUI）：`macos/AIThermalFireGuard/`
 - AI 检测网关：`gateway/`（`ai-gateway.mjs`、`detector.py`、`start.sh`）
 - CAD/校园模型脚本：`cad/`

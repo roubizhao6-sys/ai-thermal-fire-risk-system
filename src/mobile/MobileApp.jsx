@@ -1576,6 +1576,7 @@ function AboutPage({ onStartDrill }) {
       <InspectionPanel />
       <FireAssistant />
       <HazardReport />
+            <a className="app-switch-link" href="./user-app.html"><div><strong>切换到用户端 · 热感哨兵</strong><p>面向公众的逃生指引：一键报警、AR实景逃生、指南针导航</p></div><ChevronRight size={18} /></a>
             <div className="disclaimer"><ShieldAlert size={17} /><p>本系统为科研演示原型，不替代专业消防检测设备与灭火系统。</p></div>
     </div>
   )
