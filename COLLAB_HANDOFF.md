@@ -36,7 +36,7 @@
 
 ### 3.2 双端拆分（用户端 / 系统端）
 - **系统端 / 物业端**：`mobile-app.html` + `src/mobile/MobileApp.jsx`（完整管理：监控、看板、指挥中心、巡检、隐患、证据链等）。
-- **用户端 / 热感哨兵**：`user-app.html` + `src/user/UserApp.jsx`（**只保留两个功能**：首页检测 + AR 实景逃生，底部两个 tab）。两端通过「切换到用户端 / 切换到系统端」互跳。
+- **用户端 / 热感哨兵**：`user-app.html` + `src/user/UserApp.jsx`（三个 tab：首页检测 / AR实景逃生 / 更多功能；更多功能含 GPS定位、消防设施扫码巡检、隐患上报）。两端通过「切换到用户端 / 切换到系统端」互跳。
 - 桌面网站：`index.html` + `src/App.jsx`。
 
 ### 3.2 手机 App（`src/mobile/MobileApp.jsx`，重点迭代对象）
