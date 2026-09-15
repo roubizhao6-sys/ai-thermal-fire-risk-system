@@ -89,6 +89,17 @@ const tabs = [
   { id: 'about', label: '关于项目', icon: Layers3 },
 ]
 
+const QUICK_ACTIONS = [
+  { id: 'command', label: '应急指挥', icon: Siren, tone: 'red' },
+  { id: 'guide', label: '疏散导航', icon: Compass, tone: 'blue' },
+  { id: 'drill', label: '数字演练', icon: ClipboardCheck, tone: 'green' },
+  { id: 'gps', label: 'GPS定位', icon: LocateFixed, tone: 'cyan' },
+  { id: 'dashboard', label: '数据看板', icon: BarChart3, tone: 'blue' },
+  { id: 'inspect', label: '扫码巡检', icon: QrCode, tone: 'orange' },
+  { id: 'assistant', label: 'AI精灵', icon: Sparkles, tone: 'purple' },
+  { id: 'hazard', label: '隐患上报', icon: Camera, tone: 'orange' },
+]
+
 const defaultCameras = [
   { id: 'thermal-board-sim', name: '模拟热成像板', location: '实验室 P11', type: 'sensor', url: 'sensor://esp32-sim', public: true },
   { id: 'demo-live', name: '热感监控演示', location: '三楼东侧走廊', type: 'demo', url: DEMO_LIVE, public: true },
@@ -464,7 +475,7 @@ function RiskLevelCard({ risk, active }) {
   )
 }
 
-function HomePage({ inputCameraRef, inputGalleryRef, image, fileName, detecting, progress, detected, result, inference, onImage, onSample, onReset, onDetect }) {
+function HomePage({ inputCameraRef, inputGalleryRef, image, fileName, detecting, progress, detected, result, inference, onImage, onSample, onReset, onDetect, onQuickNav }) {
   return (
     <div className="mobile-page home-page">
       <header className="home-header">
@@ -472,6 +483,13 @@ function HomePage({ inputCameraRef, inputGalleryRef, image, fileName, detecting,
         <h1>燧瞳智感</h1>
         <p>超早期温度预警 · 多维度智能判断</p>
       </header>
+
+      <section className="quick-nav">
+        <div className="quick-nav-head"><strong>快捷功能</strong><small>一键直达</small></div>
+        <div className="quick-grid">
+          {QUICK_ACTIONS.map(({ id, label, icon: Icon, tone }) => <button type="button" key={id} className={`quick-card tone-${tone}`} onClick={() => onQuickNav(id)}><Icon size={18} /><span>{label}</span></button>)}
+        </div>
+      </section>
 
       <section className="detect-card">
         <div className="card-head"><div><strong>热成像图片检测</strong><small>火焰出现前捕捉异常温升</small></div><button type="button" onClick={onSample}>载入示例</button></div>
@@ -1967,6 +1985,123 @@ function HazardReport() {
   )
 }
 
+function localFireAnswer(q) {
+  const found = FIRE_KB.find((item) => item.kw.some((k) => q.includes(k)))
+  return found ? found.answer : '这个问题建议联网回答：点右上角「设置」填入大模型 API 地址即可接入。内置知识库可回答：灭火器使用、温度阈值、报警、疏散、电气火灾、烟雾等。'
+}
+
+function loadLlmConfig() {
+  try { return JSON.parse(localStorage.getItem('thermalGuardLlm') || 'null') } catch { return null }
+}
+
+function AiSprite({ frame, open, onOpenChange }) {
+  const [msgs, setMsgs] = useState([{ role: 'assistant', text: '你好，我是 AI 火警精灵。问我消防问题，或点右上角设置接入联网大模型。' }])
+  const [input, setInput] = useState('')
+  const [thinking, setThinking] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [config, setConfig] = useState(() => loadLlmConfig() || { endpoint: '', apiKey: '', model: 'gpt-4o-mini' })
+  const [testState, setTestState] = useState('')
+  const listRef = useRef(null)
+
+  useEffect(() => { try { localStorage.setItem('thermalGuardLlm', JSON.stringify(config)) } catch {} }, [config])
+  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [msgs, thinking, showSettings])
+
+  const llmReady = Boolean(config.endpoint && config.apiKey)
+
+  const callLLM = async (question) => {
+    const base = config.endpoint.trim().replace(/\/+$/, '')
+    const url = base.endsWith('/chat/completions') ? base : `${base}/chat/completions`
+    const history = msgs.slice(-8).map((m) => ({ role: m.role, content: m.text }))
+    const system = `你是「燧瞳智感」AI火警网警的消防助手。当前检测状态：风险${riskTitle(frame?.risk || 'low')}，最高温${Number(frame?.maxTemp || 0).toFixed(1)}°C，高温区域${frame?.hotspots?.length || 0}处。请用简体中文，回答简洁专业。`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey.trim()}` },
+      body: JSON.stringify({ model: config.model.trim() || 'gpt-4o-mini', messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: question }], temperature: 0.4 }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    return data.choices?.[0]?.message?.content || data.choices?.[0]?.text || data.output_text || null
+  }
+
+  const send = async () => {
+    const q = input.trim()
+    if (!q || thinking) return
+    setMsgs((m) => [...m, { role: 'user', text: q }])
+    setInput('')
+    setThinking(true)
+    let answer = null
+    if (llmReady) { try { answer = await callLLM(q) } catch { answer = null } }
+    if (!answer) {
+      answer = localFireAnswer(q)
+      if (llmReady) answer += '\n\n（大模型连接失败，已回退本地知识库）'
+    }
+    setMsgs((m) => [...m, { role: 'assistant', text: answer }])
+    setThinking(false)
+  }
+
+  const testConnection = async () => {
+    if (!llmReady) { setTestState('请先填写 API 地址和密钥'); return }
+    setTestState('测试中…')
+    try {
+      const reply = await callLLM('请只回复：连接成功')
+      setTestState(reply ? '连接成功' : '未收到有效回复')
+    } catch (e) {
+      setTestState(`连接失败：${e.message}`)
+    }
+  }
+
+  return (
+    <>
+      <button type="button" className={`ai-sprite-fab ${open ? 'hidden' : ''}`} onClick={() => onOpenChange(true)} aria-label="打开AI精灵">
+        <Sparkles size={22} />
+        <span className="sprite-dot" />
+      </button>
+
+      {open && (
+        <div className="sprite-backdrop" onClick={() => onOpenChange(false)}>
+          <section className="sprite-sheet" onClick={(event) => event.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div className="sprite-head">
+              <div className="sprite-avatar"><Sparkles size={18} /></div>
+              <div><strong>AI 火警精灵</strong><small>{llmReady ? '已接入联网大模型' : '本地知识库 · 可联网'}</small></div>
+              <div className="sprite-head-actions">
+                <button type="button" onClick={() => setShowSettings((v) => !v)} aria-label="设置"><Cpu size={17} /></button>
+                <button type="button" onClick={() => onOpenChange(false)} aria-label="关闭"><X size={18} /></button>
+              </div>
+            </div>
+
+            {showSettings ? (
+              <div className="sprite-settings">
+                <div className="sprite-settings-head"><strong>接入联网大模型</strong><small>支持 OpenAI 兼容接口</small></div>
+                <label>API 地址<input value={config.endpoint} onChange={(e) => setConfig((c) => ({ ...c, endpoint: e.target.value }))} placeholder="https://api.openai.com/v1" inputMode="url" autoCapitalize="none" /></label>
+                <label>API 密钥<input type="password" value={config.apiKey} onChange={(e) => setConfig((c) => ({ ...c, apiKey: e.target.value }))} placeholder="sk-..." autoCapitalize="none" /></label>
+                <label>模型<input value={config.model} onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))} placeholder="gpt-4o-mini / deepseek-chat" /></label>
+                <div className="sprite-settings-actions">
+                  <button type="button" onClick={testConnection}><Link2 size={14} />测试连接</button>
+                  <button type="button" onClick={() => setShowSettings(false)}>返回对话</button>
+                </div>
+                {testState && <p className="sprite-test-state">{testState}</p>}
+                <p className="sprite-settings-note"><Info size={12} />密钥仅保存在本机浏览器（localStorage），仅供演示；接口需允许跨域(CORS)。</p>
+              </div>
+            ) : (
+              <>
+                <div className="sprite-log" ref={listRef}>
+                  {msgs.map((m, i) => <div className={`sprite-msg ${m.role}`} key={i}>{m.text}</div>)}
+                  {thinking && <div className="sprite-msg assistant thinking"><LoaderCircle className="spin" size={14} />正在思考…</div>}
+                </div>
+                <div className="sprite-input">
+                  <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send() }} placeholder={llmReady ? '问我任何问题…' : '输入消防问题，或接入大模型后可问任何问题'} />
+                  <button type="button" onClick={send} disabled={thinking}><Send size={16} /></button>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
+    </>
+  )
+}
+
 function openPdfReport(report) {
   const row = (label, value) => `<tr><td>${label}</td><td>${value}</td></tr>`
   const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>AI火警处置报告</title>
@@ -2034,6 +2169,7 @@ export default function MobileApp() {
   const [inference, setInference] = useState(() => computeInference(createFrame(), null, null))
   const [showDrill, setShowDrill] = useState(false)
   const [showCommandCenter, setShowCommandCenter] = useState(() => { try { return new URLSearchParams(window.location.search).get('cmd') === '1' } catch { return false } })
+  const [spriteOpen, setSpriteOpen] = useState(false)
   const [aiGatewayUrl, setAiGatewayUrl] = useState(() => { try { return localStorage.getItem('thermalGuardAIGateway') || 'ws://127.0.0.1:8787/ws/detections' } catch { return 'ws://127.0.0.1:8787/ws/detections' } })
   const [aiConnection, setAiConnection] = useState('disconnected')
   const [aiDetections, setAiDetections] = useState([])
@@ -2285,13 +2421,25 @@ export default function MobileApp() {
     }
   }
 
+  const handleQuickNav = (action) => {
+    if (action === 'command') { setActiveTab('dashboard'); setShowCommandCenter(true) }
+    else if (action === 'drill') { setShowDrill(true) }
+    else if (action === 'assistant') { setSpriteOpen(true) }
+    else if (action === 'gps') { setActiveTab('guide') }
+    else if (action === 'guide') { setActiveTab('guide') }
+    else if (action === 'dashboard') { setActiveTab('dashboard') }
+    else if (action === 'camera') { setActiveTab('camera') }
+    else if (action === 'alerts') { setActiveTab('alerts') }
+    else if (action === 'inspect' || action === 'hazard' || action === 'about') { setActiveTab('about') }
+  }
+
   const page = useMemo(() => {
     if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} inference={inference} aiGatewayUrl={aiGatewayUrl} onAIUrlChange={setAiGatewayUrl} aiConnection={aiConnection} aiDetections={aiDetections} onConnectAI={connectAIGateway} onDisconnectAI={disconnectAIGateway} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
     if (activeTab === 'alerts') return <AlertsPage alerts={alerts} onExportEvidence={exportEvidence} />
     if (activeTab === 'dashboard') return <DashboardPage frame={frame} inference={inference} onOpenCommand={() => setShowCommandCenter(true)} />
     if (activeTab === 'guide') return <CompassPage frame={frame} />
     if (activeTab === 'about') return <AboutPage onStartDrill={() => setShowDrill(true)} />
-    return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} inference={inference} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} />
+    return <HomePage inputCameraRef={inputCameraRef} inputGalleryRef={inputGalleryRef} image={image} fileName={fileName} detecting={detecting} progress={progress} detected={detected} result={result} inference={inference} onImage={handleImage} onSample={() => { setImage(DEMO_THERMAL); setFileName('示例热成像-01.jpg'); setDetected(false) }} onReset={resetDetection} onDetect={runDetection} onQuickNav={handleQuickNav} />
   }, [activeTab, alerts, cameras, selectedCamera, selectedCameraId, frame, connection, inference, aiGatewayUrl, aiConnection, aiDetections, image, fileName, detecting, progress, detected, result, phase])
 
   return (
@@ -2308,7 +2456,8 @@ export default function MobileApp() {
       {cameraSheet && <CameraSheet editing={cameraSheet.camera} onClose={() => setCameraSheet(null)} onSave={saveCamera} />}
       {showDrill && <DrillMode frame={frame} onClose={() => setShowDrill(false)} onComplete={completeDrill} onViewEvidence={() => { setShowDrill(false); setActiveTab('alerts') }} />}
       {showCommandCenter && <CommandCenter frame={frame} inference={inference} onClose={() => setShowCommandCenter(false)} onStartDrill={() => { setShowCommandCenter(false); setShowDrill(true) }} />}
-      {toast && <div className="toast-message">{toast}</div>}
+      <AiSprite frame={frame} open={spriteOpen} onOpenChange={setSpriteOpen} />
+            {toast && <div className="toast-message">{toast}</div>}
     </div>
   )
 }
