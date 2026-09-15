@@ -5,6 +5,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BUILDING, positionNodeId } from '../mobile/building.js'
 import { planRoute } from '../mobile/evacuation.js'
+import ArNavigator from './ArNavigator.jsx'
+import useGeoLocation from './useGeoLocation.js'
+import { formatMeters } from './geo.js'
 // 所有传感器输入（信标定位、火情、热像、朝向、设置）统一从这一层订阅
 import {
   KEYS,
@@ -84,6 +87,9 @@ export default function UserApp() {
   const [dialMode, setDialMode] = useState(() => (supportsOrientation() && !needsOrientationPermission() ? 'device' : 'north'))
   const [deviceHeading, setDeviceHeading] = useState(null)
   const [hint, setHint] = useState('')
+  const [arOpen, setArOpen] = useState(false)
+  // GPS：按需开启，只在本机使用；室内楼层仍以信标或手动选点为准
+  const gps = useGeoLocation()
   // 声音/播报/震动设置由系统端维护，用户端跟随，避免两边不一致
   const [settings, setSettings] = useState(() => readSettings())
   const [audioReady, setAudioReady] = useState(() => isAudioUnlocked())
@@ -295,6 +301,19 @@ export default function UserApp() {
     ? `撤离方向表盘：目标${cardinal.label}方向，距离 ${Math.round(route.meters)} 米`
     : '撤离方向表盘：通道受阻'
 
+  // GPS 状态文案：精度、校园内外判断与最近出口距离（室内楼层仍以信标/手动为准）
+  const gpsText = useMemo(() => {
+    if (gps.status === 'active' && gps.location) {
+      const near = gps.location.nearestExit
+      const where = gps.location.inside ? '校园内' : '校园外'
+      const nearest = near ? ` · 距${near.point.name} ${formatMeters(near.meters)}` : ''
+      return `GPS 定位 ±${Math.round(gps.accuracy ?? 0)} 米 · ${where}${nearest}`
+    }
+    if (gps.status === 'requesting') return '正在获取 GPS 定位…'
+    if (gps.status === 'idle') return gps.supported ? 'GPS 未开启，可在「我的位置」里打开' : '本机不支持 GPS 定位'
+    return gps.error || '定位暂不可用'
+  }, [gps.status, gps.location, gps.accuracy, gps.error, gps.supported])
+
   const requestCompass = async () => {
     if (dialMode === 'device') {
       setDialMode('north')
@@ -431,6 +450,7 @@ export default function UserApp() {
       <footer className="compass-tools">
         <button type="button" onClick={toggleDrill} aria-pressed={Boolean(fire)}>{fire ? '结束演练' : '演练'}</button>
         <button type="button" onClick={() => setSheetOpen(true)}>我的位置</button>
+        <button type="button" className="tool-ar" onClick={() => setArOpen(true)}>AR</button>
         <button
           type="button"
           onClick={requestCompass}
@@ -441,6 +461,22 @@ export default function UserApp() {
       </footer>
 
       {hint && <div className="compass-toast">{hint}</div>}
+
+      {arOpen && (
+        <ArNavigator
+          route={route}
+          fire={fire}
+          proximity={proximity}
+          atExit={atExit}
+          proximityText={proximityText}
+          bearing={bearing}
+          targetLabel={route?.ok ? route.exitLabel : '最近安全出口'}
+          remainingFloors={remainingFloors}
+          positionSource={positionSource}
+          gps={gps}
+          onClose={() => setArOpen(false)}
+        />
+      )}
 
       {sheetOpen && (
         <div className="sheet-backdrop" onClick={() => setSheetOpen(false)}>
@@ -480,6 +516,27 @@ export default function UserApp() {
                 </button>
               ))}
             </div>
+
+            <div className={`gps-block ${gps.status === 'active' ? 'is-live' : ''}`}>
+              <div className="gps-head">
+                <strong>手机 GPS 定位</strong>
+                <span className="gps-state">{gpsText}</span>
+              </div>
+              <p className="gps-note">
+                用于判断你在校园的哪个位置、离最近出口多远。坐标只在本机使用，不上传、不写入本地存储；
+                楼内楼层仍以蓝牙信标或手动选点为准。
+              </p>
+              <button
+                type="button"
+                className="gps-toggle"
+                aria-pressed={gps.status === 'active'}
+                disabled={!gps.supported}
+                onClick={() => (gps.status === 'active' ? gps.stop() : gps.start())}
+              >
+                {gps.status === 'active' ? '关闭 GPS 定位' : gps.status === 'requesting' ? '正在获取定位…' : '开启 GPS 定位'}
+              </button>
+            </div>
+
             <button className="done-button" type="button" onClick={() => setSheetOpen(false)}>完成</button>
           </section>
         </div>
