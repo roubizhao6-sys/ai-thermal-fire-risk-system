@@ -216,3 +216,4 @@ button { border: none; background: transparent; color: inherit; }
 
 .spin { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.usr-sprite-fab { touch-action: none; cursor: grab; }

@@ -2087,7 +2087,7 @@ function HazardReport() {
   )
 }
 
-const DEFAULT_LLM = { endpoint: 'https://api.deepseek.com/v1', apiKey: 'sk-dc844ba5cb154106a6fb568d79ce3948', model: 'deepseek-chat' }
+const DEFAULT_LLM = { endpoint: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: '', model: 'doubao-1-5-pro-32k-250115' }
 
 const LLM_PRESETS = [
   { id: 'deepseek', name: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
@@ -2110,6 +2110,41 @@ function loadLlmConfig() {
   } catch { return { ...DEFAULT_LLM } }
 }
 
+function useDraggable(storageKey) {
+  const [pos, setPos] = useState(() => {
+    try { const saved = JSON.parse(localStorage.getItem(storageKey)); if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) return saved } catch {}
+    return { x: Math.max(10, window.innerWidth - 68), y: Math.max(10, window.innerHeight - 180) }
+  })
+  const posRef = useRef(pos)
+  const dragRef = useRef(null)
+  const didDrag = useRef(false)
+
+  const onPointerDown = (event) => {
+    event.preventDefault()
+    didDrag.current = false
+    dragRef.current = { sx: event.clientX, sy: event.clientY, ox: posRef.current.x, oy: posRef.current.y }
+    const move = (ev) => {
+      const dx = ev.clientX - dragRef.current.sx
+      const dy = ev.clientY - dragRef.current.sy
+      if (Math.abs(dx) + Math.abs(dy) > 4) didDrag.current = true
+      posRef.current = { x: Math.max(8, Math.min(window.innerWidth - 60, dragRef.current.ox + dx)), y: Math.max(8, Math.min(window.innerHeight - 60, dragRef.current.oy + dy)) }
+      setPos(posRef.current)
+    }
+    const up = () => {
+      try { localStorage.setItem(storageKey, JSON.stringify(posRef.current)) } catch {}
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }
+
+  return { pos, onPointerDown, didDrag, style: { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' } }
+}
+
+
 function AiSprite({ frame, open, onOpenChange }) {
   const [msgs, setMsgs] = useState([{ role: 'assistant', text: '你好，我是 AI 火警精灵。问我消防问题，或点右上角设置接入联网大模型。' }])
   const [input, setInput] = useState('')
@@ -2118,6 +2153,7 @@ function AiSprite({ frame, open, onOpenChange }) {
   const [config, setConfig] = useState(() => loadLlmConfig())
   const [testState, setTestState] = useState('')
   const listRef = useRef(null)
+  const drag = useDraggable('thermalGuardSpritePos')
 
   useEffect(() => { try { localStorage.setItem('thermalGuardLlm', JSON.stringify(config)) } catch {} }, [config])
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [msgs, thinking, showSettings])
@@ -2168,7 +2204,7 @@ function AiSprite({ frame, open, onOpenChange }) {
 
   return (
     <>
-      <button type="button" className={`ai-sprite-fab ${open ? 'hidden' : ''}`} onClick={() => onOpenChange(true)} aria-label="打开AI精灵">
+      <button type="button" className={`ai-sprite-fab ${open ? 'hidden' : ''}`} style={drag.style} onPointerDown={drag.onPointerDown} onClick={() => { if (drag.didDrag.current) { drag.didDrag.current = false; return } onOpenChange(true) }} aria-label="打开AI精灵">
         <Sparkles size={22} />
         <span className="sprite-dot" />
       </button>

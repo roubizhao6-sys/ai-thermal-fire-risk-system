@@ -1027,3 +1027,4 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .app-switch-link strong { font-size: 12px; color: #ffd7b0; }
 .app-switch-link p { margin: 0; color: #9db2c7; font-size: 9px; line-height: 1.5; }
 .app-switch-link svg { color: #f97316; }
+.ai-sprite-fab { touch-action: none; cursor: grab; }
