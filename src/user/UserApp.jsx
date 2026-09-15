@@ -248,18 +248,18 @@ function ArEscape({ exit, onPickExit, siren, onOpenAr, position, onOpenPos }) {
   const turn = shortestTurn(exit.bearing, heading)
   const turnText = Math.abs(turn) < 15 ? '保持直行' : turn > 0 ? `右转 ${Math.round(Math.abs(turn))}°` : `左转 ${Math.round(Math.abs(turn))}°`
   const seconds = Math.max(6, Math.round(exit.distance / 1.3))
+  const [exitSheet, setExitSheet] = useState(false)
+  const [trappedOpen, setTrappedOpen] = useState(false)
   return (
     <div className="usr-page usr-ar-page">
-      <div className="usr-exit-chips">{EXITS.map((e) => <button type="button" key={e.id} className={e.id === exit.id ? 'active' : ''} onClick={() => onPickExit(e.id)}>{e.name}</button>)}</div>
-
       <main className="usr-stage">
         <CompassDial heading={heading} bearing={exit.bearing} distance={exit.distance} exitName={exit.name} seconds={seconds} />
-        <div className="usr-readouts">
-          <div><span>方向指引</span><strong>{turnText}</strong></div>
-          <div><span>出口方位</span><strong>{exit.bearing}° {directionLabel(exit.bearing)}</strong></div>
-          <div><span>剩余楼层</span><strong>{Math.max(1, position.floor)} 层</strong></div>
+        <div className="usr-turn-line">{turnText}</div>
+        <div className="usr-mini-links">
+          <button type="button" onClick={onOpenPos}><MapPin size={14} />{position.floor} 楼 · {SPOT_LABEL[position.spot]}</button>
+          <button type="button" onClick={() => setExitSheet(true)}><Navigation size={14} />切换出口</button>
+          <button type="button" onClick={() => setTrappedOpen(true)}><AlertTriangle size={14} />被困自救</button>
         </div>
-        <button type="button" className="usr-pos-line" onClick={onOpenPos}><MapPin size={14} />当前位置 · {position.floor} 楼 {SPOT_LABEL[position.spot] || ''}<em>点击修改</em></button>
         <div className="usr-tools">
           <button type="button" className="usr-tool-ar" onClick={onOpenAr}><Camera size={17} />AR 实景导航</button>
           <a href="tel:119" className="usr-tool-119"><Phone size={16} />119</a>
@@ -267,9 +267,26 @@ function ArEscape({ exit, onPickExit, siren, onOpenAr, position, onOpenPos }) {
         </div>
       </main>
 
-      <TrappedDialogue exit={exit} />
+      {exitSheet && (
+        <div className="usr-sheet-backdrop" onClick={() => setExitSheet(false)}>
+          <section className="usr-sheet-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="usr-sheet-panel-head"><div><strong>切换安全出口</strong><small>点选目标出口</small></div><button type="button" onClick={() => setExitSheet(false)}><X size={18} /></button></div>
+            <div className="usr-exit-opt-list">
+              {EXITS.map((e) => <button type="button" key={e.id} className={e.id === exit.id ? 'active' : ''} onClick={() => { onPickExit(e.id); setExitSheet(false) }}><Navigation size={15} /><span>{e.name}</span><em>{e.distance} 米</em></button>)}
+            </div>
+          </section>
+        </div>
+      )}
+      {trappedOpen && (
+        <div className="usr-sheet-backdrop" onClick={() => setTrappedOpen(false)}>
+          <section className="usr-sheet-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="usr-sheet-panel-head"><div><strong>被困者自救问答</strong><small>请如实回答，AI 会给出指引</small></div><button type="button" onClick={() => setTrappedOpen(false)}><X size={18} /></button></div>
+            <TrappedDialogue exit={exit} />
+          </section>
+        </div>
+      )}
 
-      <p className="usr-disclaimer"><ShieldAlert size={14} />本应用为科研演示原型，逃生路线仅供参考，请结合实际现场标识与工作人员指挥。</p>
+      <p className="usr-disclaimer"><ShieldAlert size={14} />科研演示原型，逃生路线仅供参考。</p>
     </div>
   )
 }
