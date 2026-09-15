@@ -2337,12 +2337,22 @@ function LinkedReportsPanel() {
     const readRemote = async () => {
       let server = ''
       try { server = (localStorage.getItem('thermalGuardSyncServer') || '').replace(/\/+$/, '') } catch {}
-      if (!server) { setRemote({ hazards: [], helps: [], ok: null }); return }
       try {
-        const res = await fetch(`${server}/reports`)
-        if (!res.ok) { setRemote((r) => ({ ...r, ok: false })); return }
-        const data = await res.json()
-        const list = Array.isArray(data.reports) ? data.reports : []
+        let list = []
+        if (server) {
+          const res = await fetch(`${server}/reports`)
+          if (!res.ok) { setRemote((r) => ({ ...r, ok: false })); return }
+          const data = await res.json()
+          list = Array.isArray(data.reports) ? data.reports : []
+        } else {
+          const res = await fetch('https://ntfy.sh/must-thermal-guard-7f3a9c2e/json?poll=1')
+          if (!res.ok) { setRemote((r) => ({ ...r, ok: false })); return }
+          const text = await res.text()
+          text.split('\n').forEach((line) => {
+            const trimmed = line.trim(); if (!trimmed) return
+            try { const evt = JSON.parse(trimmed); if (evt.event === 'message' && evt.message) { const d = JSON.parse(evt.message); list.push({ id: evt.id, type: d.type, at: d.at || (evt.time ? evt.time * 1000 : Date.now()), payload: d.payload || {} }) } } catch {}
+          })
+        }
         setRemote({
           ok: true,
           hazards: list.filter((r) => r.type === 'hazard').map((r) => ({ ...(r.payload || {}), remote: true, at: r.at })),
@@ -2389,7 +2399,7 @@ function LinkedReportsPanel() {
       ))}
 
       {total === 0 && <div className="linked-empty"><ImageIcon size={26} /><p>在用户端「更多功能 → 隐患上报」拍照提交，这里会出现该照片与记录。</p></div>}
-      <p className="linked-note"><Info size={12} />同一设备直接共享；在两端都填同一个「云端同步」地址后，可跨设备实时收到用户端上报。</p>
+      <p className="linked-note"><Info size={12} />默认已开启跨设备云端同步：用户端手机上报隐患（含照片）后，这里会自动收到。</p>
     </section>
   )
 }

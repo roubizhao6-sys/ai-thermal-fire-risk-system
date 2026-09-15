@@ -18,14 +18,36 @@ const SPOT_LABEL = { A: 'A 楼梯', C: '走廊中段', B: 'B 楼梯' }
 const SPOT_IDS = ['A', 'C', 'B']
 const FLOORS_8 = [1, 2, 3, 4, 5, 6, 7, 8]
 
+const NTFY_BASE = 'https://ntfy.sh'
+const SYNC_TOPIC = 'must-thermal-guard-7f3a9c2e'
+
 function readSyncServer() {
   try { return (localStorage.getItem('thermalGuardSyncServer') || '').replace(/\/+$/, '') } catch { return '' }
 }
+
+async function uploadNtfyPhoto(dataUrl) {
+  try {
+    const blob = await (await fetch(dataUrl)).blob()
+    const res = await fetch(`${NTFY_BASE}/${SYNC_TOPIC}`, { method: 'PUT', headers: { Filename: 'hazard.jpg' }, body: blob })
+    const data = await res.json()
+    return data?.attachment?.url || ''
+  } catch { return '' }
+}
+
 async function uploadReport(type, payload) {
   const server = readSyncServer()
-  if (!server) return false
   try {
-    const res = await fetch(`${server}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, payload }) })
+    const body = { ...payload }
+    if (type === 'hazard' && body.img && String(body.img).startsWith('data:') && !server) {
+      const remote = await uploadNtfyPhoto(body.img)
+      if (remote) body.img = remote
+    }
+    const message = JSON.stringify({ type, payload: body, at: Date.now() })
+    if (server) {
+      const res = await fetch(`${server}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: message })
+      return res.ok
+    }
+    const res = await fetch(`${NTFY_BASE}/${SYNC_TOPIC}`, { method: 'POST', headers: { Title: `thermal-${type}` }, body: message })
     return res.ok
   } catch { return false }
 }
@@ -621,11 +643,11 @@ function SyncCard() {
   const test = async () => { const url = server.trim().replace(/\/+$/, ''); if (!url) { setMsg('请先填写服务地址'); return } try { const r = await fetch(`${url}/health`); setMsg(r.ok ? '连接成功' : `连接失败（${r.status}）`) } catch { setMsg('连接失败') } }
   return (
     <section className="usr-card usr-sync-card">
-      <div className="usr-card-head"><div><strong>云端同步</strong><small>上报同步到系统端（跨设备）</small></div><Link2 size={18} /></div>
+      <div className="usr-card-head"><div><strong>云端同步</strong><small>跨设备同步 · 已默认开启</small></div><Link2 size={18} /></div>
       <input className="usr-sync-input" value={server} onChange={(e) => setServer(e.target.value)} placeholder="https://xxx.workers.dev" inputMode="url" autoCapitalize="none" />
       <div className="usr-sync-actions"><button type="button" onClick={save}>保存地址</button><button type="button" onClick={test}>测试连接</button></div>
       {msg && <p className="usr-sync-msg">{msg}</p>}
-      <p className="usr-note"><Info size={12} />填入部署好的同步服务地址后，隐患/求助会上传，系统端可跨设备收到。</p>
+      <p className="usr-note"><Info size={12} />默认已通过公共实时通道同步，手机上上报隐患/求助，系统端电脑即可收到（无需任何配置）。如需私有/更安全，可填自己的同步服务地址。</p>
     </section>
   )
 }
