@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import jsQR from 'jsqr'
 import Building3DView from './Building3DView.jsx'
 import Campus3DView from './Campus3DView.jsx'
 import CampusBuildingPanel from './CampusBuildingPanel.jsx'
@@ -1888,28 +1889,128 @@ const FACILITIES = [
   { id: 'f4', name: '疏散指示', code: 'D-07', location: 'P 座宿舍 5F 出口', expire: '2027-09', status: '正常' },
 ]
 
+function QrScanModal({ onClose, onDetected }) {
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const streamRef = useRef(null)
+  const rafRef = useRef(null)
+  const [status, setStatus] = useState('starting')
+  const [msg, setMsg] = useState('正在打开摄像头…')
+
+  useEffect(() => {
+    let cancelled = false
+
+    const stop = () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+
+    const detectFrame = () => {
+      if (cancelled) return
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      if (video && canvas && video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+        const scale = Math.min(1, 640 / video.videoWidth)
+        canvas.width = Math.round(video.videoWidth * scale)
+        canvas.height = Math.round(video.videoHeight * scale)
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        try {
+          const code = jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' })
+          if (code && code.data) {
+            stop()
+            onDetected(code.data)
+            return
+          }
+        } catch {}
+      }
+      rafRef.current = requestAnimationFrame(detectFrame)
+    }
+
+    const start = async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) { setStatus('error'); setMsg('当前浏览器不支持摄像头'); return }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false })
+        if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play().catch(() => {})
+        }
+        setStatus('scanning')
+        setMsg('请对准消防设施上的二维码')
+        detectFrame()
+      } catch {
+        if (!cancelled) { setStatus('error'); setMsg('无法打开摄像头，请允许相机权限后重试') }
+      }
+    }
+
+    start()
+    return () => { cancelled = true; stop() }
+  }, [onDetected])
+
+  return (
+    <div className="scan-backdrop" onClick={onClose}>
+      <section className="scan-sheet" onClick={(event) => event.stopPropagation()}>
+        <div className="scan-head"><div><strong>扫码巡检</strong><small>对准设施二维码自动识别</small></div><button type="button" onClick={onClose}><X size={18} /></button></div>
+        <div className="scan-stage">
+          <video ref={videoRef} className="scan-video" autoPlay playsInline muted />
+          <div className="scan-frame"><i /><span className="scan-beam" /></div>
+          {status === 'error' && <div className="scan-error">{msg}</div>}
+        </div>
+        <p className="scan-status">{status === 'error' ? msg : status === 'starting' ? '正在启动摄像头…' : '正在扫描二维码…'}</p>
+        <div className="scan-actions">
+          <button type="button" onClick={onClose}>取消</button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function InspectionPanel() {
   const [records, setRecords] = useState(FACILITIES)
+  const [scanOpen, setScanOpen] = useState(false)
   const [scanMsg, setScanMsg] = useState('')
-  const inspect = (id) => setRecords((r) => r.map((f) => (f.id === id ? { ...f, status: '正常', last: new Date().toLocaleDateString('zh-CN') } : f)))
-  const tryScan = async () => {
-    if (!('BarcodeDetector' in window)) { setScanMsg('当前浏览器不支持扫码识别，建议用 Chrome，或直接手动登记。'); return }
-    setScanMsg('已调用扫码识别（Chrome 支持），对准设施二维码即可。')
+
+  const nowStamp = () => new Date().toLocaleString('zh-CN', { hour12: false })
+
+  const markInspected = (id) => setRecords((r) => r.map((f) => (f.id === id ? { ...f, status: '正常', last: nowStamp(), checks: (f.checks || 0) + 1 } : f)))
+
+  const handleDetected = (data) => {
+    const code = String(data || '').trim()
+    const found = records.find((f) => f.code.toUpperCase() === code.toUpperCase() || code.includes(f.code.toUpperCase()) || code.includes(f.name))
+    if (found) {
+      setRecords((r) => r.map((f) => (f.id === found.id ? { ...f, status: '正常', last: nowStamp(), checks: (f.checks || 0) + 1 } : f)))
+      setScanMsg(`识别成功：${found.name} ${found.code} 已登记检查`)
+    } else {
+      setScanMsg(`未匹配到设施：${code || '空二维码'}，请确认二维码内容为设施编号（如 A-01）`)
+    }
+    setScanOpen(false)
   }
+
   return (
     <section className="mobile-card inspection-card">
-      <div className="card-head"><div><strong>消防设施扫码巡检</strong><small>灭火器、消火栓定期检查与到期提醒</small></div><QrCode size={18} /></div>
-      <button type="button" className="inspection-scan" onClick={tryScan}><ScanLine size={15} />扫码检查</button>
-      {scanMsg && <p className="inspection-scan-msg">{scanMsg}</p>}
+      <div className="card-head"><div><strong>消防设施扫码巡检</strong><small>对准二维码自动识别，登记检查与到期提醒</small></div><QrCode size={18} /></div>
+      <button type="button" className="inspection-scan" onClick={() => { setScanMsg(''); setScanOpen(true) }}><ScanLine size={15} />扫码检查</button>
+      {scanMsg && <p className={`inspection-scan-msg ${scanMsg.startsWith('识别成功') ? 'ok' : ''}`}>{scanMsg}</p>}
       <div className="inspection-list">
-        {records.map((f) => (
-          <div className={`inspection-row ${f.status === '临近到期' ? 'warn' : ''}`} key={f.id}>
-            <span className="inspection-icon"><QrCode size={15} /></span>
-            <div><strong>{f.name} · {f.code}</strong><small>{f.location}{f.last ? ` · 上次检查 ${f.last}` : ''}</small><em>有效期至 {f.expire}</em></div>
-            <button type="button" onClick={() => inspect(f.id)}><CheckCircle2 size={14} />登记</button>
-          </div>
-        ))}
+        {records.map((f) => {
+          const expired = f.expire && f.expire < '2026-10'
+          return (
+            <div className={`inspection-row ${f.status === '临近到期' || expired ? 'warn' : ''}`} key={f.id}>
+              <span className="inspection-icon"><QrCode size={15} /></span>
+              <div><strong>{f.name} · {f.code}</strong><small>{f.location}{f.last ? ` · 上次检查 ${f.last}` : ' · 尚未登记'}</small><em>有效期至 {f.expire}{f.checks ? ` · 已检 ${f.checks} 次` : ''}</em></div>
+              <button type="button" onClick={() => markInspected(f.id)}><CheckCircle2 size={14} />登记</button>
+            </div>
+          )
+        })}
       </div>
+      <p className="situation-note"><Info size={12} />二维码内容示例：设施编号 A-01。可手动「登记」补录，或扫描真实二维码自动识别。</p>
+
+      {scanOpen && <QrScanModal onClose={() => setScanOpen(false)} onDetected={handleDetected} />}
     </section>
   )
 }

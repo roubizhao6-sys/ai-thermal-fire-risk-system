@@ -62,7 +62,8 @@ SwiftUI 原生 App，支持模拟热像仪、ESP32 USB 串口、Wi-Fi WebSocket�
 - **校园全域态势图**：各楼栋实时风险热力 + 告警点。
 - **一键导出 PDF 报告**：`openPdfReport()` 打开打印友好页面。
 - **告警通知**：Notification API 推送（Chrome/Android）。
-- **消防设施扫码巡检**、**AI 消防知识助手**（本地知识库）、**隐患随手拍上报**（存 localStorage）。
+- **消防设施扫码巡检**：摄像头取景器 + jsQR 实时识别二维码，自动匹配设施编号并登记检查（iOS Safari 也可用）。
+- **AI 消防知识助手**（本地知识库）、**隐患随手拍上报**（存 localStorage）。
 - **AI 火警精灵**：悬浮按钮常驻右下角，可本地知识库问答，也可在设置里填入 OpenAI 兼容 API（endpoint/key/model，存 localStorage）接入联网大模型，任意问题联网回答。
 - **首页快捷功能网格**：8 个快捷入口（应急指挥/疏散导航/数字演练/GPS/数据看板/扫码巡检/AI精灵/隐患上报）一键直达。
 - **离线 PWA 缓存**：`public/sw.js`（v17）预缓存应用外壳 + 离线导航回退。
