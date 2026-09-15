@@ -323,3 +323,11 @@ button { border: none; background: transparent; color: inherit; }
 .usr-exit-opt-list button.active em { color: #ffe3c2; }
 .usr-ar-page .usr-trapped { margin-top: 0; padding: 0; border: none; background: transparent; }
 .usr-ar-page .usr-disclaimer { justify-content: center; margin-top: 6px; }
+
+/* 安装到桌面引导 */
+.usr-install-card { border-color: rgba(56,189,248,.3); }
+.usr-install-btn { width: 100%; min-height: 44px; margin-bottom: 4px; color: #fff; border: none; border-radius: 11px; background: linear-gradient(110deg, #2563eb, #38bdf8); font-size: 11px; font-weight: 700; }
+.usr-install-steps { margin-top: 8px; padding: 11px 12px; border: 1px solid rgba(96,165,250,.18); border-radius: 11px; background: rgba(4,13,27,.5); }
+.usr-install-steps ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.usr-install-steps li { color: #b7c8da; font-size: 10px; line-height: 1.5; }
+.usr-install-steps b { color: #7cc4ff; }

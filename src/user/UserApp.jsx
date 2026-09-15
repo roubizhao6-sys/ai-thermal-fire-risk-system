@@ -567,11 +567,47 @@ function FloorPlanPanel() {
   )
 }
 
+function InstallCard() {
+  const [deferred, setDeferred] = useState(null)
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    const handler = (event) => { event.preventDefault(); setDeferred(event) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const isAndroid = /Android/i.test(ua)
+  const onClick = async () => {
+    if (deferred) { deferred.prompt(); try { await deferred.userChoice } catch {} setDeferred(null); return }
+    setShow((v) => !v)
+  }
+  return (
+    <section className="usr-card usr-install-card">
+      <div className="usr-card-head"><div><strong>安装到手机桌面</strong><small>装成独立 App · 与物业端分开</small></div><Sparkles size={18} /></div>
+      <button type="button" className="usr-install-btn" onClick={onClick}>{deferred ? '一键安装 App' : show ? '收起安装方法' : '查看安装方法'}</button>
+      {show && (
+        <div className="usr-install-steps">
+          {isIOS ? (
+            <ol><li>用 <b>Safari</b> 打开本页（不要用微信）</li><li>点底部「<b>分享</b>」按钮</li><li>选择「<b>添加到主屏幕</b>」</li><li>桌面出现「热感哨兵」独立图标</li></ol>
+          ) : isAndroid ? (
+            <ol><li>用 <b>Chrome</b> 打开本页</li><li>点右上角「<b>⋮</b>」</li><li>选「<b>安装应用 / 添加到主屏幕</b>」</li></ol>
+          ) : (
+            <ol><li>手机用 <b>Safari</b> 或 <b>Chrome</b> 打开本页</li><li>分享 / 菜单 → 「添加到主屏幕」</li></ol>
+          )}
+        </div>
+      )}
+      <p className="usr-note"><Info size={12} />安装后是独立 App「热感哨兵」，与物业端「燧瞳智感」互不影响。</p>
+    </section>
+  )
+}
+
 function MorePage() {
   return (
     <div className="usr-page">
       <header className="usr-page-head"><span>功能中心</span><h1>升级后的实用工具</h1><p>定位 · 巡检 · 上报 · 平面图</p></header>
       <UpgradeHighlights />
+      <InstallCard />
       <GpsPanel />
       <InspectionPanel />
       <HazardReport />
