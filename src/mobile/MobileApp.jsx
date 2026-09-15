@@ -2327,46 +2327,69 @@ function openPdfReport(report) {
 function LinkedReportsPanel() {
   const [hazards, setHazards] = useState([])
   const [statuses, setStatuses] = useState([])
-  const [flash, setFlash] = useState('')
+  const [remote, setRemote] = useState({ hazards: [], helps: [], ok: null })
 
   useEffect(() => {
-    const read = () => {
+    const readLocal = () => {
       try { setHazards(JSON.parse(localStorage.getItem('thermalGuardHazards') || '[]')) } catch { setHazards([]) }
       try { setStatuses(JSON.parse(localStorage.getItem('thermalGuardUserStatus') || '[]')) } catch { setStatuses([]) }
-      try { setFlash(localStorage.getItem('thermalGuardUserStatus') || '') } catch { setFlash('') }
     }
-    read()
-    const id = setInterval(read, 3000)
-    const onStorage = (e) => { if (['thermalGuardHazards', 'thermalGuardUserStatus'].includes(e.key)) read() }
+    const readRemote = async () => {
+      let server = ''
+      try { server = (localStorage.getItem('thermalGuardSyncServer') || '').replace(/\/+$/, '') } catch {}
+      if (!server) { setRemote({ hazards: [], helps: [], ok: null }); return }
+      try {
+        const res = await fetch(`${server}/reports`)
+        if (!res.ok) { setRemote((r) => ({ ...r, ok: false })); return }
+        const data = await res.json()
+        const list = Array.isArray(data.reports) ? data.reports : []
+        setRemote({
+          ok: true,
+          hazards: list.filter((r) => r.type === 'hazard').map((r) => ({ ...(r.payload || {}), remote: true, at: r.at })),
+          helps: list.filter((r) => r.type === 'help').map((r) => ({ ...(r.payload || {}), remote: true, at: r.at })),
+        })
+      } catch { setRemote((r) => ({ ...r, ok: false })) }
+    }
+    const refresh = () => { readLocal(); readRemote() }
+    refresh()
+    const id = setInterval(refresh, 4000)
+    const onStorage = (e) => { if (['thermalGuardHazards', 'thermalGuardUserStatus', 'thermalGuardSyncServer'].includes(e.key)) refresh() }
     window.addEventListener('storage', onStorage)
     return () => { clearInterval(id); window.removeEventListener('storage', onStorage) }
   }, [])
 
-  const total = hazards.length + statuses.length
+  const allHazards = [...hazards, ...remote.hazards.filter((r) => !hazards.some((h) => h.id === r.id))]
+  const allHelps = [...statuses, ...remote.helps.filter((r) => !statuses.some((h) => h.id === r.id))]
+  const total = allHazards.length + allHelps.length
+  const serverSet = remote.ok !== null
 
   return (
     <section className="mobile-card linked-card">
       <div className="card-head"><div><strong>用户端联动</strong><small>用户端上报的隐患与求助实时同步到此</small></div><Link2 size={18} /></div>
-      <div className="linked-badge"><i className={total ? 'online' : ''} />{total ? `已收到 ${total} 条用户端数据` : '暂无用户端上报（同一台设备上打开用户端上报后会出现在这里）'}</div>
+      <div className="linked-badge">
+        <i className={total ? 'online' : ''} />
+        {total ? `已收到 ${total} 条用户端数据` : '暂无用户端上报'}
+        {serverSet && <b style={{ marginLeft: 'auto' }}>{remote.ok ? '云端已连接' : '云端连接失败'}</b>}
+      </div>
 
-      {statuses.slice(0, 3).map((s) => (
-        <div className="linked-row is-help" key={s.id}>
+      {allHelps.slice(0, 3).map((s2) => (
+        <div className="linked-row is-help" key={s2.id || s2.updatedAt}>
           <span className="linked-icon"><ShieldAlert size={16} /></span>
-          <div><strong>用户求助 · {s.floor ? `${s.floor} 楼` : '位置未知'} {s.needsHelp ? '（需要帮助）' : ''}</strong><small>{s.advice || '已提交自救问答'}</small></div>
-          <em>{new Date(s.updatedAt || Date.now()).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}</em>
+          <div><strong>用户求助 · {s2.floor ? `${s2.floor} 楼` : '位置未知'} {s2.needsHelp ? '（需要帮助）' : ''}{s2.remote ? ' · 云端' : ''}</strong><small>{s2.advice || '已提交自救问答'}</small></div>
+          <em>{new Date(s2.updatedAt || s2.at || Date.now()).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}</em>
         </div>
       ))}
 
-      {hazards.slice(0, 5).map((h) => (
-        <div className="linked-row" key={h.id}>
+      {allHazards.slice(0, 5).map((h) => (
+        <div className="linked-row" key={h.id || h.time}>
           {h.img ? <img className="linked-thumb" src={h.img} alt="用户端上报照片" /> : <span className="linked-icon"><AlertTriangle size={16} /></span>}
-          <div><strong>用户上报隐患 · {h.loc}</strong><small>{h.desc} · {h.time}</small></div>
-          <em>照片</em>
+          <div><strong>用户上报隐患 · {h.loc}{h.remote ? ' · 云端' : ''}</strong><small>{h.desc} · {h.time || new Date(h.at || Date.now()).toLocaleTimeString('zh-CN', { hour12: false })}</small></div>
+          <em>{h.img ? '照片' : ''}</em>
         </div>
       ))}
 
       {total === 0 && <div className="linked-empty"><ImageIcon size={26} /><p>在用户端「更多功能 → 隐患上报」拍照提交，这里会出现该照片与记录。</p></div>}
-      <p className="linked-note"><Info size={12} />同一手机/浏览器内两端共享数据（本机演示）。跨设备实时同步需要后端服务器中转。</p>
+      <p className="linked-note"><Info size={12} />同一设备直接共享；在两端都填同一个「云端同步」地址后，可跨设备实时收到用户端上报。</p>
     </section>
   )
 }

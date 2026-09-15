@@ -1,0 +1,7 @@
+name = "thermal-guard-report-sync"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "REPORTS"
+id = "请在 wrangler kv namespace create REPORTS 后填入"

@@ -35,6 +35,7 @@
 顶部导航、英雄区、核心功能三点介绍、在线检测（上传热成像图 → 模拟加载 → 风险等级/高温区/最高温/红橙标注框/处置建议）、数据统计看板、项目说明、页脚。
 
 ### 3.2 双端拆分（用户端 / 系统端）
+- **跨设备云端联动**：`gateway/report-sync/`（Cloudflare Worker + KV）。用户端「更多功能 → 云端同步」填服务地址后，隐患/求助 POST 到 `/report`；系统端「用户端联动」轮询 `/reports` 展示（带「· 云端」标记）。不填地址时退化为同机 localStorage 联动。
 - **两端联动（同机）**：用户端「隐患上报（含照片）」写 `thermalGuardHazards`、「被困者问答」写 `thermalGuardUserStatus`，系统端数据看板新增「用户端联动」面板实时读取展示（同源共享 localStorage，storage 事件 + 3s 轮询）。跨设备同步需后端中转。
 - **完全独立的两端 App**：用户端 `user/`（`user/index.html` + `user/manifest.webmanifest` + `user/sw.js`，作用域 `/user/`）、系统端 `system/`（同样独立清单与 SW，作用域 `/system/`）。两端各自独立目录、独立 Service Worker 作用域、独立图标与启动页，互不影响。根目录 `user-app.html`/`mobile-app.html` 保留兼容旧链接。
 - **系统端 / 物业端**：`mobile-app.html` + `src/mobile/MobileApp.jsx`（完整管理：监控、看板、指挥中心、巡检、隐患、证据链等）。

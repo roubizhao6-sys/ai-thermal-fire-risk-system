@@ -9,7 +9,7 @@ import jsQR from 'jsqr'
 import {
   Camera, CheckCircle2, Flame, Navigation, Phone, ScanLine, ShieldAlert, ShieldCheck,
   Thermometer, Upload, Volume2, VolumeX, X, MapPin, AlertTriangle, LoaderCircle, RotateCcw,
-  QrCode, LocateFixed, Info, Send, Waves, Eye, BellRing, Image as ImageIcon, Sparkles,
+  QrCode, LocateFixed, Info, Send, Waves, Eye, BellRing, Image as ImageIcon, Sparkles, Link2,
 } from 'lucide-react'
 
 const DEMO = `${import.meta.env.BASE_URL}demo-thermal.jpg`
@@ -17,6 +17,18 @@ const DEMO = `${import.meta.env.BASE_URL}demo-thermal.jpg`
 const SPOT_LABEL = { A: 'A 楼梯', C: '走廊中段', B: 'B 楼梯' }
 const SPOT_IDS = ['A', 'C', 'B']
 const FLOORS_8 = [1, 2, 3, 4, 5, 6, 7, 8]
+
+function readSyncServer() {
+  try { return (localStorage.getItem('thermalGuardSyncServer') || '').replace(/\/+$/, '') } catch { return '' }
+}
+async function uploadReport(type, payload) {
+  const server = readSyncServer()
+  if (!server) return false
+  try {
+    const res = await fetch(`${server}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, payload }) })
+    return res.ok
+  } catch { return false }
+}
 
 const EXITS = [
   { id: 'library', name: '图书馆', bearing: 300, distance: 88 },
@@ -425,7 +437,7 @@ function HazardReport() {
   const submit = () => {
     if (!desc.trim() && !loc.trim()) return
     const next = [{ id: `hz-${Date.now()}`, desc: desc.trim() || '未描述', loc: loc.trim() || '未填写位置', img, time: new Date().toLocaleString('zh-CN', { hour12: false }) }, ...items].slice(0, 20)
-    setItems(next); localStorage.setItem('thermalGuardHazards', JSON.stringify(next)); setDesc(''); setLoc(''); setImg('')
+    setItems(next); localStorage.setItem('thermalGuardHazards', JSON.stringify(next)); setDesc(''); setLoc(''); setImg(''); uploadReport('hazard', next[0])
   }
   return (
     <section className="usr-card">
@@ -453,7 +465,7 @@ function TrappedDialogue({ exit }) {
   const answer = (choice) => {
     const next = answerQuestion(state, question.id, choice)
     setState(next)
-    if (next.done) saveUserStatus(summarizeForRescue(next, { id: 'user-demo', floor: 3, spot: 'C' }))
+    if (next.done) { const snapshot = summarizeForRescue(next, { id: 'user-demo', floor: 3, spot: 'C' }); saveUserStatus(snapshot); uploadReport('help', snapshot) }
   }
   const reset = () => setState(createDialogueState())
   return (
@@ -602,12 +614,29 @@ function InstallCard() {
   )
 }
 
+function SyncCard() {
+  const [server, setServer] = useState(() => { try { return localStorage.getItem('thermalGuardSyncServer') || '' } catch { return '' } })
+  const [msg, setMsg] = useState('')
+  const save = () => { try { localStorage.setItem('thermalGuardSyncServer', server.trim()) } catch {} ; setMsg(server.trim() ? '已保存，上报将同步到系统端' : '已清空'); window.setTimeout(() => setMsg(''), 2600) }
+  const test = async () => { const url = server.trim().replace(/\/+$/, ''); if (!url) { setMsg('请先填写服务地址'); return } try { const r = await fetch(`${url}/health`); setMsg(r.ok ? '连接成功' : `连接失败（${r.status}）`) } catch { setMsg('连接失败') } }
+  return (
+    <section className="usr-card usr-sync-card">
+      <div className="usr-card-head"><div><strong>云端同步</strong><small>上报同步到系统端（跨设备）</small></div><Link2 size={18} /></div>
+      <input className="usr-sync-input" value={server} onChange={(e) => setServer(e.target.value)} placeholder="https://xxx.workers.dev" inputMode="url" autoCapitalize="none" />
+      <div className="usr-sync-actions"><button type="button" onClick={save}>保存地址</button><button type="button" onClick={test}>测试连接</button></div>
+      {msg && <p className="usr-sync-msg">{msg}</p>}
+      <p className="usr-note"><Info size={12} />填入部署好的同步服务地址后，隐患/求助会上传，系统端可跨设备收到。</p>
+    </section>
+  )
+}
+
 function MorePage() {
   return (
     <div className="usr-page">
       <header className="usr-page-head"><span>功能中心</span><h1>升级后的实用工具</h1><p>定位 · 巡检 · 上报 · 平面图</p></header>
       <UpgradeHighlights />
       <InstallCard />
+      <SyncCard />
       <GpsPanel />
       <InspectionPanel />
       <HazardReport />

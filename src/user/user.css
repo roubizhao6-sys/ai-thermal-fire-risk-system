@@ -331,3 +331,11 @@ button { border: none; background: transparent; color: inherit; }
 .usr-install-steps ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
 .usr-install-steps li { color: #b7c8da; font-size: 10px; line-height: 1.5; }
 .usr-install-steps b { color: #7cc4ff; }
+
+/* 云端同步 */
+.usr-sync-card { border-color: rgba(56,189,248,.3); }
+.usr-sync-input { width: 100%; height: 42px; margin-bottom: 8px; padding: 0 11px; color: #e9f4ff; border: 1px solid rgba(96,165,250,.2); border-radius: 10px; background: rgba(4,13,27,.68); font-size: 10px; outline: none; }
+.usr-sync-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.usr-sync-actions button { min-height: 38px; color: #dcecff; border: 1px solid rgba(96,165,250,.18); border-radius: 10px; background: rgba(59,130,246,.08); font-size: 10px; }
+.usr-sync-actions button:first-child { color: #fff; background: linear-gradient(110deg, #2563eb, #38bdf8); border-color: transparent; }
+.usr-sync-msg { margin: 8px 0 0; color: #8fe8b3; font-size: 9px; }
