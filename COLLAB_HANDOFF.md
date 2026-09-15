@@ -50,6 +50,7 @@
 - **AI 检测网关**：`gateway/` 提供 `/ws/detections` WebSocket，支持模拟 + 可选 YOLO/OpenCV 检测。
 - **科大校园 3D**：澳门科技大学校园模型（`public/models/must-campus.stl/.step`）+ 官方地图/OSM 建筑 + 720 云全景。
 - **指南针疏散**：磁力计航向 + 最近安全出口动态排序。
+- **手机 GPS 定位**：`GpsPanel` 读取手机真实 GPS 坐标，展示经纬度/精度/海拔，计算到最近校园安全点的距离与方位，并在迷你地图上标出当前位置。
 
 ### 3.3 macOS 原生 App（`macos/AIThermalFireGuard/`）
 SwiftUI 原生 App，支持模拟热像仪、ESP32 USB 串口、Wi-Fi WebSocket、32×24 热成像矩阵、风险分级、SceneKit 3D 热源重建、指南针疏散。构建：`cd macos/AIThermalFireGuard && ./script/build_and_run.sh`。

@@ -582,6 +582,45 @@ function shortestTurn(target, heading) {
   return ((target - heading + 540) % 360) - 180
 }
 
+const CAMPUS_BOUNDS = { minLat: 22.1495, maxLat: 22.1555, minLng: 113.5605, maxLng: 113.5685 }
+
+const SAFE_POINTS = [
+  { id: 'gate', name: '主校门集合点', lat: 22.1522, lng: 113.5630 },
+  { id: 'library', name: '图书馆广场', lat: 22.1533, lng: 113.5643 },
+  { id: 'gym', name: '体育馆疏散点', lat: 22.1514, lng: 113.5649 },
+  { id: 'academic', name: '教学楼避难区', lat: 22.1543, lng: 113.5652 },
+  { id: 'dorm', name: '学生宿舍安全区', lat: 22.1506, lng: 113.5624 },
+]
+
+function distanceMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000
+  const toRad = (deg) => (deg * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)))
+}
+
+function bearingBetween(lat1, lng1, lat2, lng2) {
+  const toRad = (deg) => (deg * Math.PI) / 180
+  const toDeg = (rad) => (rad * 180) / Math.PI
+  const y = Math.sin(toRad(lng2 - lng1)) * Math.cos(toRad(lat2))
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lng2 - lng1))
+  return (toDeg(Math.atan2(y, x)) + 360) % 360
+}
+
+function projectToMap(lat, lng) {
+  const { minLat, maxLat, minLng, maxLng } = CAMPUS_BOUNDS
+  const x = ((lng - minLng) / (maxLng - minLng)) * 100
+  const y = ((maxLat - lat) / (maxLat - minLat)) * 100
+  return { x, y, inside: x >= 0 && x <= 100 && y >= 0 && y <= 100 }
+}
+
+function formatDistance(meters) {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${Math.round(meters)} m`
+}
+
+
 function CompassRouteMap({ route }) {
   const nodes = buildingGraph.nodes
   const path = route?.path || ['start', 'mid', 'stairs']
@@ -600,6 +639,126 @@ function CompassRouteMap({ route }) {
         {path.map((id, index) => <g key={id}><circle cx={nodes[id].x} cy={nodes[id].y} r={index === 0 ? '2.6' : '1.8'} fill={nodes[id].type === 'exit' ? '#22c55e' : '#38bdf8'} /><text x={nodes[id].x} y={nodes[id].y + 6} textAnchor="middle" fontSize="4" fill="#cfe4f7">{nodes[id].label}</text></g>)}
       </svg>
     </div>
+  )
+}
+
+function GpsPanel() {
+  const watchRef = useRef(null)
+  const [status, setStatus] = useState('idle')
+  const [position, setPosition] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => () => {
+    if (watchRef.current != null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchRef.current)
+    }
+  }, [])
+
+  const start = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) { setStatus('unsupported'); return }
+    setStatus('requesting')
+    setError('')
+    navigator.vibrate?.(40)
+    watchRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        setPosition({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          altitude: pos.coords.altitude,
+          heading: pos.coords.heading,
+          speed: pos.coords.speed,
+          ts: pos.timestamp,
+        })
+        setStatus('active')
+      },
+      (err) => {
+        setStatus(err && err.code === 1 ? 'denied' : 'error')
+        setError(err?.message || '定位失败')
+      },
+      { enableHighAccuracy: true, maximumAge: 4000, timeout: 15000 }
+    )
+  }
+
+  const stop = () => {
+    if (watchRef.current != null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchRef.current)
+    }
+    watchRef.current = null
+    setStatus('idle')
+  }
+
+  const ranked = position
+    ? SAFE_POINTS.map((point) => ({
+        ...point,
+        distance: distanceMeters(position.lat, position.lng, point.lat, point.lng),
+        bearing: bearingBetween(position.lat, position.lng, point.lat, point.lng),
+      })).sort((a, b) => a.distance - b.distance)
+    : []
+  const nearest = ranked[0]
+  const projected = position ? projectToMap(position.lat, position.lng) : null
+  const userPoint = projected ? { x: Math.max(4, Math.min(96, projected.x)), y: Math.max(4, Math.min(96, projected.y)) } : null
+  const nearestPoint = nearest ? projectToMap(nearest.lat, nearest.lng) : null
+  const updateText = position ? new Date(position.ts).toLocaleTimeString('zh-CN', { hour12: false }) : ''
+
+  return (
+    <section className="mobile-card gps-card">
+      <div className="card-head"><div><strong>手机 GPS 实时定位</strong><small>读取当前位置，计算到最近安全点的距离与方向</small></div><LocateFixed size={18} /></div>
+
+      {status !== 'active' && (
+        <div className="gps-idle">
+          <p>开启后可读取手机真实 GPS 坐标，结合校园安全点计算撤离距离与方位，位置仅在本机使用、不会上传。</p>
+          <button type="button" className="gps-start" onClick={start} disabled={status === 'requesting'}><LocateFixed size={16} />{status === 'requesting' ? '正在定位…' : '开启手机 GPS 定位'}</button>
+          {status === 'denied' && <div className="gps-warn">定位权限被拒绝，请在系统设置中允许位置访问后重试。</div>}
+          {status === 'unsupported' && <div className="gps-warn">当前浏览器不支持定位，请使用 Safari 或 Chrome 打开。</div>}
+          {status === 'error' && <div className="gps-warn">定位失败：{error || '请检查网络与定位服务'}</div>}
+        </div>
+      )}
+
+      {status === 'active' && position && userPoint && (
+        <div className="gps-active">
+          <div className="gps-coord-grid">
+            <div><span>纬度</span><strong>{position.lat.toFixed(6)}</strong></div>
+            <div><span>经度</span><strong>{position.lng.toFixed(6)}</strong></div>
+            <div><span>定位精度</span><strong>±{Math.round(position.accuracy)} m</strong></div>
+            <div><span>海拔</span><strong>{position.altitude != null ? `${Math.round(position.altitude)} m` : '—'}</strong></div>
+          </div>
+          <div className="gps-meta"><span><i />实时定位中 · 更新 {updateText}</span><b>{projected.inside ? '位于校园范围内' : '当前距离校园较远'}</b></div>
+
+          <div className="gps-map">
+            <svg viewBox="0 0 100 80" aria-label="GPS 定位示意图">
+              <defs><filter id="gps-glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter></defs>
+              <rect x="6" y="6" width="88" height="68" rx="6" fill="#04101f" stroke="#2f6ba3" strokeOpacity=".42" />
+              <path d="M6 40 H94 M50 6 V74" stroke="#3b82f6" strokeOpacity=".12" />
+              {SAFE_POINTS.map((point) => {
+                const p = projectToMap(point.lat, point.lng)
+                return <g key={point.id}><circle cx={p.x} cy={p.y} r="1.7" fill="#22c55e" /><text x={p.x + 2.3} y={p.y + 1.2} fontSize="3.3" fill="#9fd8b6">{point.name}</text></g>
+              })}
+              {nearest && nearestPoint && <line x1={userPoint.x} y1={userPoint.y} x2={nearestPoint.x} y2={nearestPoint.y} stroke="#f59e0b" strokeWidth=".7" strokeDasharray="2 1.4" />}
+              <circle cx={userPoint.x} cy={userPoint.y} r="3.2" fill="#38bdf8" opacity=".25"><animate attributeName="r" values="2.4;4.6;2.4" dur="1.8s" repeatCount="indefinite" /></circle>
+              <circle cx={userPoint.x} cy={userPoint.y} r="1.8" fill="#38bdf8" filter="url(#gps-glow)" />
+              <text x={userPoint.x + 2.8} y={userPoint.y - 1.6} fontSize="3.5" fill="#bfe6ff">当前位置</text>
+            </svg>
+          </div>
+
+          <div className="gps-safe-list">
+            {ranked.map((item, index) => (
+              <div className={`gps-safe-row ${index === 0 ? 'nearest' : ''}`} key={item.id}>
+                <span className="gps-safe-badge">{index === 0 ? '最近' : index + 1}</span>
+                <div><strong>{item.name}</strong><small>{formatDistance(item.distance)} · 方向 {directionLabel(item.bearing)} {Math.round(item.bearing)}°</small></div>
+                {index === 0 && <Navigation size={15} style={{ transform: `rotate(${item.bearing}deg)` }} />}
+              </div>
+            ))}
+          </div>
+
+          <div className="gps-actions">
+            <button type="button" onClick={() => window.open(`https://maps.apple.com/?ll=${position.lat},${position.lng}&q=${encodeURIComponent('当前位置')}`, '_blank')}><MapPin size={14} />在地图中查看</button>
+            <button type="button" onClick={stop}><X size={14} />停止定位</button>
+          </div>
+          <p className="gps-note"><Info size={12} />安全点为演示参考坐标，可在代码中替换为真实校园出口坐标；GPS 数据仅在本机使用。</p>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -692,6 +851,8 @@ function CompassPage({ frame }) {
       {mode === 'ar' && <ArEvacuationView route={route} risk={frame?.risk || 'low'} />}
       {mode === 'compass' && !tracking && <button type="button" className="compass-enable compass-enable-large" onClick={enableCompass}><Compass size={16} />开启手机指南针并开始引导</button>}
       {mode === 'compass' && <div className="compass-status compass-status-page"><span><i className={tracking ? 'online' : ''} />{tracking ? `实时方向 ${Math.round(heading)}°` : permission === 'denied' ? '未授权，使用模拟方向演示' : '当前为模拟方向'}</span><b>最高温 {Number(frame?.maxTemp || 0).toFixed(1)}°C</b></div>}
+
+      <GpsPanel />
 
       <div className="section-title"><strong>选择最近安全出口</strong><span>根据风险动态排序</span></div>
       <div className="exit-choice-list">
