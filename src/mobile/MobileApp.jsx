@@ -59,6 +59,8 @@ import {
 
 import AlarmCenterView from './AlarmCenterView.jsx'
 import AlarmOverlay from './AlarmOverlay.jsx'
+import AiCommandSheet from './AiCommandSheet.jsx'
+import { HazardReport, InspectionPanel, ReportButton, exportIncidentPdf, openPdfReport } from './EmergencyPanels.jsx'
 import CityMap from './CityMap.jsx'
 import EvacuationView from './EvacuationView.jsx'
 import { SPOT_MAPPING_NOTE, campusLocationForNode } from './campus.js'
@@ -67,6 +69,7 @@ import { advanceCrowd, createCrowdState } from './crowd.js'
 // 3D 引擎（three.js）体积较大，只有打开校园三维视图时才加载
 const Campus3D = lazy(() => import('./Campus3D.jsx'))
 import { BUILDING, FLOOR_COUNT, positionNodeId } from './building.js'
+import ArNavigator from '../user/ArNavigator.jsx'
 import { planRoute } from './evacuation.js'
 import { DEFAULT_THRESHOLDS, createFrame, normalizePacket, riskFromMaxTemp } from './thermal.js'
 import {
@@ -351,7 +354,7 @@ function HomePage({ inputCameraRef, inputGalleryRef, image, fileName, detecting,
   )
 }
 
-function AlertsPage({ alerts }) {
+function AlertsPage({ alerts, onToast }) {
   const [riskFilter, setRiskFilter] = useState('全部')
   const [timeFilter, setTimeFilter] = useState('全部时间')
   const [selected, setSelected] = useState(null)
@@ -375,6 +378,34 @@ function AlertsPage({ alerts }) {
   return (
     <div className="mobile-page">
       <header className="page-heading"><span>预警记录</span><h1>检测日志</h1><p>自动留存检测日志，支持事后回溯分析起火原因与蔓延过程</p></header>
+      {alerts.length > 0 && (
+        <div className="record-toolbar">
+          <ReportButton
+            className="record-export"
+            label="导出处置报告（PDF）"
+            onDone={(state) => onToast?.(state === 'saved' ? '处置报告已保存为 PDF 文件' : '已在新标签页打开报告，可按 ⌘P 存为 PDF')}
+            build={() => {
+              const worst = alerts.some((item) => item.risk === 'high')
+                ? 'high'
+                : alerts.some((item) => item.risk === 'medium') ? 'medium' : 'low'
+              const maxTemp = Math.max(...alerts.map((item) => Number(item.temp) || 0))
+              return {
+                system: '热感哨兵 · 系统端',
+                generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+                location: '澳门科技大学校园数字孪生 · 检测日志汇总',
+                risk: worst,
+                riskLabel: riskTitle(worst),
+                riskIndex: Math.min(99, Math.round(maxTemp)),
+                maxTemp,
+                hotspotCount: alerts.reduce((sum, item) => sum + (item.hotspots || 0), 0),
+                recommendedExit: '1 楼大堂正门',
+                notes: `共 ${alerts.length} 条记录：${alerts.slice(0, 3).map((item) => `${item.zone}（${item.time}，${item.temp.toFixed(1)}°C）`).join('；')}。`,
+              }
+            }}
+          />
+          <span className="record-toolbar-hint">导出后在新标签页按 ⌘P / Ctrl+P 可存成 PDF 文件</span>
+        </div>
+      )}
       <div className="filter-row">{['全部', '高风险', '中风险', '低风险'].map((item) => <button type="button" className={riskFilter === item ? 'active' : ''} key={item} onClick={() => setRiskFilter(item)}>{item}</button>)}</div>
       <div className="filter-row secondary">{['全部时间', '今天', '最近7天'].map((item) => <button type="button" className={timeFilter === item ? 'active' : ''} key={item} onClick={() => setTimeFilter(item)}>{item}</button>)}</div>
       {filtered.map((item) => (
@@ -727,6 +758,8 @@ function AboutPage({ onBack }) {
       <section className="mobile-card principle-card"><div className="card-head"><div><strong>技术原理</strong><small>多模态融合识别</small></div><Cpu size={19} /></div><div className="principle-flow"><div><ScanLine size={20} /><strong>YOLO检测</strong><span>火焰与烟雾目标</span></div><ArrowRight size={16} /><div><Thermometer size={20} /><strong>温度融合</strong><span>热区轮廓与梯度</span></div><ArrowRight size={16} /><div><ShieldAlert size={20} /><strong>风险判断</strong><span>灾前分级预警</span></div></div></section>
       <section className="mobile-card innovation-card"><div className="card-head"><div><strong>六大核心创新</strong><small>AI火警网警的优势</small></div><Sparkles size={18} /></div>{[['灾前预警', '在明火和烟雾出现前识别温度异常'], ['精准定位', '红橙热区标注高温隐患位置'], ['多级研判', '温度轮廓、扩散梯度、持续特征综合分析'], ['低误报率', '区分人员、设备和正常热源'], ['3D热感重建', '将热成像板数据映射到空间热源场景'], ['智能疏散导航', '指南针结合安全出口动态引导撤离']].map(([title, text], index) => <div className="innovation-row" key={title}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{title}</strong><p>{text}</p></div></div>)}</section>
       <section className="mobile-card advantage-card"><div><ShieldCheck size={19} /><strong>复杂场景适配</strong></div><p>适配老旧楼宇、仓库、配电房和人员密集楼道，无需大规模重新布线，硬件成本可控，适合民用普及。</p></section>
+      <InspectionPanel />
+      <HazardReport />
       <div className="disclaimer"><ShieldAlert size={17} /><p>本系统为科研演示原型，不替代专业消防检测设备与灭火系统。</p></div>
     </div>
   )
@@ -735,6 +768,9 @@ function AboutPage({ onBack }) {
 export default function MobileApp() {
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [showDevices, setShowDevices] = useState(false)
+  const [showAiSheet, setShowAiSheet] = useState(false)
+  const [arOpen, setArOpen] = useState(false)
+  const [reportBusy, setReportBusy] = useState(false)
   const [phase, setPhase] = useState(0)
   const [frame, setFrame] = useState(() => createFrame())
   const [image, setImage] = useState('')
@@ -966,6 +1002,23 @@ export default function MobileApp() {
     [position.floor, position.spot, fire, elapsedSec, blockedNodes],
   )
 
+  // AR 实景导航（系统端同样可用）：方向、距离、剩余楼层都直接取自同一条疏散路线
+  const arStartNode = route?.startId ? BUILDING.nodes[route.startId] : null
+  const arNextNode = route?.ok && route.path?.[1] ? BUILDING.nodes[route.path[1]] : null
+  const arTargetNode = arNextNode || (route?.ok ? BUILDING.nodes[route.exitId] : null)
+  const arBearing = arStartNode && arTargetNode
+    ? ((Math.atan2(arTargetNode.x - arStartNode.x, -(arTargetNode.y - arStartNode.y)) * 180) / Math.PI + 360) % 360
+    : 0
+  const arExitFloor = route?.ok ? BUILDING.nodes[route.exitId]?.floor ?? 1 : null
+  const arRemainingFloors = arExitFloor == null
+    ? '—'
+    : arExitFloor === position.floor
+      ? '同层'
+      : `${Math.abs(position.floor - arExitFloor)} 层 · ${position.floor > arExitFloor ? '下行' : '上行'}`
+  const arProximity = route?.ok ? Math.max(0, Math.min(1, 1 - route.meters / 120)) : 0
+  const arAtExit = Boolean(route?.ok && route.meters <= 6)
+  const arProximityText = !route?.ok ? '' : arAtExit ? '就在这里' : arProximity > 0.62 ? '就在附近' : arProximity > 0.3 ? '接近中' : '按箭头前进'
+
   // 校园 3D：把火源（可能多处）映射为校园建筑 + 楼层
   const campusFires = useMemo(() => {
     if (!fire) return []
@@ -983,6 +1036,28 @@ export default function MobileApp() {
   const fireLocationDetail = fire
     ? `${campusLocationForNode(fire.nodeId)?.label ?? `${fireFloorForCrowd} 楼`}${fire.floor ? `（${fire.floor} 楼·${fire.nodeId}）` : `（${fire.nodeId}）`}`
     : null
+
+  // 处置报告（导出为 PDF）：把当前这一刻的判定、路线与人流写进同一份报告
+  const buildIncidentReport = () => ({
+    system: '热感哨兵 · AI 火警预警与动态疏散系统',
+    generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    location: fireLocationDetail || alarm?.location || '澳门科技大学校园数字孪生',
+    risk: alarm?.risk || resultRisk,
+    riskLabel: riskTitle(alarm?.risk || resultRisk),
+    riskIndex: Math.min(99, Math.round(Number(result.maxTemp) || 0)),
+    maxTemp: Number(result.maxTemp) || 0,
+    hotspotCount: result.hotspots?.length ?? 0,
+    recommendedExit: route?.ok ? route.exitLabel : '最近安全出口',
+    evacuationDistance: route?.ok ? Math.round(route.meters) : null,
+    evacuationEta: route?.ok ? Math.round(route.meters / 1.2) : null,
+    occupancy: crowd?.totals?.remaining ?? null,
+    notes: [
+      `起火点：${fireLocationDetail || '未定位'}`,
+      alarm?.mode === 'drill' ? '本次为演练报警' : null,
+      `在场人员：共 ${crowd?.totals?.total ?? '—'} 人，未撤离 ${crowd?.totals?.remaining ?? '—'} 人`,
+      blockedNodes?.length ? `已封锁通道：${blockedNodes.join('、')}` : null,
+    ].filter(Boolean).join('；'),
+  })
   // ?demo=1 一键演示模式（人流节奏放快、并高亮人流监看面板）
   const demoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1'
   useEffect(() => {
@@ -1380,7 +1455,7 @@ export default function MobileApp() {
         />
       )
     }
-    if (activeTab === 'alerts') return <AlertsPage alerts={alerts} />
+    if (activeTab === 'alerts') return <AlertsPage alerts={alerts} onToast={setToast} />
     if (activeTab === 'evacuation') {
       return (
         <EvacuationView
@@ -1397,6 +1472,7 @@ export default function MobileApp() {
           onStartDrillAt={(nodeId, floor) => startDrill(floor, nodeId[0])}
           onSpreadFire={spreadFireUp}
           onClearFire={() => setFire(null)}
+          onOpenAr={() => setArOpen(true)}
         />
       )
     }
@@ -1425,6 +1501,9 @@ export default function MobileApp() {
         </span>
         <div className="top-actions">
           <ConnectionBadge state={connection} />
+          <button type="button" className="ai-entry" title="AI 指挥 · 本地模型接口" onClick={() => setShowAiSheet(true)}>
+            <Cpu size={15} /><span>AI 指挥</span>
+          </button>
           <a className="peer-link" href="./user-app.html" title="切换到用户端">用户端</a>
           <button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button>
         </div>
@@ -1477,6 +1556,21 @@ export default function MobileApp() {
         {tabs.map(({ id, label, icon: Icon }) => <button type="button" className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}><Icon size={20} /><span>{label}</span></button>)}
       </nav>
       {showDevices && <DeviceSheet devices={devices} activeDevice={activeDevice} connection={connection} error={error} onClose={() => setShowDevices(false)} onConnect={connectDevice} onDisconnect={disconnect} onSave={saveDevice} onDelete={(id) => setDevices((current) => current.filter((device) => device.id !== id))} />}
+      {showAiSheet && <AiCommandSheet onClose={() => setShowAiSheet(false)} onSaved={() => setToast('AI 指挥设置已保存')} />}
+      {arOpen && (
+        <ArNavigator
+          route={route}
+          fire={fire}
+          proximity={arProximity}
+          atExit={arAtExit}
+          proximityText={arProximityText}
+          bearing={arBearing}
+          targetLabel={route?.ok ? route.exitLabel : '最近安全出口'}
+          remainingFloors={arRemainingFloors}
+          positionSource={`指挥端视角 · ${position.floor} 楼 ${position.spot}`}
+          onClose={() => setArOpen(false)}
+        />
+      )}
       {cameraSheet && <CameraSheet editing={cameraSheet.camera} onClose={() => setCameraSheet(null)} onSave={saveCamera} />}
       {toast && <div className="toast-message">{toast}</div>}
       {alarm && overlayOpen && (
@@ -1496,6 +1590,17 @@ export default function MobileApp() {
           onStopDrill={stopDrill}
           onSpreadFire={spreadFireUp}
           onEnableSound={enableSound}
+          onExportReport={() => {
+            setReportBusy(true)
+            exportIncidentPdf(buildIncidentReport())
+              .then(() => setToast('处置报告已保存为 PDF 文件'))
+              .catch(() => {
+                const opened = openPdfReport(buildIncidentReport())
+                setToast(opened ? '已在新标签页打开处置报告，可按 ⌘P 存为 PDF' : '报告生成失败，请重试')
+              })
+              .finally(() => setReportBusy(false))
+          }}
+          reportBusy={reportBusy}
         />
       )}
     </div>

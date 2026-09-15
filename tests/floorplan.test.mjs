@@ -2,10 +2,13 @@
 // 这些计算决定「按路线图撤离」时箭头指向与每步文案是否正确。
 
 import {
+  applyPlanRecognition,
+  buildPlanRecognitionPrompt,
   buildPlanRoute,
   currentStep,
   imageBearing,
   normalizeDeg,
+  parsePlanRecognition,
 } from '../src/user/floorplan.js'
 
 let failures = 0
@@ -73,6 +76,31 @@ console.log('[4] 朝向校正（图上方不是北时）')
     exit: { x: 0.5, y: 0.1 },
   })
   check('罗盘方位 = 图内方位 + 校正角', close(plan.instructions[0].compassBearing, 90, 0.01), `${plan.instructions[0].compassBearing}`)
+}
+
+console.log('[5] 本地模型复核（AI 辅助）：提示词、回复解析、名称回填')
+{
+  const analysis = {
+    exits: [{ x: 0.82, y: 0.5, area: 120 }, { x: 0.12, y: 0.48, area: 90 }],
+    extinguishers: [{ x: 0.4, y: 0.6, area: 30 }],
+  }
+  const prompt = buildPlanRecognitionPrompt(analysis, { floor: 4, fireText: '4 楼东侧' })
+  check('提示词里带上每个候选出口的编号与坐标', prompt.includes('1. 图内坐标 (0.82, 0.50)') && prompt.includes('2. 图内坐标 (0.12, 0.48)'))
+  check('提示词要求只回 JSON', prompt.includes('只回答一个 JSON'))
+  check('提示词带上楼层与火源', prompt.includes('4 楼') && prompt.includes('4 楼东侧'))
+
+  const parsed = parsePlanRecognition('好的，结果如下：\n{"exitLabels":["东侧楼梯间","西侧楼梯间"],"recommendedExit":2,"rooms":["机房"],"corridor":"东西向主通道","notes":"东侧近火源，建议走西侧"}\n以上。')
+  check('能从夹杂文字里取出 JSON', parsed?.exitLabels?.[0] === '东侧楼梯间')
+  check('推荐出口按 0 基索引解析', parsed?.recommendedExit === 2)
+  check('读不出的字段给空值', parsePlanRecognition('{"exitLabels":[]}')?.recommendedExit !== undefined)
+  check('完全不是 JSON 时返回 null', parsePlanRecognition('抱歉我无法识别') === null)
+  check('空输入返回 null', parsePlanRecognition('') === null)
+
+  const merged = applyPlanRecognition(analysis, parsed)
+  check('名称贴回候选出口', merged.exits[0].label === '东侧楼梯间' && merged.exits[1].label === '西侧楼梯间')
+  check('位置仍用启发式坐标', merged.exits[0].x === 0.82)
+  check('推荐索引越界时退回第一个出口', applyPlanRecognition(analysis, { exitLabels: ['A'], recommendedExit: 9 }).chosen.label === 'A')
+  check('模型没给名字时保留默认名称', applyPlanRecognition(analysis, {}).exits[0].label === '候选出口 1')
 }
 
 console.log(`\n结果：${failures === 0 ? '全部通过' : `${failures} 项失败`}`)

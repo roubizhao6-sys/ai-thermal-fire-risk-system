@@ -521,7 +521,9 @@ export default function UserApp() {
             <div className="plan-note">
               <span className="plan-tag">按路线图撤离</span>
               <span>
-                {activePlan?.name ?? '本层路线图'} · {planStep?.text ?? '等待路线'}
+                {activePlan?.name ?? '本层路线图'}
+                {activePlan?.ai ? '（本地模型已复核）' : ''}
+                {planRoute.exitLabel ? ` → ${planRoute.exitLabel}` : ''} · {planStep?.text ?? '等待路线'}
                 {' · '}全程约 {Math.round(planRoute.totalMeters)} 米
               </span>
             </div>

@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronUp,
   Compass,
+  Camera,
   DoorOpen,
   Flame,
   Footprints,
@@ -47,7 +48,7 @@ function formatDuration(seconds) {
   return `约 ${minutes} 分 ${String(seconds % 60).padStart(2, '0')} 秒`
 }
 
-export default function EvacuationView({ route, fire, position, blocked, nowMs, crowd, crowdHistory, crowdDemo, onPositionChange, onToggleBlock, onStartDrillAt, onSpreadFire, onClearFire }) {
+export default function EvacuationView({ route, fire, position, blocked, nowMs, crowd, crowdHistory, crowdDemo, onPositionChange, onToggleBlock, onStartDrillAt, onSpreadFire, onClearFire, onOpenAr }) {
   const [viewFloor, setViewFloor] = useState(position.floor)
   const [follow, setFollow] = useState(false)
 
@@ -76,6 +77,14 @@ export default function EvacuationView({ route, fire, position, blocked, nowMs, 
         </div>
         <span className={`evac-badge ${fire ? 'badge-danger' : 'badge-safe'}`}>{fire ? '火警中' : '待命'}</span>
       </header>
+
+      {onOpenAr && (
+        <button className="ar-entry-button" type="button" onClick={onOpenAr}>
+          <Camera size={17} />
+          <span>AR 实景导航</span>
+          <small>举起手机，把撤离方向叠在实景画面上（与用户端同一个界面）</small>
+        </button>
+      )}
 
       <section className="mobile-card position-card">
         <div className="card-title"><div><strong>我的位置</strong><small>实际部署由蓝牙信标自动定位</small></div><Navigation size={18} /></div>

@@ -48,6 +48,9 @@ export const DEFAULT_AI_SETTINGS = {
   model: '',
   apiKey: '',
   timeoutMs: 6000,
+  // 该本地模型是否支持读图（qwen2.5-vl / llava / minicpm-v 等）。关掉时只发文字摘要，
+  // 打开后会把缩小的路线图一并交给本地模型识别——两者都不出本机网络。
+  vision: false,
 }
 
 function safeParse(raw) {
@@ -117,6 +120,50 @@ export async function aiChat(messages, settings = readAiSettings(), timeoutMs = 
         messages,
         temperature: 0.2,
         stream: false,
+      }),
+      signal: controller?.signal,
+    })
+    if (!response.ok) throw new Error(`ai-http-${response.status}`)
+    const data = await response.json()
+    const text = data?.choices?.[0]?.message?.content
+    if (!text) throw new Error('ai-empty')
+    return String(text)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// 带图片的一次调用：把（缩小后的）图片以 data URL 交给本地视觉模型。
+// 注意：data URL 只是内存里的字符串，仍然只发往 settings.baseUrl 指向的本地端点，
+// 不经过任何云端服务；端点没配或模型不支持读图时由调用方回落到纯文字或启发式结果。
+export async function aiChatVision(prompt, imageDataUrl, settings = readAiSettings(), timeoutMs = settings.timeoutMs ?? 12000) {
+  if (!settings.baseUrl || settings.provider === 'offline') {
+    throw new Error('ai-disabled')
+  }
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+  const timer = setTimeout(() => controller?.abort(), timeoutMs)
+  try {
+    const response = await fetch(`${settings.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(settings.apiKey ? { Authorization: `Bearer ${settings.apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model: settings.model || 'local-model',
+        temperature: 0.1,
+        stream: false,
+        messages: [
+          {
+            role: 'user',
+            content: imageDataUrl
+              ? [
+                { type: 'text', text: prompt },
+                { type: 'image_url', image_url: { url: imageDataUrl } },
+              ]
+              : [{ type: 'text', text: prompt }],
+          },
+        ],
       }),
       signal: controller?.signal,
     })

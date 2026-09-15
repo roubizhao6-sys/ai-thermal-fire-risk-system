@@ -9,6 +9,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Compass, Camera, CameraOff, Flashlight, RefreshCw, X } from 'lucide-react'
+// 样式与组件放在一起，用户端与系统端复用同一个 AR 界面时两边都拿得到样式
+import '../shared/ar.css'
 
 const TURN_TEXT = (turn) => {
   const abs = Math.abs(turn)

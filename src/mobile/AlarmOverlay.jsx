@@ -1,4 +1,4 @@
-import { AlertTriangle, BellRing, Flame, Route, ShieldCheck, Volume2, VolumeX, X } from 'lucide-react'
+import { AlertTriangle, BellRing, FileText, Flame, Route, ShieldCheck, Volume2, VolumeX, X } from 'lucide-react'
 
 function formatElapsed(startedAt, nowMs) {
   const seconds = Math.max(0, Math.round((nowMs - startedAt) / 1000))
@@ -19,6 +19,8 @@ export default function AlarmOverlay({
   onSpreadFire,
   onEnableSound,
   locationDetail,
+  onExportReport,
+  reportBusy = false,
 }) {
   if (!alarm) return null
 
@@ -71,6 +73,12 @@ export default function AlarmOverlay({
           <button className="alarm-primary" type="button" onClick={onEvacuate}>
             <Route size={22} />查看逃生路线
           </button>
+
+          {onExportReport && (
+            <button className="alarm-secondary" type="button" onClick={onExportReport} disabled={reportBusy}>
+              <FileText size={17} />{reportBusy ? '正在生成报告…' : '导出处置报告（PDF）'}
+            </button>
+          )}
 
           {acknowledged ? (
             <div className="alarm-row">

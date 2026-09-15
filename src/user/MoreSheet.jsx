@@ -1,10 +1,12 @@
 // 「更多」面板：逃生路线图（上传 / 识别 / 本地保存）、AI 指挥设置、端切换入口。
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Cpu, DoorOpen, Image as ImageIcon, Link2, Save, Trash2, Upload } from 'lucide-react'
+import { Cpu, DoorOpen, Image as ImageIcon, Link2, Save, Sparkles, Trash2, Upload } from 'lucide-react'
 import { AI_PROVIDERS, aiReachable } from '../shared/aiClient.js'
 import {
+  aiReviewPlan,
   analyzePlanImage,
+  applyPlanRecognition,
   buildPlanRoute,
   deletePlan,
   fileToDataUrl,
@@ -41,11 +43,14 @@ export default function MoreSheet({
     return () => window.clearTimeout(timer)
   }, [notice])
 
+  const aiConfigured = aiSettings.provider !== 'offline' && Boolean(aiSettings.baseUrl)
+
+  // 浏览器内识别：先把"哪里像出口"找出来（离线也能跑）
   const analyze = async (dataUrl, name) => {
     setBusy('analyze')
     try {
       const result = await analyzePlanImage(dataUrl)
-      setDraft({
+      const base = {
         id: `plan-${Date.now()}`,
         name,
         floor,
@@ -54,19 +59,62 @@ export default function MoreSheet({
         upBearing: 0,
         start: { x: 0.5, y: 0.5 },
         exit: result.exits[0] ?? { x: 0.5, y: 0.08 },
-        exits: result.exits,
+        exits: (result.exits ?? []).map((item, index) => ({ ...item, label: `候选出口 ${index + 1}` })),
         extinguishers: result.extinguishers,
         ratios: result.ratios,
-        source: 'local-vision',
-      })
-      setNotice(result.exits.length
+        source: result.exits?.length ? 'local-vision' : 'manual',
+        exitLabel: '路线图出口',
+        ai: null,
+      }
+      setDraft(base)
+      setNotice(result.exits?.length
         ? `识别到 ${result.exits.length} 处候选出口（绿色疏散指示），已生成草稿路线，可点图调整起点、点绿点改出口`
         : '没有识别到绿色出口标记，请手动点选出口位置后再保存')
+      // 配了本地模型就顺手复核一次：让它给出口起名、结合火源推荐走哪个
+      if (aiConfigured) await runAiReview(base)
     } catch (error) {
       setNotice(`识别失败：${error.message}`)
     } finally {
       setBusy('')
     }
+  }
+
+  // 本地模型复核：位置仍用启发式结果，模型只负责命名与推荐，失败就退回原草稿
+  const runAiReview = async (target) => {
+    if (!target) return
+    if (!aiConfigured) {
+      setNotice('还没有配置本地模型：可在「AI 指挥」里填端点，或直接用当前识别结果')
+      return
+    }
+    setBusy('ai')
+    setNotice('正在让本地模型复核这张路线图…')
+    const recognition = await aiReviewPlan({
+      dataUrl: target.dataUrl,
+      analysis: { exits: target.exits, extinguishers: target.extinguishers },
+      floor,
+      settings: aiSettings,
+    })
+    setBusy('')
+    if (!recognition.ok) {
+      setNotice(`本地模型复核未成功（${recognition.reason ?? '未知原因'}），继续使用浏览器内的识别结果`)
+      return
+    }
+    const merged = applyPlanRecognition({ exits: target.exits }, recognition)
+    setDraft({
+      ...target,
+      exits: merged.exits,
+      exit: merged.chosen ? { x: merged.chosen.x, y: merged.chosen.y } : target.exit,
+      exitLabel: merged.chosen?.label || target.exitLabel,
+      ai: {
+        source: 'local-model',
+        vision: recognition.vision,
+        model: recognition.model,
+        notes: recognition.notes,
+        corridor: recognition.corridor,
+        rooms: recognition.rooms,
+      },
+    })
+    setNotice(`本地模型已复核：推荐「${merged.chosen?.label || '出口'}」${recognition.vision ? '（读图）' : '（按识别摘要）'}`)
   }
 
   const onPickFile = async (event) => {
@@ -154,7 +202,8 @@ export default function MoreSheet({
           <div className="more-body">
             <p className="more-hint">
               上传本层的传统疏散路线图，识别后存在手机里；火警时按图给出方向与步序，没网络也能用。
-              识别在浏览器内完成，图片不会上传到任何服务器。
+              出口位置由浏览器内识别给出；若在「AI 指挥」里配了本地模型，会再把图交给本地模型复核一遍（出口命名、推荐走哪个）。
+              两种方式都在本机完成，图片不会上传到任何服务器。
             </p>
             <div className="more-actions">
               <button type="button" className="more-primary" onClick={() => fileRef.current?.click()} disabled={busy === 'analyze'}>
@@ -197,6 +246,30 @@ export default function MoreSheet({
                   {draftRoute && draftRoute.instructions.length ? draftRoute.instructions[0].text : '等待起点与出口'}，
                   全程约 {Math.round(draftRoute?.totalMeters ?? 0)} 米。
                 </p>
+                {(draft.exits ?? []).length > 0 && (
+                  <div className="plan-exit-list">
+                    <span className="plan-exit-label">候选出口</span>
+                    {(draft.exits ?? []).map((item, index) => (
+                      <button
+                        key={`exit-pick-${index}`}
+                        type="button"
+                        className={Math.hypot(item.x - draft.exit.x, item.y - draft.exit.y) < 0.01 ? 'is-active' : ''}
+                        onClick={() => setDraft({ ...draft, exit: { x: item.x, y: item.y }, exitLabel: item.label || `候选出口 ${index + 1}` })}
+                      >
+                        {index + 1}. {item.label || `候选出口 ${index + 1}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {draft.ai && (
+                  <p className="plan-ai-note">
+                    <Sparkles size={13} />
+                    <b>本地模型复核</b>
+                    {draft.ai.vision ? '（读图）' : '（按识别摘要）'}
+                    {draft.ai.corridor ? ` · 主通道：${draft.ai.corridor}` : ''}
+                    {draft.ai.notes ? ` · ${draft.ai.notes}` : ''}
+                  </p>
+                )}
                 <div className="plan-fields">
                   <label>
                     整图宽度代表
@@ -221,6 +294,9 @@ export default function MoreSheet({
                 </div>
                 <div className="more-actions">
                   <button type="button" className="more-primary" onClick={persistDraft}><Save size={15} /> 保存到本机</button>
+                  <button type="button" onClick={() => runAiReview(draft)} disabled={busy === 'ai' || busy === 'analyze'}>
+                    <Sparkles size={15} /> {busy === 'ai' ? '复核中…' : 'AI 复核'}
+                  </button>
                   <button type="button" onClick={() => setDraft(null)}>放弃</button>
                 </div>
               </div>
@@ -233,7 +309,12 @@ export default function MoreSheet({
                 <div className={`plan-row ${plan.id === savedActive?.id ? 'is-active' : ''}`} key={plan.id}>
                   <div>
                     <strong>{plan.name}</strong>
-                    <small>{plan.floor ?? floor} 楼 · {plan.source === 'local-vision' ? '本地识别' : '手动'} · {new Date(plan.updatedAt ?? plan.createdAt).toLocaleDateString()}</small>
+                    <small>
+                      {plan.floor ?? floor} 楼 · {plan.source === 'local-vision' ? '浏览器内识别' : '手动选点'}
+                      {plan.ai ? ' · 本地模型已复核' : ''}
+                      {plan.exitLabel ? ` · 出口：${plan.exitLabel}` : ''}
+                      {' · '}{new Date(plan.updatedAt ?? plan.createdAt).toLocaleDateString()}
+                    </small>
                   </div>
                   <button type="button" onClick={() => onActivePlanChange(plan.id)} aria-pressed={plan.id === savedActive?.id}>
                     {plan.id === savedActive?.id ? '使用中' : '设为当前'}
@@ -298,6 +379,19 @@ export default function MoreSheet({
                 disabled={aiSettings.provider === 'offline'}
               />
             </label>
+            <label className="ai-check">
+              <input
+                type="checkbox"
+                checked={Boolean(aiSettings.vision)}
+                onChange={(event) => onAiSettingsChange({ vision: event.target.checked })}
+                disabled={aiSettings.provider === 'offline'}
+              />
+              该模型支持读图（视觉模型，如 qwen2.5-vl / llava / minicpm-v）
+            </label>
+            <p className="ai-preset-hint">
+              勾上后，上传路线图时会把缩小后的图片一并发给这个本地端点做识别；不勾只发文字摘要。
+              两者都只在你填的地址内网流转，图片不会上传到任何服务器。
+            </p>
             <div className="more-actions">
               <button type="button" className="more-primary" onClick={testAi} disabled={probe === 'testing' || aiSettings.provider === 'offline'}>
                 <Cpu size={15} /> {probe === 'testing' ? '正在测试…' : '测试连接'}

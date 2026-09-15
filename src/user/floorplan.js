@@ -4,6 +4,8 @@
 // 没有模型时用浏览器内的颜色/线条启发式给出一份"草稿"，由用户点一下确认，
 // 这样现场没有网络也能用（AI 辅助 + 人工确认）。
 
+import { aiChatVision, readAiSettings } from '../shared/aiClient.js'
+
 export const PLAN_DB = 'thermalGuardPlans'
 export const PLAN_STORE = 'plans'
 
@@ -186,6 +188,123 @@ function clusterCells(mask, cols, rows, cell, width, height) {
 }
 
 // ---------------------------------------------------------------- 按图指引
+
+// ---------------------------------------------------------------- 本地模型复核（AI 辅助）
+//
+// 分工：启发式负责"哪里像出口"（像素级、可解释），本地模型负责"这个出口叫什么、走哪个更合理"。
+// 两者都在本机完成，模型端点由用户自己填；模型不可用时只返回启发式结果，流程不中断。
+
+const AI_MAX_SIDE = 768
+
+export function downscaleDataUrl(dataUrl, maxSide = AI_MAX_SIDE, quality = 0.72) {
+  return new Promise((resolve) => {
+    if (typeof document === 'undefined') {
+      resolve({ dataUrl, width: 0, height: 0 })
+      return
+    }
+    const image = new Image()
+    image.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height))
+      const width = Math.max(1, Math.round(image.width * scale))
+      const height = Math.max(1, Math.round(image.height * scale))
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        resolve({ dataUrl, width: image.width, height: image.height })
+        return
+      }
+      ctx.drawImage(image, 0, 0, width, height)
+      try {
+        resolve({ dataUrl: canvas.toDataURL('image/jpeg', quality), width, height })
+      } catch {
+        resolve({ dataUrl, width, height })
+      }
+    }
+    image.onerror = () => resolve({ dataUrl, width: 0, height: 0 })
+    image.src = dataUrl
+  })
+}
+
+// 给本地模型的任务描述：只让它做"命名 + 选哪个出口"，位置由启发式给出，避免模型乱报坐标
+export function buildPlanRecognitionPrompt(analysis = {}, context = {}) {
+  const exits = (analysis.exits ?? []).map((item, index) => (
+    `  ${index + 1}. 图内坐标 (${item.x.toFixed(2)}, ${item.y.toFixed(2)})，图上方为北`
+  ))
+  const extinguishers = (analysis.extinguishers ?? [])
+    .map((item, index) => `  ${index + 1}. (${item.x.toFixed(2)}, ${item.y.toFixed(2)})`)
+  return [
+    '这是一张传统火灾疏散路线图（平面图）。系统已经用颜色检测找出若干候选出口（绿色疏散指示）与消防设施（红色）。',
+    `楼层：${context.floor ?? '未知'} 楼。当前火源位置：${context.fireText ?? '未知'}。`,
+    '',
+    '候选出口：',
+    ...(exits.length ? exits : ['  （未检测到绿色标记）']),
+    '消防设施（红色）：',
+    ...(extinguishers.length ? extinguishers : ['  （未检测到）']),
+    '',
+    '请只回答一个 JSON，不要任何解释文字，字段如下：',
+    '{"exitLabels":["每个候选出口的中文名称，按上面编号顺序"],"recommendedExit":1,"rooms":["图中能读出的房间/区域名称"],"corridor":"一句话描述主疏散通道走向","notes":"结合当前火源，说明为什么推荐这个出口"}',
+    '规则：名称要短（如"东侧楼梯间""南门""中庭扶梯口"）；读不出来的字段给空字符串或空数组；不要编造图上没有的房间名。',
+  ].join('\n')
+}
+
+// 解析模型回复（纯函数，便于单测）：容错地取出第一段 JSON
+export function parsePlanRecognition(text) {
+  if (!text) return null
+  const start = String(text).indexOf('{')
+  const end = String(text).lastIndexOf('}')
+  if (start < 0 || end <= start) return null
+  let parsed = null
+  try {
+    parsed = JSON.parse(String(text).slice(start, end + 1))
+  } catch {
+    return null
+  }
+  if (!parsed || typeof parsed !== 'object') return null
+  const labels = Array.isArray(parsed.exitLabels)
+    ? parsed.exitLabels.map((item) => String(item ?? '').trim().slice(0, 16))
+    : []
+  const rooms = Array.isArray(parsed.rooms)
+    ? parsed.rooms.map((item) => String(item ?? '').trim().slice(0, 16)).filter(Boolean).slice(0, 8)
+    : []
+  const recommended = Number.isFinite(Number(parsed.recommendedExit)) ? Number(parsed.recommendedExit) : NaN
+  return {
+    exitLabels: labels,
+    recommendedExit: Number.isInteger(recommended) ? recommended : NaN,
+    rooms,
+    corridor: String(parsed.corridor ?? '').slice(0, 60),
+    notes: String(parsed.notes ?? '').slice(0, 120),
+  }
+}
+
+// 统一入口：有本地模型就让模型复核，没有就返回 null 让调用方继续用启发式结果。永不抛异常。
+export async function aiReviewPlan({ dataUrl, analysis, floor, fireText, settings = readAiSettings() } = {}) {
+  if (!settings || settings.provider === 'offline' || !settings.baseUrl) {
+    return { ok: false, source: 'offline', reason: 'ai-disabled' }
+  }
+  const prompt = buildPlanRecognitionPrompt(analysis, { floor, fireText })
+  const image = settings.vision ? await downscaleDataUrl(dataUrl) : { dataUrl: '' }
+  try {
+    const text = await aiChatVision(prompt, settings.vision ? image.dataUrl : '', settings, settings.timeoutMs ?? 15000)
+    const parsed = parsePlanRecognition(text)
+    if (!parsed) return { ok: false, source: 'local-model', reason: 'reply-not-json', reply: String(text).slice(0, 120) }
+    return { ok: true, source: 'local-model', vision: Boolean(settings.vision), model: settings.model, ...parsed }
+  } catch (error) {
+    return { ok: false, source: 'local-model', reason: String(error?.message ?? error) }
+  }
+}
+
+// 把模型给的名称贴回候选出口（位置仍用启发式结果），并挑出推荐的出口
+export function applyPlanRecognition(analysis, recognition) {
+  const exits = (analysis.exits ?? []).map((item, index) => ({
+    ...item,
+    label: recognition?.exitLabels?.[index] || item.label || `候选出口 ${index + 1}`,
+  }))
+  const recommended = Number.isInteger(recognition?.recommendedExit) ? recognition.recommendedExit : -1
+  const chosen = exits[recommended] ?? exits[0] ?? null
+  return { exits, chosen, recommended }
+}
 
 export function normalizeDeg(value) {
   return ((value % 360) + 360) % 360
