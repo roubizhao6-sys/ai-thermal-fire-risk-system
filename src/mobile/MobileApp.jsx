@@ -77,6 +77,9 @@ import {
   X,
   Zap,
 } from 'lucide-react'
+import AlarmOverlay from './AlarmOverlay.jsx'
+import AlarmCenterView from './AlarmCenterView.jsx'
+import { unlockAudio, isAudioUnlocked, startSiren, stopSiren, setSirenIntensity, speak, stopSpeak, vibrateAlarm, stopVibrate, ALARM_VIBRATION_INTERVAL } from './alarm.js'
 
 const DEMO_THERMAL = `${import.meta.env.BASE_URL}demo-thermal.jpg`
 const DEMO_LIVE = `${import.meta.env.BASE_URL}demo-live.gif`
@@ -2338,6 +2341,100 @@ export default function MobileApp() {
   const [showDrill, setShowDrill] = useState(false)
   const [showCommandCenter, setShowCommandCenter] = useState(() => { try { return new URLSearchParams(window.location.search).get('cmd') === '1' } catch { return false } })
   const [spriteOpen, setSpriteOpen] = useState(false)
+  const [showAlarmCenter, setShowAlarmCenter] = useState(false)
+  const [alarm, setAlarm] = useState(null)
+  const [fire, setFire] = useState(null)
+  const [alarmDismissed, setAlarmDismissed] = useState(false)
+  const [alarmAlerts, setAlarmAlerts] = useState([])
+  const [alarmSettings, setAlarmSettings] = useState(() => {
+    const defaults = { sound: true, voice: true, vibrate: true, autoTrigger: false, highThreshold: 65, mediumThreshold: 45, escalateSec: 30 }
+    try { return { ...defaults, ...(JSON.parse(localStorage.getItem('thermalGuardAlarmSettings') || 'null') || {}) } } catch { return defaults }
+  })
+  const [audioReady, setAudioReady] = useState(false)
+  const [nowMs, setNowMs] = useState(Date.now())
+  const autoTriggeredRef = useRef(false)
+
+  useEffect(() => { try { localStorage.setItem('thermalGuardAlarmSettings', JSON.stringify(alarmSettings)) } catch {} }, [alarmSettings])
+
+  useEffect(() => {
+    if (!alarm) return undefined
+    const id = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [alarm])
+
+  const pushAlarmAlert = (record) => setAlarmAlerts((cur) => [record, ...cur].slice(0, 30))
+
+  const triggerAlarm = (payload) => {
+    const rec = {
+      mode: payload.mode || 'live',
+      startedAt: Date.now(),
+      temp: payload.temp,
+      risk: payload.risk || 'high',
+      location: payload.location || '热像仪监测点',
+      sourceLabel: payload.sourceLabel || '传感器',
+      acknowledged: false,
+      escalated: false,
+    }
+    setAlarm(rec)
+    setAlarmDismissed(false)
+    setFire(payload.mode === 'drill' ? { mode: 'drill', floor: payload.floor, spot: payload.spot } : null)
+    pushAlarmAlert({ id: `al-${Date.now()}`, kind: 'alarm', mode: rec.mode, risk: rec.risk, temp: rec.temp, location: rec.location, time: new Date().toLocaleString('zh-CN', { hour12: false }), handled: false })
+  }
+
+  const manualAlarm = () => { if (!alarm) triggerAlarm({ mode: 'live', temp: Number(frame?.maxTemp || 0), risk: 'high', location: '手动触发演示', sourceLabel: '手动' }) }
+  const startDrill = (floor, spot) => {
+    const label = { A: 'A 楼梯口', C: '走廊中段', B: 'B 楼梯口' }[spot] || spot
+    triggerAlarm({ mode: 'drill', floor, spot, temp: 82, risk: 'high', location: `${floor} 层 ${label}`, sourceLabel: '演练' })
+  }
+  const stopDrill = () => { setAlarm(null); setFire(null); setAlarmDismissed(false); stopSiren(); stopSpeak(); stopVibrate() }
+  const clearFire = () => setFire(null)
+  const acknowledge = () => setAlarm((a) => (a ? { ...a, acknowledged: true } : a))
+  const reenforce = () => { setAlarm((a) => (a ? { ...a, acknowledged: false, escalated: false } : a)); setAlarmDismissed(false) }
+  const resolveAlarm = () => { setAlarm(null); setFire(null); setAlarmDismissed(false) }
+  const spreadFire = () => setFire((f) => (f && f.floor ? { ...f, floor: f.floor + 1 } : f))
+  const markHandled = (id) => setAlarmAlerts((cur) => cur.map((a) => (a.id === id ? { ...a, handled: true } : a)))
+  const clearAlarms = () => setAlarmAlerts([])
+  const enableSound = async () => { const ok = await unlockAudio(); setAudioReady(ok || isAudioUnlocked()) }
+  const exportAlarmReport = () => {
+    const r = planEvacuation(frame)
+    openPdfReport({ system: '燧瞳智感 AI火警网警系统', generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }), location: alarm?.location || '火情位置', risk: alarm?.risk || 'high', riskLabel: riskTitle(alarm?.risk || 'high'), riskIndex: 92, maxTemp: Number(alarm?.temp || 0), hotspotCount: 1, recommendedExit: buildingGraph.nodes[r.path[r.path.length - 1]]?.label || '最近安全出口', evacuationDistance: r.distance, evacuationEta: r.eta })
+  }
+
+  useEffect(() => {
+    if (!alarm) { stopSiren(); stopSpeak(); stopVibrate(); return undefined }
+    const active = !alarm.acknowledged && !alarmDismissed
+    if (active && alarmSettings.sound && audioReady) startSiren(alarm.escalated ? 'escalated' : alarm.mode === 'drill' ? 'drill' : 'normal')
+    else stopSiren()
+    let speechTimer
+    let vibrateTimer
+    if (active && alarmSettings.voice) {
+      const say = () => { try { speak('检测到火警，请立即沿逃生路线撤离，不要搭乘电梯。') } catch {} }
+      say()
+      speechTimer = setInterval(say, 12000)
+    }
+    if (active && alarmSettings.vibrate) {
+      vibrateAlarm()
+      vibrateTimer = setInterval(() => vibrateAlarm(), ALARM_VIBRATION_INTERVAL)
+    }
+    return () => { if (speechTimer) clearInterval(speechTimer); if (vibrateTimer) clearInterval(vibrateTimer); stopSiren(); stopSpeak(); stopVibrate() }
+  }, [alarm, alarmSettings.sound, alarmSettings.voice, alarmSettings.vibrate, alarmDismissed, audioReady])
+
+  useEffect(() => {
+    if (!alarm || alarm.acknowledged || alarm.escalated || !alarmSettings.escalateSec) return undefined
+    const id = setTimeout(() => setAlarm((a) => (a && !a.escalated ? { ...a, escalated: true } : a)), alarmSettings.escalateSec * 1000)
+    return () => clearTimeout(id)
+  }, [alarm?.startedAt, alarm?.acknowledged, alarmSettings.escalateSec])
+
+  useEffect(() => { if (alarm?.escalated && !alarm.acknowledged && audioReady) setSirenIntensity('escalated') }, [alarm?.escalated, alarm?.acknowledged, audioReady])
+
+  useEffect(() => {
+    if (!alarmSettings.autoTrigger || alarm) return undefined
+    if (frame?.risk === 'high' && !autoTriggeredRef.current) {
+      autoTriggeredRef.current = true
+      triggerAlarm({ mode: 'live', temp: Number(frame?.maxTemp || 0), risk: 'high', location: '热像仪自动触发', sourceLabel: '传感器' })
+    }
+    if (frame?.risk !== 'high') autoTriggeredRef.current = false
+  }, [frame?.risk, alarmSettings.autoTrigger, alarm])
   const [aiGatewayUrl, setAiGatewayUrl] = useState(() => { try { return localStorage.getItem('thermalGuardAIGateway') || 'ws://127.0.0.1:8787/ws/detections' } catch { return 'ws://127.0.0.1:8787/ws/detections' } })
   const [aiConnection, setAiConnection] = useState('disconnected')
   const [aiDetections, setAiDetections] = useState([])
@@ -2614,7 +2711,7 @@ export default function MobileApp() {
     <div className="mobile-app-shell">
       <header className="mobile-topbar">
         <div className="mobile-brand"><span><Flame size={19} /></span><div><strong>燧瞳智感</strong><small>AI火警网警</small></div></div>
-        <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="AI指挥中心" onClick={() => setShowCommandCenter(true)}><Siren size={18} /></button><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
+        <div className="top-actions"><ConnectionBadge state={connection} /><button type="button" aria-label="报警中心" onClick={() => setShowAlarmCenter(true)}><BellRing size={18} /></button><button type="button" aria-label="AI指挥中心" onClick={() => setShowCommandCenter(true)}><Siren size={18} /></button><button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button></div>
       </header>
       <main className="mobile-main">{page}</main>
       <nav className="mobile-tabs">
@@ -2625,6 +2722,20 @@ export default function MobileApp() {
       {showDrill && <DrillMode frame={frame} onClose={() => setShowDrill(false)} onComplete={completeDrill} onViewEvidence={() => { setShowDrill(false); setActiveTab('alerts') }} />}
       {showCommandCenter && <CommandCenter frame={frame} inference={inference} onClose={() => setShowCommandCenter(false)} onStartDrill={() => { setShowCommandCenter(false); setShowDrill(true) }} />}
       <AiSprite frame={frame} open={spriteOpen} onOpenChange={setSpriteOpen} />
+            {showAlarmCenter && (
+        <div className="alarm-center-overlay" onClick={() => setShowAlarmCenter(false)}>
+          <div className="alarm-center-sheet" onClick={(event) => event.stopPropagation()}>
+            <div className="alarm-center-close-row"><button type="button" onClick={() => setShowAlarmCenter(false)}><X size={18} /></button></div>
+            <AlarmCenterView alarm={alarm} fire={fire} alerts={alarmAlerts} settings={alarmSettings} audioReady={audioReady} onSettingsChange={(patch) => setAlarmSettings((cur) => ({ ...cur, ...patch }))} onManualAlarm={manualAlarm} onStartDrill={startDrill} onStopDrill={stopDrill} onClearFire={clearFire} onEnableSound={enableSound} onMarkHandled={markHandled} onClearAlerts={clearAlarms} />
+          </div>
+        </div>
+      )}
+      {alarm && !alarmDismissed && (
+        <AlarmOverlay alarm={alarm} nowMs={nowMs} soundOn={alarmSettings.sound} audioReady={audioReady} onEvacuate={() => { acknowledge(); setAlarmDismissed(true); setActiveTab('guide') }} onAcknowledge={acknowledge} onReenforce={reenforce} onResolve={resolveAlarm} onStopDrill={stopDrill} onSpreadFire={spreadFire} onEnableSound={enableSound} locationDetail={fire?.mode === 'drill' ? `${fire.floor} 层 ${fire.spot}` : undefined} onExportReport={exportAlarmReport} />
+      )}
+      {alarm && alarmDismissed && (
+        <button type="button" className="alarm-dismissed-banner" onClick={() => setAlarmDismissed(false)}><BellRing size={15} />火警进行中 · 点击返回警报</button>
+      )}
             {toast && <div className="toast-message">{toast}</div>}
     </div>
   )
