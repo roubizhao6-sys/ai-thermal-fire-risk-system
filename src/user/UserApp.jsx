@@ -8,7 +8,7 @@ import jsQR from 'jsqr'
 import {
   Camera, CheckCircle2, Flame, Navigation, Phone, ScanLine, ShieldAlert, ShieldCheck,
   Thermometer, Upload, Volume2, VolumeX, X, MapPin, AlertTriangle, LoaderCircle, RotateCcw,
-  QrCode, LocateFixed, Info, Send, Waves, Eye, BellRing,
+  QrCode, LocateFixed, Info, Send, Waves, Eye, BellRing, Image as ImageIcon, Sparkles,
 } from 'lucide-react'
 
 const DEMO = `${import.meta.env.BASE_URL}demo-thermal.jpg`
@@ -430,13 +430,60 @@ function TrappedDialogue({ exit }) {
   )
 }
 
+function UpgradeHighlights() {
+  const items = [
+    ['全屏 AR 实景导航', '摄像头叠加箭头 + 表盘兜底 + 手电筒'],
+    ['被困者自救问答', '是 / 否问答，生成自救指引并同步救援端'],
+    ['校园 GPS 定位', '经纬度换算校园坐标 + 最近安全出口'],
+    ['三路证据融合判定', '视觉 + 烟雾 + 热像，单路不报警'],
+    ['消防设施扫码巡检', '摄像头扫码识别 + 到期提醒'],
+    ['隐患随手拍上报', '拍照 + 位置，本地留存待处理'],
+    ['楼层平面图', '上传逃生平面图作为参考'],
+  ]
+  return (
+    <section className="usr-card usr-highlights">
+      <div className="usr-card-head"><div><strong>本次升级亮点</strong><small>与队友版本优势互补后的能力清单</small></div><Sparkles size={18} /></div>
+      <div className="usr-highlight-list">
+        {items.map(([title, desc], index) => (
+          <div className="usr-highlight-row" key={title}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{title}</strong><small>{desc}</small></div></div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function FloorPlanPanel() {
+  const [plan, setPlan] = useState(() => { try { return localStorage.getItem('thermalGuardPlan') || '' } catch { return '' } })
+  const fileRef = useRef(null)
+  const pick = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => { setPlan(reader.result); try { localStorage.setItem('thermalGuardPlan', reader.result) } catch {} }
+    reader.readAsDataURL(file)
+  }
+  const clear = () => { setPlan(''); try { localStorage.removeItem('thermalGuardPlan') } catch {} }
+  return (
+    <section className="usr-card usr-plan-card">
+      <div className="usr-card-head"><div><strong>我的楼层平面图</strong><small>上传后作为火警逃生参考图</small></div><ImageIcon size={18} /></div>
+      {plan
+        ? <><img className="usr-plan-img" src={plan} alt="楼层平面图" /><div className="usr-plan-actions"><button type="button" onClick={() => fileRef.current?.click()}><Upload size={14} />更换</button><button type="button" onClick={clear}><X size={14} />删除</button></div></>
+        : <button type="button" className="usr-plan-add" onClick={() => fileRef.current?.click()}><Upload size={16} />上传楼层平面图</button>}
+      <input ref={fileRef} type="file" accept="image/*" onChange={pick} style={{ display: 'none' }} />
+      <p className="usr-note"><Info size={12} />图片仅保存在本机，用于火警时参考。</p>
+    </section>
+  )
+}
+
 function MorePage() {
   return (
     <div className="usr-page">
-      <header className="usr-page-head"><span>更多功能</span><h1>定位 · 巡检 · 上报</h1><p>辅助消防安全的实用工具</p></header>
+      <header className="usr-page-head"><span>功能中心</span><h1>升级后的实用工具</h1><p>定位 · 巡检 · 上报 · 平面图</p></header>
+      <UpgradeHighlights />
       <GpsPanel />
       <InspectionPanel />
       <HazardReport />
+      <FloorPlanPanel />
     </div>
   )
 }
@@ -451,7 +498,7 @@ export default function UserApp() {
   return (
     <div className="usr-app">
       <header className="usr-topbar">
-        <div className="usr-brand"><span><Flame size={20} /></span><div><strong>热感哨兵</strong><small>AI 热感火警 · 用户端</small></div></div>
+        <div className="usr-brand"><span><Flame size={20} /></span><div><strong>热感哨兵 <em className="usr-ver">升级版</em></strong><small>AI 热感火警 · 用户端</small></div></div>
         <button type="button" className={`usr-alarm ${siren.on ? 'on' : ''}`} onClick={siren.toggle}>{siren.on ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
       </header>
 

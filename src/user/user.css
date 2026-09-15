@@ -237,3 +237,22 @@ button { border: none; background: transparent; color: inherit; }
 .usr-trapped-advice p { margin: 0; font-size: 10px; line-height: 1.6; }
 .usr-trapped-advice small { color: #a9c2da; font-size: 8px; }
 .usr-trapped-reset { width: 100%; min-height: 38px; margin-top: 9px; color: #dcecff; border: 1px solid rgba(96,165,250,.16); border-radius: 10px; background: rgba(59,130,246,.08); font-size: 9px; }
+
+/* 升级亮点清单 */
+.usr-highlights { border-color: rgba(124,58,237,.3); background: linear-gradient(150deg, rgba(76,29,149,.35), rgba(7,16,31,.9)); }
+.usr-highlights .usr-card-head svg { color: #c084fc; }
+.usr-highlight-list { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
+.usr-highlight-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid rgba(148,163,184,.14); border-radius: 10px; background: rgba(4,13,27,.5); }
+.usr-highlight-row > span { width: 26px; height: 26px; display: grid; place-items: center; color: #c084fc; border-radius: 8px; background: rgba(124,58,237,.16); font-size: 9px; font-weight: 700; }
+.usr-highlight-row > div { display: flex; flex-direction: column; gap: 2px; }
+.usr-highlight-row strong { color: #e6dcff; font-size: 11px; }
+.usr-highlight-row small { color: #9db2c7; font-size: 8px; }
+
+/* 楼层平面图 */
+.usr-plan-img { width: 100%; max-height: 260px; object-fit: contain; border: 1px solid rgba(96,165,250,.2); border-radius: 11px; background: #020617; }
+.usr-plan-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 8px; }
+.usr-plan-actions button { min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 5px; color: #dcecff; border: 1px solid rgba(96,165,250,.18); border-radius: 9px; background: rgba(59,130,246,.08); font-size: 9px; }
+.usr-plan-actions button:last-child { color: #ffc9c9; border-color: rgba(239,68,68,.3); }
+.usr-plan-add { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 46px; color: #fff; border: 1px dashed rgba(96,165,250,.4); border-radius: 12px; background: rgba(59,130,246,.08); font-size: 11px; font-weight: 700; }
+
+.usr-ver { margin-left: 5px; padding: 2px 6px; color: #e9d5ff; border: 1px solid rgba(192,132,252,.45); border-radius: 999px; background: rgba(124,58,237,.22); font-size: 8px; font-style: normal; font-weight: 700; vertical-align: middle; }
