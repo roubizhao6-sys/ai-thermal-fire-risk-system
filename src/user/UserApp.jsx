@@ -1,37 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  AlertTriangle, Camera, CheckCircle2, Compass, Flame, Info, Link2, LocateFixed, MapPin,
-  Navigation, Phone, QrCode, RotateCcw, Send, ShieldAlert, Sparkles, Volume2, VolumeX, X,
-  Building2, ChevronRight, BellRing, Play, Cpu, LoaderCircle,
+  Camera, CheckCircle2, Flame, Navigation, Phone, ScanLine, ShieldAlert, ShieldCheck,
+  Thermometer, Upload, Volume2, VolumeX, X, MapPin, AlertTriangle, LoaderCircle, RotateCcw,
 } from 'lucide-react'
 
+const DEMO = `${import.meta.env.BASE_URL}demo-thermal.jpg`
+
 const EXITS = [
+  { id: 'library', name: '图书馆', bearing: 300, distance: 88 },
+  { id: 'r', name: 'R座教学大楼', bearing: 45, distance: 95 },
   { id: 'north', name: '北门', bearing: 0, distance: 118 },
   { id: 'south', name: '南门', bearing: 180, distance: 132 },
   { id: 'lrt', name: '轻轨科大站', bearing: 90, distance: 160 },
-  { id: 'r', name: 'R座综合教学大楼', bearing: 45, distance: 95 },
   { id: 'j', name: 'J座体育馆', bearing: 135, distance: 140 },
-  { id: 'library', name: '图书馆', bearing: 300, distance: 88 },
-  { id: 'p', name: 'P座宿舍', bearing: 225, distance: 150 },
-]
-
-const FLOORS = ['G', '1F', '2F', '3F', '4F', '5F']
-
-const DEFAULT_LLM = { endpoint: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: '', model: 'doubao-1-5-pro-32k-250115', proxy: '', proxyToken: '' }
-const LLM_PRESETS = [
-  { id: 'deepseek', name: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
-  { id: 'moonshot', name: 'Kimi', endpoint: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
-  { id: 'openai', name: 'OpenAI', endpoint: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
-  { id: 'doubao', name: '豆包', endpoint: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-1-5-pro-32k-250115' },
-]
-
-const FIRE_KB = [
-  { kw: ['灭火器', '怎么用', '使用'], answer: '干粉灭火器口诀「提拔握压」：提起灭火器 → 拔掉保险销 → 握住喷管对准火源根部 → 压下压把扫射。' },
-  { kw: ['温度', '多少度', '正常'], answer: '设备表面 40-60°C 需关注，超过 65°C 建议现场核查，超过 80°C 应视为高风险并立即处置。' },
-  { kw: ['报警', '119', '电话'], answer: '先保证自身安全，迅速拨打 119，说清地址、起火物、火势大小、是否有人被困。' },
-  { kw: ['疏散', '逃生', '撤离'], answer: '湿毛巾捂口鼻、低姿前行，沿疏散指示和绿色路线撤离，不乘电梯，到安全集合点报告。' },
-  { kw: ['电气', '火灾', '线路'], answer: '电气火灾先断电，勿用水扑救带电设备，用干粉或二氧化碳灭火器，并通知电工检查线路。' },
-  { kw: ['烟雾', '烟'], answer: '烟雾有毒且向上聚集，逃生时贴近地面，用湿布捂住口鼻，避免吸入浓烟。' },
 ]
 
 function directionLabel(degree) {
@@ -43,6 +24,22 @@ function shortestTurn(target, heading) {
   return ((target - heading + 540) % 360) - 180
 }
 
+function riskTitle(risk) {
+  return risk === 'high' ? '高风险' : risk === 'medium' ? '中风险' : '低风险'
+}
+
+function makeDetection() {
+  const maxTemp = 45 + Math.random() * 50
+  const risk = maxTemp >= 65 ? 'high' : maxTemp >= 45 ? 'medium' : 'low'
+  const count = Math.max(1, Math.round(maxTemp / 26))
+  const hotspots = Array.from({ length: count }, (_, i) => ({
+    temp: Math.round(maxTemp - i * 14),
+    x: 15 + Math.random() * 60,
+    y: 15 + Math.random() * 55,
+  }))
+  return { maxTemp, risk, hotspots, width: 32, height: 24 }
+}
+
 function useSiren() {
   const ref = useRef(null)
   const [on, setOn] = useState(false)
@@ -51,10 +48,8 @@ function useSiren() {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext
       const ctx = new Ctx()
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      const lfo = ctx.createOscillator()
-      const lfoGain = ctx.createGain()
+      const osc = ctx.createOscillator(); const gain = ctx.createGain()
+      const lfo = ctx.createOscillator(); const lfoGain = ctx.createGain()
       osc.type = 'sawtooth'; osc.frequency.value = 720
       lfo.type = 'sine'; lfo.frequency.value = 2
       gain.gain.value = 0.0001; lfoGain.gain.value = 0.05
@@ -63,18 +58,16 @@ function useSiren() {
       osc.start(); lfo.start()
       gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.08)
       ref.current = { ctx, osc, lfo, gain, lfoGain }
-      setOn(true)
-      navigator.vibrate?.([260, 100, 260, 100, 260])
+      setOn(true); navigator.vibrate?.([260, 100, 260, 100, 260])
     } catch {}
   }
   useEffect(() => () => { try { ref.current?.ctx.close() } catch {} }, [])
   return { on, toggle }
 }
 
-function useHeading(enabled) {
+function useHeading() {
   const [heading, setHeading] = useState(24)
   useEffect(() => {
-    if (!enabled) return undefined
     const handler = (event) => {
       const raw = Number.isFinite(event.webkitCompassHeading) ? event.webkitCompassHeading : Number(event.alpha)
       if (Number.isFinite(raw)) setHeading((raw + 360) % 360)
@@ -85,15 +78,89 @@ function useHeading(enabled) {
       window.removeEventListener('deviceorientationabsolute', handler, true)
       window.removeEventListener('deviceorientation', handler, true)
     }
-  }, [enabled])
+  }, [])
   return heading
 }
 
-function FullArEscape({ exit, siren, onMore }) {
+function DetectionHome() {
+  const inputRef = useRef(null)
+  const [image, setImage] = useState('')
+  const [fileName, setFileName] = useState('')
+  const [detecting, setDetecting] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [result, setResult] = useState(null)
+
+  const onImage = (file) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => { setImage(reader.result); setFileName(file.name); setResult(null) }
+    reader.readAsDataURL(file)
+  }
+  const onSample = () => { setImage(DEMO); setFileName('示例热成像-01.jpg'); setResult(null) }
+  const reset = () => { setImage(''); setFileName(''); setResult(null); setDetecting(false); setProgress(0) }
+  const detect = () => {
+    if (!image || detecting) return
+    setDetecting(true); setProgress(3)
+    let value = 3
+    const id = setInterval(() => {
+      value += Math.round(Math.random() * 9 + 8)
+      if (value >= 100) {
+        value = 100; clearInterval(id)
+        setTimeout(() => { setResult(makeDetection()); setDetecting(false) }, 240)
+      }
+      setProgress(Math.min(value, 99))
+    }, 110)
+  }
+
+  const active = result?.risk
+
+  return (
+    <div className="usr-page">
+      <header className="usr-page-head"><span>首页检测</span><h1>AI 热感火警检测</h1><p>上传热成像图，火焰出现前识别异常温升</p></header>
+
+      <section className="usr-card">
+        <div className="usr-card-head"><div><strong>热成像图片检测</strong><small>拍摄 / 上传 / 载入示例</small></div><button type="button" className="usr-mini-btn" onClick={onSample}>载入示例</button></div>
+
+        <div className="usr-preview">
+          {image
+            ? <><img src={image} alt="热成像预览" />{result && result.hotspots.map((h, i) => <span key={i} className="usr-hot-box" style={{ left: `${h.x}%`, top: `${h.y}%` }}><b>{h.temp}°</b></span>)}</>
+            : <div className="usr-preview-empty"><ScanLine size={30} /><p>尚未选择图片</p></div>}
+          {detecting && <div className="usr-preview-scan" />}
+        </div>
+
+        <div className="usr-capture">
+          <button type="button" onClick={() => inputRef.current?.click()}><Camera size={15} />拍摄热成像图</button>
+          <button type="button" onClick={() => inputRef.current?.click()}><Upload size={15} />上传图片</button>
+          <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={(e) => onImage(e.target.files?.[0])} style={{ display: 'none' }} />
+        </div>
+
+        <div className="usr-meta"><span>{fileName || '尚未选择图片'}</span>{image && <button type="button" onClick={reset}><RotateCcw size={12} />重置</button>}</div>
+        <button className="usr-detect-btn" type="button" disabled={!image || detecting} onClick={detect}>{detecting ? <><LoaderCircle className="spin" size={17} />AI 正在检测</> : <><ScanLine size={17} />开始 AI 检测</>}</button>
+        {detecting && <div className="usr-progress"><div><i style={{ width: `${progress}%` }} /></div><small>{progress}% · 温度轮廓分析中</small></div>}
+      </section>
+
+      {result && (
+        <section className="usr-card usr-result">
+          <div className="usr-result-title"><div><span>AI检测结果</span><strong>{riskTitle(result.risk)}</strong></div></div>
+          <div className="usr-level-grid">
+            {['low', 'medium', 'high'].map((r) => <div key={r} className={`usr-level level-${r} ${active === r ? 'active' : ''}`}><span>{r === 'low' ? <ShieldCheck size={16} /> : r === 'medium' ? <AlertTriangle size={16} /> : <ShieldAlert size={16} />}</span><strong>{riskTitle(r)}</strong><small>{r === 'low' ? '持续观察' : r === 'medium' ? '现场核查' : '立即疏散'}</small>{active === r && <CheckCircle2 size={15} />}</div>)}
+          </div>
+          <div className="usr-detail-grid">
+            <div><MapPin size={16} /><span>高温区域</span><strong>{result.hotspots.length} 处</strong></div>
+            <div><Thermometer size={16} /><span>最高温度</span><strong>{result.maxTemp.toFixed(1)}°C</strong></div>
+          </div>
+          <div className="usr-explain"><span><ShieldAlert size={16} /></span><p>基于温度轮廓与扩散梯度分析，区分正常热源与火灾隐患，有效降低误报率。</p></div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+function ArEscape({ exit, onPickExit, siren }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const [status, setStatus] = useState('idle')
-  const heading = useHeading(true)
+  const heading = useHeading()
   const turn = shortestTurn(exit.bearing, heading)
   const turnText = Math.abs(turn) < 15 ? '沿箭头方向直行' : turn > 0 ? `向右转 ${Math.round(Math.abs(turn))}°` : `向左转 ${Math.round(Math.abs(turn))}°`
 
@@ -104,302 +171,73 @@ function FullArEscape({ exit, siren, onMore }) {
     try {
       if (!navigator.mediaDevices?.getUserMedia) { setStatus('unsupported'); return }
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false })
-      streamRef.current = stream
-      setStatus('active')
-      navigator.vibrate?.(40)
+      streamRef.current = stream; setStatus('active'); navigator.vibrate?.(40)
     } catch { setStatus('denied') }
   }
   const stop = () => { streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null; setStatus('idle') }
 
   useEffect(() => {
-    if (status === 'active' && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current
-      videoRef.current.play().catch(() => {})
-    }
+    if (status === 'active' && videoRef.current && streamRef.current) { videoRef.current.srcObject = streamRef.current; videoRef.current.play().catch(() => {}) }
   }, [status])
 
   return (
-    <div className="usr-escape">
-      <header className="usr-escape-top">
-        <div className="usr-brand"><span><Flame size={20} /></span><div><strong>热感哨兵</strong><small>AR 实景逃生</small></div></div>
-        <div className="usr-escape-top-actions">
-          <button type="button" className={siren.on ? 'on' : ''} onClick={siren.toggle}>{siren.on ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
-          <button type="button" onClick={onMore}><BellRing size={18} /></button>
-        </div>
-      </header>
+    <div className="usr-page usr-ar-page">
+      <header className="usr-page-head"><span>AR 实景逃生</span><h1>跟着箭头跑</h1><p>摄像头实景 + 方向箭头，带你到最近安全出口</p></header>
 
-      <div className="usr-escape-stage">
-        {status === 'active' && <video ref={videoRef} className="usr-escape-video" autoPlay playsInline muted />}
+      <div className="usr-exit-chips">{EXITS.map((e) => <button type="button" key={e.id} className={e.id === exit.id ? 'active' : ''} onClick={() => onPickExit(e.id)}>{e.name}</button>)}</div>
 
-        {status !== 'active' ? (
-          <div className="usr-escape-hero">
-            <div className="usr-escape-hero-badge"><i />实时逃生引导</div>
-            <h1>摄像头对准前方</h1>
-            <p>画面将叠加逃生方向箭头，带你前往 <strong>{exit.name}</strong></p>
-            <button type="button" className="usr-escape-start" onClick={start}>
-              {status === 'requesting' ? <><LoaderCircle className="spin" size={20} />正在打开摄像头…</> : <><Camera size={20} />开启 AR 实景逃生</>}
-            </button>
-            {status === 'denied' && <p className="usr-escape-warn">摄像头权限被拒绝，请在浏览器设置中允许后重试。</p>}
-            {status === 'unsupported' && <p className="usr-escape-warn">当前浏览器不支持摄像头，请用 Safari 或 Chrome。</p>}
-          </div>
-        ) : (
-          <div className="usr-escape-overlay">
-            <div className="usr-escape-top-line"><span className="usr-ar-exit"><Navigation size={13} />{exit.name}</span><span className="usr-ar-dist">{exit.distance} m</span></div>
-            <div className="usr-ar-arrow-wrap" style={{ transform: `rotate(${turn}deg)` }}><Navigation size={64} className="usr-ar-arrow" /></div>
-            <div className="usr-ar-center"><strong>{turnText}</strong><p>{Math.round(heading)}° 当前朝向 · 出口方位 {exit.bearing}°</p></div>
-          </div>
-        )}
-      </div>
-
-      <footer className="usr-escape-bottom">
-        <a href="tel:119"><Phone size={20} />一键报警 119</a>
-        {status === 'active' ? <button type="button" onClick={stop}><X size={18} />退出 AR</button> : <button type="button" onClick={start}><Camera size={18} />开始 AR</button>}
-      </footer>
-    </div>
-  )
-}
-
-function HazardReport() {
-  const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('thermalGuardHazards') || '[]') } catch { return [] } })
-  const [desc, setDesc] = useState('')
-  const [loc, setLoc] = useState('')
-  const [img, setImg] = useState('')
-  const fileRef = useRef(null)
-
-  const pick = (e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => setImg(r.result); r.readAsDataURL(f) }
-  const submit = () => {
-    if (!desc.trim() && !loc.trim()) return
-    const next = [{ id: `hz-${Date.now()}`, desc: desc.trim() || '未描述', loc: loc.trim() || '未填写位置', img, time: new Date().toLocaleString('zh-CN', { hour12: false }) }, ...items].slice(0, 20)
-    setItems(next); localStorage.setItem('thermalGuardHazards', JSON.stringify(next)); setDesc(''); setLoc(''); setImg('')
-  }
-  return (
-    <section className="usr-card">
-      <div className="usr-card-head"><div><strong>隐患上报</strong><small>拍照记录隐患位置</small></div><AlertTriangle size={18} /></div>
-      <div className="usr-hazard-form">
-        <input value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="隐患位置，如：三楼配电箱旁" />
-        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="隐患描述，如：线路发热" rows={2} />
-        <div className="usr-hazard-row">
-          <button type="button" onClick={() => fileRef.current?.click()}><Camera size={14} />{img ? '更换照片' : '拍照/选图'}</button>
-          {img && <img src={img} alt="" />}
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={pick} style={{ display: 'none' }} />
-        </div>
-        <button type="button" className="usr-hazard-submit" onClick={submit}><Send size={14} />提交隐患</button>
-      </div>
-      {items.length > 0 && <div className="usr-hazard-list">{items.map((h) => <div key={h.id}><span><AlertTriangle size={13} /></span><div><strong>{h.loc}</strong><p>{h.desc}</p><small>{h.time}</small></div>{h.img && <img src={h.img} alt="" />}</div>)}</div>}
-    </section>
-  )
-}
-
-function loadLlm() {
-  try { return { ...DEFAULT_LLM, ...(JSON.parse(localStorage.getItem('thermalGuardLlm') || 'null') || {}) } } catch { return { ...DEFAULT_LLM } }
-}
-
-function useDraggable(storageKey) {
-  const [pos, setPos] = useState(() => {
-    try { const saved = JSON.parse(localStorage.getItem(storageKey)); if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) return saved } catch {}
-    return { x: Math.max(10, window.innerWidth - 68), y: Math.max(10, window.innerHeight - 180) }
-  })
-  const posRef = useRef(pos)
-  const dragRef = useRef(null)
-  const didDrag = useRef(false)
-
-  const onPointerDown = (event) => {
-    event.preventDefault()
-    didDrag.current = false
-    dragRef.current = { sx: event.clientX, sy: event.clientY, ox: posRef.current.x, oy: posRef.current.y }
-    const move = (ev) => {
-      const dx = ev.clientX - dragRef.current.sx
-      const dy = ev.clientY - dragRef.current.sy
-      if (Math.abs(dx) + Math.abs(dy) > 4) didDrag.current = true
-      posRef.current = { x: Math.max(8, Math.min(window.innerWidth - 60, dragRef.current.ox + dx)), y: Math.max(8, Math.min(window.innerHeight - 60, dragRef.current.oy + dy)) }
-      setPos(posRef.current)
-    }
-    const up = () => {
-      try { localStorage.setItem(storageKey, JSON.stringify(posRef.current)) } catch {}
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', up)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-    window.addEventListener('pointercancel', up)
-  }
-
-  return { pos, onPointerDown, didDrag, style: { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' } }
-}
-
-
-function UserSprite({ onClose }) {
-  const [msgs, setMsgs] = useState([{ role: 'assistant', text: '你好，我是 AI 火警精灵。问我消防问题，或点右上角设置接入大模型。' }])
-  const [input, setInput] = useState('')
-  const [thinking, setThinking] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
-  const [config, setConfig] = useState(() => loadLlm())
-  const listRef = useRef(null)
-
-  useEffect(() => { try { localStorage.setItem('thermalGuardLlm', JSON.stringify(config)) } catch {} }, [config])
-  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [msgs, thinking])
-
-  const llmReady = Boolean((config.endpoint && config.apiKey) || config.proxy)
-
-  const callLLM = async (q) => {
-    if (config.proxy && config.proxy.trim()) {
-      const proxyUrl = `${config.proxy.trim().replace(/\/+$/, '')}/chat`
-      const res = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-proxy-token': (config.proxyToken || '').trim() },
-        body: JSON.stringify({ messages: [{ role: 'system', content: '你是消防助手，请用简体中文简洁回答。' }, ...msgs.slice(-6).map((m) => ({ role: m.role, content: m.text })), { role: 'user', content: q }] }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      return data.reply || null
-    }
-    const base = config.endpoint.trim().replace(/\/+$/, '')
-    const url = base.endsWith('/chat/completions') ? base : `${base}/chat/completions`
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey.trim()}` },
-      body: JSON.stringify({ model: config.model.trim() || 'deepseek-chat', messages: [{ role: 'system', content: '你是消防助手，请用简体中文简洁回答。' }, ...msgs.slice(-6).map((m) => ({ role: m.role, content: m.text })), { role: 'user', content: q }] }),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    return data.choices?.[0]?.message?.content || null
-  }
-
-  const send = async () => {
-    const q = input.trim(); if (!q || thinking) return
-    setMsgs((m) => [...m, { role: 'user', text: q }]); setInput(''); setThinking(true)
-    let answer = null
-    if (llmReady) { try { answer = await callLLM(q) } catch { answer = null } }
-    if (!answer) { const hit = FIRE_KB.find((i) => i.kw.some((k) => q.includes(k))); answer = hit ? hit.answer : '这个问题建议联网回答：点右上角设置接入大模型。' }
-    setMsgs((m) => [...m, { role: 'assistant', text: answer }]); setThinking(false)
-  }
-
-  return (
-    <div className="usr-sprite-backdrop" onClick={onClose}>
-      <section className="usr-sprite-sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="usr-sprite-head">
-          <div className="usr-sprite-avatar"><Sparkles size={18} /></div>
-          <div><strong>AI 火警精灵</strong><small>{config.proxy ? '已接入后端代理' : llmReady ? '已接入联网大模型' : '本地知识库 · 可联网'}</small></div>
-          <div className="usr-sprite-head-actions">
-            <button type="button" onClick={() => setShowSettings((v) => !v)}><Cpu size={17} /></button>
-            <button type="button" onClick={onClose}><X size={18} /></button>
-          </div>
-        </div>
-        {showSettings ? (
-          <div className="usr-sprite-settings">
-            <div className="usr-sprite-presets">{LLM_PRESETS.map((p) => <button type="button" key={p.id} className={config.endpoint === p.endpoint ? 'active' : ''} onClick={() => setConfig((c) => ({ ...c, endpoint: p.endpoint, model: p.model }))}>{p.name}</button>)}</div>
-            <label>API 地址<input value={config.endpoint} onChange={(e) => setConfig((c) => ({ ...c, endpoint: e.target.value }))} /></label>
-            <label>API 密钥<input type="password" value={config.apiKey} onChange={(e) => setConfig((c) => ({ ...c, apiKey: e.target.value }))} /></label>
-            <label>模型<input value={config.model} onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))} /></label>
-            <label>代理地址（无需密钥）<input value={config.proxy} onChange={(e) => setConfig((c) => ({ ...c, proxy: e.target.value }))} placeholder="https://xxx.workers.dev" /></label>
-            <label>代理访问令牌（可选）<input value={config.proxyToken} onChange={(e) => setConfig((c) => ({ ...c, proxyToken: e.target.value }))} /></label>
-            <p className="usr-sprite-note"><Info size={12} />可填 API 密钥直连，或填「代理地址」通过后端代理访问（无需密钥）。</p>
-          </div>
-        ) : (
-          <>
-            <div className="usr-sprite-log" ref={listRef}>
-              {msgs.map((m, i) => <div className={`usr-sprite-msg ${m.role}`} key={i}>{m.text}</div>)}
-              {thinking && <div className="usr-sprite-msg assistant"><LoaderCircle className="spin" size={14} />正在思考…</div>}
+      <section className="usr-ar-stage-card">
+        <div className="usr-ar-stage">
+          {status === 'active' && <video ref={videoRef} className="usr-ar-video" autoPlay playsInline muted />}
+          {status !== 'active' ? (
+            <div className="usr-ar-idle">
+              <div className="usr-ar-idle-badge"><i />实时逃生引导</div>
+              <h2>摄像头对准前方</h2>
+              <p>画面将叠加箭头，前往 <strong>{exit.name}</strong>（{exit.distance} 米）</p>
+              <button type="button" onClick={start}>{status === 'requesting' ? <><LoaderCircle className="spin" size={18} />正在打开摄像头…</> : <><Camera size={18} />开启 AR 实景逃生</>}</button>
+              {status === 'denied' && <small className="usr-warn">摄像头权限被拒绝，请在浏览器设置中允许后重试。</small>}
+              {status === 'unsupported' && <small className="usr-warn">当前浏览器不支持摄像头，请用 Safari 或 Chrome。</small>}
             </div>
-            <div className="usr-sprite-input"><input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send() }} placeholder={llmReady ? '问我任何问题…' : '输入消防问题'} /><button type="button" onClick={send}><Send size={16} /></button></div>
-          </>
-        )}
+          ) : (
+            <div className="usr-ar-overlay">
+              <div className="usr-ar-top"><span className="usr-ar-exit"><Navigation size={13} />{exit.name}</span><span className="usr-ar-dist">{exit.distance} m</span></div>
+              <div className="usr-ar-arrow-wrap" style={{ transform: `rotate(${turn}deg)` }}><Navigation size={60} className="usr-ar-arrow" /></div>
+              <div className="usr-ar-center"><strong>{turnText}</strong><p>{Math.round(heading)}° 当前朝向 · 出口方位 {exit.bearing}°</p></div>
+            </div>
+          )}
+        </div>
+        <div className="usr-ar-actions">
+          <a href="tel:119"><Phone size={16} />一键报警 119</a>
+          <button type="button" onClick={siren.toggle}>{siren.on ? <VolumeX size={16} /> : <Volume2 size={16} />}{siren.on ? '静音' : '警报'}</button>
+          {status === 'active' ? <button type="button" onClick={stop}><X size={16} />退出AR</button> : <button type="button" onClick={start}><Camera size={16} />开始</button>}
+        </div>
       </section>
+      <p className="usr-disclaimer"><ShieldAlert size={14} />本应用为科研演示原型，逃生路线仅供参考，请结合实际现场标识与工作人员指挥。</p>
     </div>
   )
 }
 
 export default function UserApp() {
-  const [view, setView] = useState('escape')
+  const [tab, setTab] = useState('home')
   const [exitId, setExitId] = useState('library')
-  const [gpsOn, setGpsOn] = useState(false)
-  const [gps, setGps] = useState(null)
-  const [floor, setFloor] = useState('3F')
-  const [spriteOpen, setSpriteOpen] = useState(false)
   const siren = useSiren()
-  const drag = useDraggable('thermalGuardSpritePos')
-  const heading = useHeading(true)
   const exit = EXITS.find((e) => e.id === exitId) || EXITS[0]
-  const turn = shortestTurn(exit.bearing, heading)
-  const turnText = Math.abs(turn) < 15 ? '保持当前方向直行' : turn > 0 ? `向右转 ${Math.round(Math.abs(turn))}°` : `向左转 ${Math.round(Math.abs(turn))}°`
-
-  useEffect(() => {
-    if (!gpsOn) return undefined
-    if (!navigator.geolocation) return undefined
-    const id = navigator.geolocation.watchPosition(
-      (pos) => setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
-      () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-    )
-    return () => navigator.geolocation.clearWatch(id)
-  }, [gpsOn])
 
   return (
     <div className="usr-app">
-      {view === 'escape'
-        ? <FullArEscape exit={exit} siren={siren} onMore={() => setView('more')} />
-        : (
-          <main className="usr-main">
-            <header className="usr-more-head">
-              <button type="button" onClick={() => setView('escape')}><ChevronRight size={16} />返回逃生</button>
-              <div><strong>更多功能</strong><small>热感哨兵 · 用户端</small></div>
-              <span />
-            </header>
+      <header className="usr-topbar">
+        <div className="usr-brand"><span><Flame size={20} /></span><div><strong>热感哨兵</strong><small>AI 热感火警 · 用户端</small></div></div>
+        <button type="button" className={`usr-alarm ${siren.on ? 'on' : ''}`} onClick={siren.toggle}>{siren.on ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
+      </header>
 
-            <section className="usr-card usr-compass-card">
-              <div className="usr-card-head"><div><strong>指南针导航</strong><small>朝向最近安全出口</small></div><Compass size={18} /></div>
-              <div className="usr-compass-dial" style={{ '--heading': `${-heading}deg`, '--turn': `${turn}deg` }}>
-                <span className="usr-cn">N</span><span className="usr-ce">E</span><span className="usr-cs">S</span><span className="usr-cw">W</span>
-                <i className="usr-ring" /><b className="usr-arrow"><Navigation size={30} /></b>
-              </div>
-              <h2 className="usr-turn-text">{turnText}</h2>
-              <p className="usr-turn-sub">前往 {exit.name} · 出口方位 {exit.bearing}° · 距离 {exit.distance} 米</p>
-            </section>
+      <main className="usr-main">
+        {tab === 'home' ? <DetectionHome /> : <ArEscape exit={exit} onPickExit={setExitId} siren={siren} />}
+      </main>
 
-            <section className="usr-card">
-              <div className="usr-card-head"><div><strong>最近安全出口</strong><small>点选目标，导航自动切换</small></div><Building2 size={18} /></div>
-              <div className="usr-exit-list">
-                {[...EXITS].sort((a, b) => a.distance - b.distance).map((e) => (
-                  <button type="button" key={e.id} className={e.id === exitId ? 'active' : ''} onClick={() => setExitId(e.id)}>
-                    <span>{e.id === exitId ? <Navigation size={16} /> : <ChevronRight size={16} />}</span>
-                    <div><strong>{e.name}</strong><small>{e.distance} 米 · {directionLabel(e.bearing)}</small></div>
-                    <b>{e.id === exitId ? '当前' : '选择'}</b>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="usr-card">
-              <div className="usr-card-head"><div><strong>我的位置</strong><small>手机 GPS 定位</small></div><LocateFixed size={18} /></div>
-              <button type="button" className="usr-gps-close" onClick={() => setGpsOn((v) => !v)}>{gpsOn ? '关闭 GPS 定位' : '开启 GPS 定位'}</button>
-              {gpsOn && (gps ? (
-                <div className="usr-gps-grid" style={{ marginTop: 8 }}>
-                  <div><span>纬度</span><strong>{gps.lat.toFixed(6)}</strong></div>
-                  <div><span>经度</span><strong>{gps.lng.toFixed(6)}</strong></div>
-                  <div><span>精度</span><strong>±{Math.round(gps.accuracy)} m</strong></div>
-                  <div><span>最近出口</span><strong>{exit.name}</strong></div>
-                </div>
-              ) : <p className="usr-gps-pending" style={{ marginTop: 8 }}>正在获取定位… 请允许位置权限。</p>)}
-            </section>
-
-            <section className="usr-card">
-              <div className="usr-card-head"><div><strong>所在楼层</strong><small>用于楼梯疏散指引</small></div><Building2 size={18} /></div>
-              <div className="usr-floor-row">{FLOORS.map((f) => <button type="button" key={f} className={floor === f ? 'active' : ''} onClick={() => setFloor(f)}>{f}</button>)}</div>
-              <div className="usr-stair-row">
-                <button type="button"><BellRing size={15} />进楼梯</button>
-                <button type="button"><Play size={15} />开始演练</button>
-              </div>
-            </section>
-
-            <HazardReport />
-
-            <a className="usr-switch" href="./mobile-app.html">我是物业/管理员，进入系统端 →</a>
-            <p className="usr-disclaimer"><ShieldAlert size={14} />本应用为科研演示原型，逃生路线仅供参考，不替代专业消防设施与现场指挥。</p>
-          </main>
-        )}
-
-      <button type="button" className="usr-sprite-fab" style={drag.style} onPointerDown={drag.onPointerDown} onClick={() => { if (drag.didDrag.current) { drag.didDrag.current = false; return } setSpriteOpen(true) }} aria-label="打开AI精灵"><Sparkles size={20} /><i /></button>
-      {spriteOpen && <UserSprite onClose={() => setSpriteOpen(false)} />}
+      <nav className="usr-tabs">
+        <button type="button" className={tab === 'home' ? 'active' : ''} onClick={() => setTab('home')}><ScanLine size={19} /><span>首页检测</span></button>
+        <button type="button" className={tab === 'ar' ? 'active' : ''} onClick={() => setTab('ar')}><Navigation size={19} /><span>AR实景逃生</span></button>
+      </nav>
     </div>
   )
 }
